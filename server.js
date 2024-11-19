@@ -37,3 +37,47 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+
+const bcrypt = require('bcrypt');
+
+// Ruta para registrar un nuevo usuario
+app.post('/register', (req, res) => {
+  const { username, email, password } = req.body;
+
+  // Validación básica
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: 'Todos los campos son obligatorios' });
+  }
+
+  // Verificar si el usuario ya existe
+  const checkUserQuery = 'SELECT * FROM users WHERE email = ? OR username = ?';
+  db.query(checkUserQuery, [email, username], (err, results) => {
+    if (err) {
+      console.error('Error al verificar usuario:', err);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
+
+    if (results.length > 0) {
+      return res.status(409).json({ message: 'El usuario o correo ya existe' });
+    }
+
+    // Cifrar la contraseña
+    bcrypt.hash(password, 10, (err, hashedPassword) => {
+      if (err) {
+        console.error('Error al cifrar la contraseña:', err);
+        return res.status(500).json({ message: 'Error del servidor' });
+      }
+
+      // Insertar el nuevo usuario en la base de datos
+      const insertUserQuery = 'INSERT INTO users (username, email, password) VALUES (?, ?, ?)';
+      db.query(insertUserQuery, [username, email, hashedPassword], (err, result) => {
+        if (err) {
+          console.error('Error al registrar usuario:', err);
+          return res.status(500).json({ message: 'Error del servidor' });
+        }
+
+        res.status(201).json({ message: 'Usuario registrado con éxito' });
+      });
+    });
+  });
+});
