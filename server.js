@@ -16,7 +16,7 @@ const db = mysql.createConnection({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT,  // El puerto de la base de datos (3306 por defecto)
+  port: process.env.DB_PORT,  
 });
 
 // Conectar a la base de datos
@@ -122,8 +122,6 @@ app.post('/login', (req, res) => {
 });
 
 // Rutas para la gestión de clientes
-
-// Ruta para obtener todos los clientes
 app.get('/clients', authenticateToken, (req, res) => {
   const query = 'SELECT * FROM clientes'; // Ajusta el nombre de la tabla si es necesario
   db.query(query, (err, results) => {
@@ -188,9 +186,6 @@ app.delete('/clients/:id', authenticateToken, (req, res) => {
     res.status(200).json({ message: 'Cliente eliminado con éxito' });
   });
 });
-
-
-
 
 
 // Middleware para verificar JWT

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // Asegúrate de que esta conexión funcione correctamente
+const db = require('../db'); 
 
 // Obtener todos los clientes
 router.get('/', async (req, res) => {
