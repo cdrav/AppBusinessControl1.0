@@ -89,14 +89,14 @@ app.post('/login', (req, res) => {
   }
 
   const query = 'SELECT * FROM users WHERE email = ?';
-  db.query(query, [email], (err, results) => {
+  db.query(query, [email.toLowerCase()], (err, results) => {
     if (err) {
       console.error('Error al verificar usuario:', err);
       return res.status(500).json({ message: 'Error del servidor' });
     }
 
     if (results.length === 0) {
-      return res.status(401).json({ message: 'Credenciales incorrectas' });
+      return res.status(401).json({ message: 'Correo electrónico o contraseña incorrectos' });
     }
 
     const user = results[0];
@@ -107,7 +107,7 @@ app.post('/login', (req, res) => {
       }
 
       if (!isMatch) {
-        return res.status(401).json({ message: 'Credenciales incorrectas' });
+        return res.status(401).json({ message: 'Correo electrónico o contraseña incorrectos' });
       }
 
       const token = jwt.sign(
@@ -120,6 +120,78 @@ app.post('/login', (req, res) => {
     });
   });
 });
+
+// Rutas para la gestión de clientes
+
+// Ruta para obtener todos los clientes
+app.get('/clients', authenticateToken, (req, res) => {
+  const query = 'SELECT * FROM clientes'; // Ajusta el nombre de la tabla si es necesario
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error al obtener los clientes:', err);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
+    res.status(200).json(results);
+  });
+});
+
+// Ruta para agregar un nuevo cliente
+app.post('/clients', authenticateToken, (req, res) => {
+  const { nombre, email, telefono, direccion } = req.body;
+
+  // Validación básica
+  if (!nombre || !email || !telefono) {
+    return res.status(400).json({ message: 'Nombre, email y teléfono son obligatorios' });
+  }
+
+  const query = 'INSERT INTO clientes (nombre, email, telefono, direccion) VALUES (?, ?, ?, ?)';
+  db.query(query, [nombre, email, telefono, direccion], (err, result) => {
+    if (err) {
+      console.error('Error al agregar cliente:', err);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
+    res.status(201).json({ message: 'Cliente agregado con éxito', clienteId: result.insertId });
+  });
+});
+
+// Ruta para actualizar un cliente
+app.put('/clients/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const { nombre, email, telefono, direccion } = req.body;
+
+  const query = 'UPDATE clientes SET nombre = ?, email = ?, telefono = ?, direccion = ? WHERE id = ?';
+  db.query(query, [nombre, email, telefono, direccion, id], (err, result) => {
+    if (err) {
+      console.error('Error al actualizar cliente:', err);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Cliente no encontrado' });
+    }
+    res.status(200).json({ message: 'Cliente actualizado con éxito' });
+  });
+});
+
+// Ruta para eliminar un cliente
+app.delete('/clients/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+
+  const query = 'DELETE FROM clientes WHERE id = ?';
+  db.query(query, [id], (err, result) => {
+    if (err) {
+      console.error('Error al eliminar cliente:', err);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Cliente no encontrado' });
+    }
+    res.status(200).json({ message: 'Cliente eliminado con éxito' });
+  });
+});
+
+
+
+
 
 // Middleware para verificar JWT
 function authenticateToken(req, res, next) {
