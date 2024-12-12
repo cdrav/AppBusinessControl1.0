@@ -1,4 +1,4 @@
-require('dotenv').config();  // Asegúrate de que las variables de entorno se carguen correctamente
+require('dotenv').config();  
 const express = require('express');
 const mysql = require('mysql');
 const bcrypt = require('bcrypt');
@@ -9,7 +9,7 @@ const fs = require('fs');
 
 // Crear la aplicación Express
 const app = express();
-app.use(express.json()); // Usar express.json() en lugar de body-parser
+app.use(express.json()); 
 app.use(cors());
 
 // Configurar la conexión a MySQL
@@ -125,7 +125,7 @@ app.post('/login', (req, res) => {
 
 // Rutas para la gestión de clientes
 app.get('/clients', authenticateToken, (req, res) => {
-  const query = 'SELECT * FROM clients'; // Ajusta el nombre de la tabla si es necesario
+  const query = 'SELECT * FROM clients'; 
   db.query(query, (err, results) => {
     if (err) {
       console.error('Error al obtener los clientes:', err);
@@ -144,7 +144,6 @@ app.post('/clients', authenticateToken, (req, res) => {
     return res.status(400).json({ message: 'Nombre, email y teléfono son obligatorios' });
   }
 
-  // Asegúrate de que los nombres de las columnas coincidan con la base de datos
   const query = 'INSERT INTO clients (name, email, phone, address) VALUES (?, ?, ?, ?)';
   db.query(query, [name, email, phone, address], (err, result) => {
     if (err) {
@@ -160,7 +159,7 @@ app.post('/clients', authenticateToken, (req, res) => {
 // Middleware para verificar JWT
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // El token está en formato 'Bearer <token>'
+  const token = authHeader && authHeader.split(' ')[1]; 
 
   if (!token) {
     return res.status(401).json({ message: 'Acceso no autorizado' });
@@ -204,7 +203,7 @@ app.get('/inventory', authenticateToken, (req, res) => {
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
     }
   
-    // Cambiar 'name' por 'product_name' y 'quantity' por 'stock'
+    
     const query = 'INSERT INTO inventory (product_name, stock, price) VALUES (?, ?, ?)';
     db.query(query, [name, quantity, price], (err, result) => {
       if (err) {
@@ -224,7 +223,7 @@ app.get('/inventory', authenticateToken, (req, res) => {
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
     }
   
-    // Cambiar 'name' por 'product_name' y 'quantity' por 'stock'
+    
     const query = 'UPDATE inventory SET product_name = ?, stock = ?, price = ? WHERE id = ?';
     db.query(query, [name, quantity, price, id], (err) => {
       if (err) {
@@ -329,6 +328,86 @@ app.post('/sales', authenticateToken, (req, res) => {
         });
     });
 });
+
+// Ruta para obtener clientes
+app.get('/clients', async (req, res) => {
+  try {
+    const [clients] = await db.query('SELECT id, name FROM Clientes');
+    res.json(clients);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener clientes' });
+  }
+});
+
+// Ruta para obtener productos
+app.get('/products', async (req, res) => {
+  try {
+    const [products] = await db.query('SELECT id, name, price FROM Productos');
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener productos' });
+  }
+});
+// Ruta para registrar una venta
+app.post('/sales', authenticateToken, (req, res) => {
+  const { client_id, product_id, quantity } = req.body;
+
+  if (!client_id || !product_id || !quantity) {
+    return res.status(400).json({ message: 'Todos los campos son obligatorios' });
+  }
+
+  // Obtenemos el precio del producto
+  const query = 'SELECT price FROM products WHERE id = ?';
+  db.query(query, [product_id], (err, results) => {
+    if (err) {
+      console.error('Error al obtener el precio del producto:', err);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    const price = results[0].price;
+    const total = price * quantity;
+
+    // Insertar venta
+    const insertSaleQuery = 'INSERT INTO sales (client_id, product_id, quantity, total, sale_date) VALUES (?, ?, ?, ?, NOW())';
+    db.query(insertSaleQuery, [client_id, product_id, quantity, total], (err, result) => {
+      if (err) {
+        console.error('Error al registrar la venta:', err);
+        return res.status(500).json({ message: 'Error del servidor' });
+      }
+
+      res.status(201).json({ message: 'Venta registrada con éxito', saleId: result.insertId });
+    });
+  });
+});
+
+// Ruta para obtener todas las ventas
+app.get('/sales', authenticateToken, (req, res) => {
+  const query = `
+    SELECT s.id, c.name AS client_name, p.name AS product_name, s.quantity, s.total, s.sale_date
+    FROM sales s
+    JOIN clients c ON s.client_id = c.id
+    JOIN products p ON s.product_id = p.id
+    ORDER BY s.sale_date DESC
+  `;
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error al obtener las ventas:', err);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
+    res.status(200).json(results);
+  });
+});
+
+
+
+
+
+
+
 
 // Ruta para generar el reporte en PDF
 app.get('/report', authenticateToken, (req, res) => {
