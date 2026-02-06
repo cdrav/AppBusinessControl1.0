@@ -1,6 +1,8 @@
 // Función para cargar los clientes y mostrarlos en la tabla
+const API_URL = 'http://localhost:3000';
+
 function loadClients() {
-    fetch('http://localhost:3000/clients', {
+    fetch(`${API_URL}/clients`, {
       headers: {
         'Authorization': 'Bearer ' + localStorage.getItem('token'),
       },
@@ -10,11 +12,11 @@ function loadClients() {
         const tableBody = document.getElementById('clientsTableBody');
         tableBody.innerHTML = ''; // Limpiar la tabla
   
-        // Crear filas dinámicamente
-        data.forEach((client, index) => {
-          const row = `
+        // Optimización: Crear todas las filas en una sola operación para mejorar rendimiento
+        const rows = data.map((client, index) => `
             <tr>
               <td>${index + 1}</td>
+              <!-- Nota: Para evitar XSS, idealmente usar textContent en lugar de interpolación directa si los datos no son confiables -->
               <td>${client.name}</td>
               <td>${client.email}</td>
               <td>${client.phone}</td>
@@ -27,9 +29,9 @@ function loadClients() {
                 </button>
               </td>
             </tr>
-          `;
-          tableBody.innerHTML += row;
-        });
+          `).join('');
+        
+        tableBody.innerHTML = rows;
       })
       .catch(error => {
         console.error('Error al cargar los clientes:', error);
@@ -40,7 +42,7 @@ function loadClients() {
   // Función para eliminar un cliente
   function deleteClient(id) {
     if (confirm('¿Estás seguro de eliminar este cliente?')) {
-      fetch(`http://localhost:3000/clients/${id}`, {
+      fetch(`${API_URL}/clients/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': 'Bearer ' + localStorage.getItem('token'),

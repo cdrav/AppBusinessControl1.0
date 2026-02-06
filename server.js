@@ -1,6 +1,5 @@
 require('dotenv').config();  
 const express = require('express');
-const mysql = require('mysql');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -12,7 +11,10 @@ const app = express();
 app.use(express.json()); 
 app.use(cors());
 
-// Configurar la conexión a MySQL
+// Configurar la conexión a MySQL. Usaremos mysql2 para soporte de promesas y transacciones más limpias.
+// Por favor, ejecuta: npm install mysql2
+const mysql = require('mysql2/promise');
+
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -21,14 +23,10 @@ const db = mysql.createConnection({
   port: process.env.DB_PORT,  
 });
 
-// Conectar a la base de datos
-db.connect((err) => {
-  if (err) {
-    console.error('Error al conectar a la base de datos:', err.code, err.sqlMessage);
-    return;
-  }
-  console.log('Conexión exitosa a la base de datos');
-});
+// La conexión con mysql2/promise se maneja de forma diferente, no se llama a .connect() al inicio.
+// Las conexiones se gestionan por consulta. Para transacciones, crearemos una conexión específica.
+console.log('Pool de conexión a la base de datos configurado.');
+
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -154,6 +152,21 @@ app.post('/clients', authenticateToken, (req, res) => {
   });
 });
 
+// Ruta para obtener un cliente específico por ID
+app.get('/clients/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const query = 'SELECT id, name, email, phone, address FROM clients WHERE id = ?';
+  db.query(query, [id], (err, results) => {
+    if (err) {
+      console.error('Error al obtener el cliente:', err);
+      return res.status(500).json({ message: 'Error del servidor' });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Cliente no encontrado' });
+    }
+    res.status(200).json(results[0]);
+  });
+});
 
 
 // Middleware para verificar JWT
@@ -248,149 +261,99 @@ app.get('/inventory', authenticateToken, (req, res) => {
     });
   });
   
-// Ruta para agregar una venta
-app.post('/sales', authenticateToken, (req, res) => {
-    const { clientId, products, saleDate } = req.body;  // Cambié 'productId' y 'quantity' por un arreglo de productos
+// ==================================================================
+// RUTA DE VENTAS REFACTORIZADA CON TRANSACCIONES
+// ==================================================================
+app.post('/sales', authenticateToken, async (req, res) => {
+  const { clientId, products, saleDate } = req.body;
 
-    // Validación básica
-    if (!clientId || !products || products.length === 0 || !saleDate) {
-        return res.status(400).json({ message: 'Todos los campos son obligatorios' });
-    }
+  if (!clientId || !products || !Array.isArray(products) || products.length === 0 || !saleDate) {
+    return res.status(400).json({ message: 'Datos de venta inválidos. Se requiere cliente, fecha y un arreglo de productos.' });
+  }
 
-    // Verificar si los productos tienen suficiente stock
-    let totalSalePrice = 0; // Para calcular el total de la venta
-    let saleDetails = []; // Para almacenar los detalles de la venta
-
-    // Verificar el stock y calcular el subtotal
-    products.forEach(product => {
-        const { productId, quantity } = product;
-        
-        const checkStockQuery = 'SELECT stock, price FROM inventory WHERE id = ?';
-        db.query(checkStockQuery, [productId], (err, results) => {
-            if (err) {
-                console.error('Error al verificar stock del producto:', err);
-                return res.status(500).json({ message: 'Error del servidor' });
-            }
-
-            if (results.length === 0) {
-                return res.status(404).json({ message: 'Producto no encontrado' });
-            }
-
-            const productStock = results[0].stock;
-            const productPrice = results[0].price;
-
-            if (productStock < quantity) {
-                return res.status(400).json({ message: 'No hay suficiente stock del producto' });
-            }
-
-            // Calcular el subtotal para este producto
-            const subtotal = productPrice * quantity;
-            totalSalePrice += subtotal;
-
-            // Agregar los detalles de la venta
-            saleDetails.push({ saleId: null, productId, quantity, subtotal }); // saleId se asignará después de insertar la venta
-
-            // Si todos los productos fueron procesados, continuar con la inserción de la venta
-            if (saleDetails.length === products.length) {
-                // Registrar la venta en la tabla sales
-                const insertSaleQuery = 'INSERT INTO sales (client_id, total_price, sale_date) VALUES (?, ?, ?)';
-                db.query(insertSaleQuery, [clientId, totalSalePrice, saleDate], (err, result) => {
-                    if (err) {
-                        console.error('Error al registrar venta:', err);
-                        return res.status(500).json({ message: 'Error del servidor' });
-                    }
-
-                    const saleId = result.insertId;
-
-                    // Insertar los detalles de la venta en la tabla sale_details
-                    saleDetails.forEach(detail => {
-                        const insertSaleDetailQuery = 'INSERT INTO sale_details (sale_id, product_id, quantity, subtotal) VALUES (?, ?, ?, ?)';
-                        db.query(insertSaleDetailQuery, [saleId, detail.productId, detail.quantity, detail.subtotal], (err) => {
-                            if (err) {
-                                console.error('Error al insertar detalle de la venta:', err);
-                                return res.status(500).json({ message: 'Error del servidor' });
-                            }
-
-                            // Actualizar el stock del producto
-                            const updateStockQuery = 'UPDATE inventory SET stock = stock - ? WHERE id = ?';
-                            db.query(updateStockQuery, [detail.quantity, detail.productId], (err) => {
-                                if (err) {
-                                    console.error('Error al actualizar stock del producto:', err);
-                                    return res.status(500).json({ message: 'Error del servidor' });
-                                }
-                            });
-                        });
-                    });
-
-                    res.status(201).json({ message: 'Venta registrada con éxito', saleId });
-                });
-            }
-        });
-    });
-});
-
-// Ruta para obtener clientes
-app.get('/clients', async (req, res) => {
+  // Usaremos una conexión del pool para la transacción
+  let connection;
   try {
-    const [clients] = await db.query('SELECT id, name FROM Clientes');
-    res.json(clients);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener clientes' });
-  }
-});
+    connection = await db.getConnection();
+    await connection.beginTransaction();
 
-// Ruta para obtener productos
-app.get('/products', async (req, res) => {
-  try {
-    const [products] = await db.query('SELECT id, name, price FROM Productos');
-    res.json(products);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener productos' });
-  }
-});
-// Ruta para registrar una venta
-app.post('/sales', authenticateToken, (req, res) => {
-  const { client_id, product_id, quantity } = req.body;
+    let totalSalePrice = 0;
+    const productDetails = [];
 
-  if (!client_id || !product_id || !quantity) {
-    return res.status(400).json({ message: 'Todos los campos son obligatorios' });
-  }
-
-  // Obtenemos el precio del producto
-  const query = 'SELECT price FROM products WHERE id = ?';
-  db.query(query, [product_id], (err, results) => {
-    if (err) {
-      console.error('Error al obtener el precio del producto:', err);
-      return res.status(500).json({ message: 'Error del servidor' });
-    }
-
-    if (results.length === 0) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
-    }
-
-    const price = results[0].price;
-    const total = price * quantity;
-
-    // Insertar venta
-    const insertSaleQuery = 'INSERT INTO sales (client_id, product_id, quantity, total, sale_date) VALUES (?, ?, ?, ?, NOW())';
-    db.query(insertSaleQuery, [client_id, product_id, quantity, total], (err, result) => {
-      if (err) {
-        console.error('Error al registrar la venta:', err);
-        return res.status(500).json({ message: 'Error del servidor' });
+    // 1. Validar stock y calcular totales (usando FOR...OF para usar await dentro)
+    for (const product of products) {
+      const { productId, quantity } = product;
+      if (!productId || !quantity || quantity <= 0) {
+        throw new Error('Cada producto debe tener un ID y una cantidad válida.');
       }
 
-      res.status(201).json({ message: 'Venta registrada con éxito', saleId: result.insertId });
-    });
-  });
+      const [rows] = await connection.query('SELECT product_name, stock, price FROM inventory WHERE id = ? FOR UPDATE', [productId]);
+      if (rows.length === 0) {
+        throw new Error(`Producto con ID ${productId} no encontrado.`);
+      }
+
+      const item = rows[0];
+      if (item.stock < quantity) {
+        throw new Error(`Stock insuficiente para el producto: ${item.product_name}. Disponible: ${item.stock}`);
+      }
+
+      const subtotal = item.price * quantity;
+      totalSalePrice += subtotal;
+      productDetails.push({ productId, quantity, subtotal });
+    }
+
+    // 2. Insertar la venta principal
+    const [saleResult] = await connection.query(
+      'INSERT INTO sales (client_id, total_price, sale_date) VALUES (?, ?, ?)',
+      [clientId, totalSalePrice, saleDate]
+    );
+    const saleId = saleResult.insertId;
+
+    // 3. Insertar detalles de la venta y actualizar stock
+    for (const detail of productDetails) {
+      // Insertar detalle
+      await connection.query(
+        'INSERT INTO sale_details (sale_id, product_id, quantity, subtotal) VALUES (?, ?, ?, ?)',
+        [saleId, detail.productId, detail.quantity, detail.subtotal]
+      );
+
+      // Actualizar stock
+      await connection.query(
+        'UPDATE inventory SET stock = stock - ? WHERE id = ?',
+        [detail.quantity, detail.productId]
+      );
+    }
+
+    // 4. Si todo fue bien, confirmar la transacción
+    await connection.commit();
+
+    res.status(201).json({ message: 'Venta registrada con éxito', saleId });
+
+  } catch (error) { {
+    // 5. Si algo falló, revertir todos los cambios
+    if (connection) await connection.rollback();
+    console.error('Error en la transacción de venta:', error);
+    // Enviamos el mensaje de error específico al cliente
+    res.status(500).json({ message: error.message || 'Error del servidor al procesar la venta.' });
+  }
+  } finally {
+    // 6. Liberar la conexión en cualquier caso
+    if (connection) connection.release();
+  }
 });
+
+
 
 // Ruta para obtener todas las ventas
 app.get('/sales', authenticateToken, (req, res) => {
   const query = `
-    SELECT s.id, c.name AS client_name, p.name AS product_name, s.quantity, s.total, s.sale_date
+    SELECT 
+      s.id, 
+      c.name AS client_name, 
+      s.total_price, 
+      s.sale_date
     FROM sales s
     JOIN clients c ON s.client_id = c.id
-    JOIN products p ON s.product_id = p.id
     ORDER BY s.sale_date DESC
   `;
   db.query(query, (err, results) => {
@@ -401,13 +364,6 @@ app.get('/sales', authenticateToken, (req, res) => {
     res.status(200).json(results);
   });
 });
-
-
-
-
-
-
-
 
 // Ruta para generar el reporte en PDF
 app.get('/report', authenticateToken, (req, res) => {
@@ -426,7 +382,13 @@ app.get('/report', authenticateToken, (req, res) => {
     doc.moveDown();
     
     // Aquí puedes obtener los datos de la base de datos, por ejemplo, ventas
-    const query = 'SELECT * FROM sales';  // Ajusta la consulta a lo que necesites
+    const query = `
+      SELECT s.id, c.name AS client_name, s.total_price, s.sale_date
+      FROM sales s
+      JOIN clients c ON s.client_id = c.id
+      ORDER BY s.sale_date DESC
+    `;
+
     db.query(query, (err, results) => {
       if (err) {
         console.error('Error al obtener los datos del reporte:', err);
@@ -436,7 +398,7 @@ app.get('/report', authenticateToken, (req, res) => {
       // Agregar cada venta al PDF
       results.forEach(sale => {
         doc.fontSize(12).text(`ID de Venta: ${sale.id}`);
-        doc.text(`Cliente: ${sale.client_id}`);
+        doc.text(`Cliente: ${sale.client_name}`);
         doc.text(`Fecha de Venta: ${sale.sale_date}`);
         doc.text(`Total: Q${sale.total_price.toFixed(2)}`);
         doc.moveDown();

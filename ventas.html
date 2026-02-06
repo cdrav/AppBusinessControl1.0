@@ -4,104 +4,394 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ventas - Business Control</title>
+  <meta name="author" content="Cristian David Ruiz">
+  <meta name="description" content="Sistema de gestión de ventas - Business Control por Cristian David Ruiz">
+  <link rel="stylesheet" href="/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .page-wrapper {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background-attachment: fixed;
+      position: relative;
+    }
+    
+    .page-wrapper::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+      pointer-events: none;
+    }
+    
+    .content-container {
+      position: relative;
+      z-index: 2;
+      padding: 40px 20px;
+    }
+    
+    .page-header {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: var(--shadow-xl);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .page-title {
+      background: var(--secondary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 700;
+      font-size: 2.5rem;
+      margin-bottom: 0;
+    }
+    
+    .table-container {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: var(--shadow-xl);
+      border: 1px solid rgba(255,255,255,0.2);
+      overflow: hidden;
+    }
+    
+    .btn-back {
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 50px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+    
+    .btn-back:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      color: white;
+      text-decoration: none;
+    }
+    
+    .btn-add {
+      background: var(--secondary-gradient);
+      border: none;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 50px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      font-weight: 600;
+      box-shadow: var(--shadow-md);
+    }
+    
+    .btn-add:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      color: white;
+      text-decoration: none;
+    }
+    
+    .table-custom {
+      border-radius: 12px;
+      overflow: hidden;
+      border: none;
+    }
+    
+    .table-custom thead {
+      background: var(--secondary-gradient);
+      color: white;
+    }
+    
+    .table-custom thead th {
+      font-weight: 600;
+      padding: 20px 15px;
+      border: none;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+    }
+    
+    .table-custom tbody tr {
+      transition: all 0.3s ease;
+    }
+    
+    .table-custom tbody tr:hover {
+      background: rgba(102, 126, 234, 0.05);
+      transform: scale(1.01);
+    }
+    
+    .table-custom tbody td {
+      padding: 18px 15px;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+      vertical-align: middle;
+    }
+    
+    .table-custom tbody tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .sale-badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    
+    .sale-completed {
+      background: var(--success-gradient);
+      color: white;
+    }
+    
+    .sale-pending {
+      background: var(--warning-gradient);
+      color: white;
+    }
+    
+    .price-tag {
+      font-weight: 700;
+      color: var(--primary-color);
+      font-size: 1.1rem;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-light);
+    }
+    
+    .empty-state i {
+      font-size: 4rem;
+      color: var(--primary-color);
+      margin-bottom: 20px;
+    }
+    
+    .loading-skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+      border-radius: 4px;
+      height: 40px;
+      margin: 10px 0;
+    }
+    
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .stat-card {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 15px;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .stat-card h4 {
+      color: white;
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    
+    .stat-card p {
+      color: rgba(255,255,255,0.8);
+      margin: 5px 0 0 0;
+    }
+    
+    .filter-section {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .filter-section label {
+      color: white;
+      font-weight: 600;
+    }
+    
+    .client-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .client-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--primary-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+    }
+    
+    .product-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .product-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: rgba(102, 126, 234, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary-color);
+    }
+  </style>
 </head>
 <body>
-  <div class="container mt-5">
-    <h2>Ventas</h2>
-
-    <!-- Botón de regreso al dashboard -->
-    <a href="/dashboard.html" class="btn btn-secondary">
-      <i class="bi bi-arrow-left"></i> Regresar al Dashboard
-    </a>
-
-    <!-- Formulario para agregar una venta -->
-    <div class="mt-4">
-      <h4>Registrar Venta</h4>
-      <form id="saleForm">
-        <div class="mb-3">
-          <label for="client" class="form-label">Cliente</label>
-          <select id="client" class="form-select">
-            <option value="">Selecciona un cliente</option>
-          </select>
+  <div class="page-wrapper">
+    <div class="content-container">
+      <div class="container">
+        <!-- Header -->
+        <div class="page-header fade-in-up">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h1 class="page-title">
+                <i class="bi bi-cart-check me-3"></i>Gestión de Ventas
+              </h1>
+              <p class="text-muted mb-0 mt-2">Administra y visualiza todas tus ventas</p>
+            </div>
+            <a href="/dashboard.html" class="btn-back">
+              <i class="bi bi-arrow-left"></i>
+              Regresar al Dashboard
+            </a>
+          </div>
         </div>
-        <div class="mb-3">
-          <label for="product" class="form-label">Producto</label>
-          <select id="product" class="form-select">
-            <option value="">Selecciona un producto</option>
-          </select>
-        </div>
-        <div class="mb-3">
-          <label for="quantity" class="form-label">Cantidad</label>
-          <input type="number" id="quantity" class="form-control" min="1" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Registrar Venta</button>
-      </form>
-    </div>
 
-    <!-- Tabla de Ventas -->
-    <h4 class="mt-5">Listado de Ventas</h4>
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Cliente</th>
-          <th>Producto</th>
-          <th>Cantidad</th>
-          <th>Total</th>
-          <th>Fecha</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Contenido dinámico generado con JavaScript -->
-      </tbody>
-    </table>
+        <!-- Stats Cards -->
+        <div class="stats-row fade-in-up" style="animation-delay: 0.1s">
+          <div class="stat-card">
+            <h4 id="totalSales">$0</h4>
+            <p>Ventas Totales</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="totalOrders">0</h4>
+            <p>Total Órdenes</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="avgSale">$0</h4>
+            <p>Promedio Venta</p>
+          </div>
+          <div class="stat-card">
+            <h4 id="todaySales">$0</h4>
+            <p>Ventas Hoy</p>
+          </div>
+        </div>
 
-    <!-- Botón para agregar venta -->
-    <div class="text-end">
-      <a href="/addSale.html" class="btn btn-primary">Agregar Venta</a>
+        <!-- Filter Section -->
+        <div class="filter-section fade-in-up" style="animation-delay: 0.2s">
+          <div class="row">
+            <div class="col-md-4">
+              <label for="filterDate">Filtrar por fecha</label>
+              <input type="date" class="form-control" id="filterDate">
+            </div>
+            <div class="col-md-4">
+              <label for="filterClient">Filtrar por cliente</label>
+              <select class="form-control" id="filterClient">
+                <option value="">Todos los clientes</option>
+              </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn btn-light w-100" onclick="applyFilters()">
+                <i class="bi bi-funnel me-2"></i>Aplicar Filtros
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="table-container fade-in-up" style="animation-delay: 0.3s">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="mb-0">
+              <i class="bi bi-list-ul me-2"></i>Historial de Ventas
+            </h3>
+            <a href="/addSale.html" class="btn-add">
+              <i class="bi bi-plus-circle"></i>
+              Nueva Venta
+            </a>
+          </div>
+          
+          <!-- Loading State -->
+          <div id="loadingState" class="loading-skeleton"></div>
+          
+          <!-- Empty State -->
+          <div id="emptyState" class="empty-state" style="display: none;">
+            <i class="bi bi-cart-x"></i>
+            <h4>No hay ventas registradas</h4>
+            <p>Comienza registrando tu primera venta</p>
+            <a href="/addSale.html" class="btn-add">
+              <i class="bi bi-plus-circle"></i>
+              Registrar Primera Venta
+            </a>
+          </div>
+          
+          <!-- Table -->
+          <div class="table-responsive">
+            <table class="table table-custom" id="salesTable" style="display: none;">
+              <thead>
+                <tr>
+                  <th><i class="bi bi-hash me-1"></i>ID</th>
+                  <th><i class="bi bi-person me-1"></i>Cliente</th>
+                  <th><i class="bi bi-box-seam me-1"></i>Productos</th>
+                  <th><i class="bi bi-currency-dollar me-1"></i>Total</th>
+                  <th><i class="bi bi-calendar me-1"></i>Fecha</th>
+                  <th><i class="bi bi-check-circle me-1"></i>Estado</th>
+                  <th><i class="bi bi-gear me-1"></i>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="salesTableBody">
+                <!-- Contenido dinámico generado con JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/scripts/main.js"></script>
   <script>
-    const apiUrl = 'http://localhost:3000'; // URL de la API
-
-    // Función para cargar clientes y productos
-    async function loadClientsAndProducts() {
-      try {
-        const clientResponse = await fetch(`${apiUrl}/clients`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        const productResponse = await fetch(`${apiUrl}/products`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-
-        const clients = await clientResponse.json();
-        const products = await productResponse.json();
-
-        // Llenar el select de clientes
-        const clientSelect = document.getElementById('client');
-        clients.forEach(client => {
-          const option = document.createElement('option');
-          option.value = client.id;
-          option.textContent = client.name;
-          clientSelect.appendChild(option);
-        });
-
-        // Llenar el select de productos
-        const productSelect = document.getElementById('product');
-        products.forEach(product => {
-          const option = document.createElement('option');
-          option.value = product.id;
-          option.textContent = `${product.name} - $${product.price}`;
-          productSelect.appendChild(option);
-        });
-      } catch (error) {
-        console.error('Error al cargar clientes y productos:', error);
-      }
-    }
+    const apiUrl = 'http://localhost:3000';
+    let allSales = [];
+    let allClients = [];
 
     // Función para cargar ventas
     async function loadSales() {
@@ -114,67 +404,181 @@
         }
 
         const sales = await response.json();
-        const tbody = document.querySelector('table tbody');
-        tbody.innerHTML = ''; // Limpiar tabla
+        allSales = sales;
+        
+        const loadingState = document.getElementById('loadingState');
+        const emptyState = document.getElementById('emptyState');
+        const salesTable = document.getElementById('salesTable');
 
-        sales.forEach((sale, index) => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${index + 1}</td>
-            <td>${sale.client_name}</td>
-            <td>${sale.product_name}</td>
-            <td>${sale.quantity}</td>
-            <td>$${sale.total.toFixed(2)}</td>
-            <td>${sale.sale_date}</td>
-          `;
-          tbody.appendChild(row);
-        });
+        // Ocultar loading
+        loadingState.style.display = 'none';
+
+        if (sales.length === 0) {
+          emptyState.style.display = 'block';
+        } else {
+          salesTable.style.display = 'table';
+          renderSalesTable(sales);
+          updateStats(sales);
+        }
       } catch (error) {
         console.error('Error al cargar ventas:', error);
+        document.getElementById('loadingState').innerHTML = 
+          '<div class="alert alert-danger">Error al cargar las ventas. Intente nuevamente.</div>';
       }
     }
 
-    // Función para registrar venta
-    async function registerSale(event) {
-      event.preventDefault();
-      const clientId = document.getElementById('client').value;
-      const productId = document.getElementById('product').value;
-      const quantity = document.getElementById('quantity').value;
+    // Función para renderizar tabla de ventas
+    function renderSalesTable(sales) {
+      const tbody = document.getElementById('salesTableBody');
+      tbody.innerHTML = '';
 
-      if (!clientId || !productId || !quantity) {
-        alert('Por favor complete todos los campos');
-        return;
-      }
+      sales.forEach((sale, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>#${sale.id || index + 1}</strong></td>
+          <td>
+            <div class="client-info">
+              <div class="client-avatar">${sale.client_name ? sale.client_name.charAt(0).toUpperCase() : 'C'}</div>
+              <div>
+                <strong>${sale.client_name || 'Cliente'}</strong>
+                <br>
+                <small class="text-muted">${sale.client_email || ''}</small>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="product-info">
+              <div class="product-icon">
+                <i class="bi bi-box-seam"></i>
+              </div>
+              <div>
+                <strong>${sale.product_name || 'Producto'}</strong>
+                <br>
+                <small class="text-muted">Cantidad: ${sale.quantity || 1}</small>
+              </div>
+            </div>
+          </td>
+          <td><span class="price-tag">$${(sale.total || 0).toFixed(2)}</span></td>
+          <td>
+            <div>
+              <strong>${formatDate(sale.sale_date)}</strong>
+              <br>
+              <small class="text-muted">${formatTime(sale.sale_date)}</small>
+            </div>
+          </td>
+          <td>
+            <span class="sale-badge sale-completed">Completada</span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-action btn-edit" onclick="viewSale(${sale.id || index})">
+                <i class="bi bi-eye"></i> Ver
+              </button>
+              <button class="btn-action btn-delete" onclick="deleteSale(${sale.id || index})">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Función para actualizar estadísticas
+    function updateStats(sales) {
+      const totalSales = sales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+      const avgSale = sales.length > 0 ? totalSales / sales.length : 0;
+      const today = new Date().toISOString().split('T')[0];
+      const todaySales = sales
+        .filter(sale => sale.sale_date && sale.sale_date.startsWith(today))
+        .reduce((sum, sale) => sum + (sale.total || 0), 0);
+
+      document.getElementById('totalSales').textContent = `$${totalSales.toFixed(2)}`;
+      document.getElementById('totalOrders').textContent = sales.length;
+      document.getElementById('avgSale').textContent = `$${avgSale.toFixed(2)}`;
+      document.getElementById('todaySales').textContent = `$${todaySales.toFixed(2)}`;
+    }
+
+    // Función para formatear fecha
+    function formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-ES', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric' 
+      });
+    }
+
+    // Función para formatear hora
+    function formatTime(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    }
+
+    // Función para ver detalles de venta
+    function viewSale(id) {
+      showNotification(`Ver detalles de venta #${id}`, 'info');
+    }
+
+    // Función para eliminar venta
+    async function deleteSale(id) {
+      if (!confirm('¿Estás seguro de eliminar esta venta?')) return;
 
       try {
-        const response = await fetch(`${apiUrl}/sales`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify({ client_id: clientId, product_id: productId, quantity }),
+        const response = await fetch(`${apiUrl}/sales/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         });
-
+        
         if (response.ok) {
-          alert('Venta registrada correctamente');
-          loadSales(); // Recargar las ventas
+          showNotification('Venta eliminada con éxito', 'success');
+          loadSales();
         } else {
-          const error = await response.json();
-          alert('Error al registrar la venta: ' + error.message);
+          throw new Error('Error al eliminar la venta');
         }
       } catch (error) {
-        console.error('Error al registrar la venta:', error);
-        alert('Error al registrar la venta');
+        console.error('Error:', error.message);
+        showNotification('Error al eliminar la venta', 'error');
       }
+    }
+
+    // Función para aplicar filtros
+    function applyFilters() {
+      const dateFilter = document.getElementById('filterDate').value;
+      const clientFilter = document.getElementById('filterClient').value;
+      
+      let filteredSales = allSales;
+      
+      if (dateFilter) {
+        filteredSales = filteredSales.filter(sale => 
+          sale.sale_date && sale.sale_date.startsWith(dateFilter)
+        );
+      }
+      
+      if (clientFilter) {
+        filteredSales = filteredSales.filter(sale => 
+          sale.client_id == clientFilter
+        );
+      }
+      
+      renderSalesTable(filteredSales);
+      updateStats(filteredSales);
     }
 
     // Cargar datos iniciales
-    document.addEventListener('DOMContentLoaded', () => {
-      loadClientsAndProducts();
-      loadSales();
-      document.getElementById('saleForm').addEventListener('submit', registerSale);
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(loadSales, 1000); // Simular tiempo de carga
     });
   </script>
+  
+  <!-- Footer con Copyright -->
+  <footer class="text-center py-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); color: white; position: relative; z-index: 2; margin-top: 40px; border-radius: 15px;">
+    <p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
+  </footer>
 </body>
 </html>

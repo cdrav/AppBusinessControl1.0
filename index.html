@@ -3,61 +3,308 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Business Control</title>
-  <link href="/styles.css">
+  <title>Business Control - Sistema de Gestión Empresarial</title>
+  <meta name="author" content="Cristian David Ruiz">
+  <meta name="description" content="Business Control - Sistema de gestión empresarial desarrollado por Cristian David Ruiz">
+  <link rel="stylesheet" href="/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
- 
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .hero-section {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background-attachment: fixed;
+    }
+    
+    .hero-content {
+      text-align: center;
+      z-index: 2;
+      position: relative;
+    }
+    
+    .hero-title {
+      font-size: 4rem;
+      font-weight: 800;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      color: white;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .hero-subtitle {
+      font-size: 1.5rem;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 3rem;
+      font-weight: 300;
+    }
+    
+    .feature-card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 2.5rem;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.6s;
+    }
+    
+    .feature-card:hover::before {
+      left: 100%;
+    }
+    
+    .feature-card:hover {
+      transform: translateY(-15px) scale(1.05);
+      background: rgba(255,255,255,0.25);
+      box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+    }
+    
+    .feature-icon {
+      font-size: 4rem;
+      color: white;
+      margin-bottom: 1.5rem;
+      display: inline-block;
+      animation: float 3s ease-in-out infinite;
+    }
+    
+    .feature-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 1rem;
+    }
+    
+    .feature-text {
+      color: rgba(255,255,255,0.8);
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+    
+    .cta-button {
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255,255,255,0.4);
+      color: white;
+      padding: 18px 40px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      border-radius: 50px;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .cta-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      transition: left 0.6s;
+    }
+    
+    .cta-button:hover::before {
+      left: 100%;
+    }
+    
+    .cta-button:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-3px);
+      box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+      color: white;
+      text-decoration: none;
+    }
+    
+    .floating-shapes {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: 1;
+    }
+    
+    .shape {
+      position: absolute;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(5px);
+      border-radius: 50%;
+      animation: float-up 15s infinite linear;
+    }
+    
+    .shape:nth-child(1) {
+      width: 80px;
+      height: 80px;
+      left: 10%;
+      animation-delay: 0s;
+    }
+    
+    .shape:nth-child(2) {
+      width: 120px;
+      height: 120px;
+      left: 70%;
+      animation-delay: 2s;
+    }
+    
+    .shape:nth-child(3) {
+      width: 60px;
+      height: 60px;
+      left: 40%;
+      animation-delay: 4s;
+    }
+    
+    .shape:nth-child(4) {
+      width: 100px;
+      height: 100px;
+      left: 85%;
+      animation-delay: 6s;
+    }
+    
+    .shape:nth-child(5) {
+      width: 90px;
+      height: 90px;
+      left: 25%;
+      animation-delay: 8s;
+    }
+    
+    @keyframes float-up {
+      0% {
+        transform: translateY(100vh) rotate(0deg);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      90% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-100vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+    
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-20px);
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .hero-title {
+        font-size: 2.5rem;
+      }
+      
+      .hero-subtitle {
+        font-size: 1.2rem;
+      }
+      
+      .feature-card {
+        padding: 2rem;
+        margin-bottom: 2rem;
+      }
+      
+      .feature-icon {
+        font-size: 3rem;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div class="container py-5">
-    <h2 class="text-center mb-5">Bienvenido a Business Control</h2>
-    <div class="row row-cols-1 row-cols-md-3 g-4">
-      <!-- Tarjeta 1 -->
-      <div class="col">
-        <div class="card text-center shadow-sm">
-          <div class="card-body">
-            <div class="card-icon">
-              <i class="bi bi-box"></i> <!-- Icono de inventario -->
-            </div>
-            <h5 class="card-title">Controla tu inventario</h5>
-            <p class="card-text">Gestiona y controla tus productos de manera eficiente.</p>
-          </div>
-        </div>
-      </div>
-      <!-- Tarjeta 2 -->
-      <div class="col">
-        <div class="card text-center shadow-sm">
-          <div class="card-body">
-            <div class="card-icon">
-              <i class="bi bi-person-lines-fill"></i> <!-- Icono de clientes -->
-            </div>
-            <h5 class="card-title">Clientes al día</h5>
-            <p class="card-text">Mantén un registro completo y actualizado de tus clientes.</p>
-          </div>
-        </div>
-      </div>
-      <!-- Tarjeta 3 -->
-      <div class="col">
-        <div class="card text-center shadow-sm">
-          <div class="card-body">
-            <div class="card-icon">
-              <i class="bi bi-graph-up"></i> <!-- Icono de reportes -->
-            </div>
-            <h5 class="card-title">Reportes rápidos</h5>
-            <p class="card-text">Genera informes detallados con un solo clic.</p>
-          </div>
-        </div>
-      </div>
+  <div class="hero-section">
+    <div class="floating-shapes">
+      <div class="shape"></div>
+      <div class="shape"></div>
+      <div class="shape"></div>
+      <div class="shape"></div>
+      <div class="shape"></div>
     </div>
     
-    <!-- Botón para iniciar sesión -->
-    <div class="text-center mt-5">
-      <a href="/login.html" class="btn btn-primary btn-lg">Iniciar Sesión</a>
+    <div class="container">
+      <div class="hero-content">
+        <h1 class="hero-title fade-in-up">Business Control</h1>
+        <p class="hero-subtitle fade-in-up" style="animation-delay: 0.2s">
+          El sistema inteligente para gestionar tu negocio con eficiencia y estilo
+        </p>
+        
+        <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+          <!-- Tarjeta 1 -->
+          <div class="col fade-in-up" style="animation-delay: 0.4s">
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-box-seam"></i>
+              </div>
+              <h3 class="feature-title">Controla tu inventario</h3>
+              <p class="feature-text">Gestiona y controla tus productos de manera eficiente con tracking en tiempo real y alertas automáticas de stock bajo.</p>
+            </div>
+          </div>
+          
+          <!-- Tarjeta 2 -->
+          <div class="col fade-in-up" style="animation-delay: 0.6s">
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-people-fill"></i>
+              </div>
+              <h3 class="feature-title">Clientes al día</h3>
+              <p class="feature-text">Mantén un registro completo y actualizado de tus clientes con historial de compras y preferencias.</p>
+            </div>
+          </div>
+          
+          <!-- Tarjeta 3 -->
+          <div class="col fade-in-up" style="animation-delay: 0.8s">
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-graph-up-arrow"></i>
+              </div>
+              <h3 class="feature-title">Reportes rápidos</h3>
+              <p class="feature-text">Genera informes detallados con un solo clic. Visualiza el crecimiento de tu negocio con analytics avanzados.</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="fade-in-up" style="animation-delay: 1s">
+          <a href="/login.html" class="cta-button">
+            <i class="bi bi-rocket-takeoff me-2"></i>
+            Comenzar Ahora
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- Bootstrap Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- Footer con Copyright -->
+  <footer class="text-center py-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); color: white; position: relative; z-index: 2; margin-top: 40px; border-radius: 15px;">
+    <p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
+  </footer>
 </body>
 </html>

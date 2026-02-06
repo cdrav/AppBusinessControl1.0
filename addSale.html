@@ -3,123 +3,655 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registrar Venta</title>
-  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <title>Registrar Venta - Business Control</title>
+  <meta name="author" content="Cristian David Ruiz">
+  <meta name="description" content="Formulario de registro de ventas - Business Control por Cristian David Ruiz">
+  <link rel="stylesheet" href="/styles.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .page-wrapper {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background-attachment: fixed;
+      position: relative;
+    }
+    
+    .page-wrapper::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+      pointer-events: none;
+    }
+    
+    .content-container {
+      position: relative;
+      z-index: 2;
+      padding: 40px 20px;
+    }
+    
+    .form-container {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: var(--shadow-xl);
+      border: 1px solid rgba(255,255,255,0.2);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .form-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    .form-title {
+      background: var(--secondary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 700;
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+    
+    .form-subtitle {
+      color: var(--text-light);
+      font-size: 1.1rem;
+    }
+    
+    .form-floating {
+      margin-bottom: 25px;
+    }
+    
+    .form-control {
+      border: 2px solid #E9ECEF;
+      border-radius: var(--border-radius);
+      padding: 16px 20px;
+      font-size: 1rem;
+      transition: var(--transition);
+      background: var(--bg-white);
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .form-control:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+      outline: none;
+    }
+    
+    .form-label {
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .btn-submit {
+      background: var(--secondary-gradient);
+      border: none;
+      border-radius: 50px;
+      padding: 16px 32px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: white;
+      cursor: pointer;
+      transition: var(--transition);
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      margin-top: 20px;
+    }
+    
+    .btn-submit::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+    
+    .btn-submit:hover::before {
+      left: 100%;
+    }
+    
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+    
+    .btn-back {
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 50px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+    
+    .btn-back:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      color: white;
+      text-decoration: none;
+    }
+    
+    .alert {
+      border-radius: var(--border-radius);
+      border: none;
+      padding: 16px 20px;
+      font-weight: 500;
+      box-shadow: var(--shadow-md);
+      margin-top: 20px;
+    }
+    
+    .alert-success {
+      background: var(--success-gradient);
+      color: white;
+    }
+    
+    .alert-danger {
+      background: var(--danger-gradient);
+      color: white;
+    }
+    
+    .alert-warning {
+      background: var(--warning-gradient);
+      color: white;
+    }
+    
+    .fade-in {
+      animation: fadeInUp 0.6s ease-out;
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .loading-spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .btn-submit.loading .btn-text {
+      display: none;
+    }
+    
+    .btn-submit.loading .loading-spinner {
+      display: block;
+    }
+    
+    .form-icon {
+      font-size: 4rem;
+      color: var(--primary-color);
+      margin-bottom: 20px;
+      display: block;
+      text-align: center;
+    }
+    
+    .sale-summary {
+      background: rgba(102, 126, 234, 0.1);
+      border-radius: 15px;
+      padding: 20px;
+      margin-top: 30px;
+      border: 2px solid rgba(102, 126, 234, 0.2);
+    }
+    
+    .sale-summary h5 {
+      color: var(--primary-color);
+      font-weight: 700;
+      margin-bottom: 15px;
+    }
+    
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+    
+    .summary-item:last-child {
+      border-bottom: none;
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: var(--primary-color);
+    }
+    
+    .product-item {
+      background: var(--bg-white);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+      border: 1px solid rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .product-info h6 {
+      margin: 0;
+      color: var(--text-dark);
+    }
+    
+    .product-info p {
+      margin: 0;
+      color: var(--text-light);
+      font-size: 0.9rem;
+    }
+    
+    .product-price {
+      font-weight: 700;
+      color: var(--primary-color);
+    }
+    
+    .add-product-btn {
+      background: var(--success-gradient);
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+    
+    .add-product-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+  </style>
 </head>
 <body>
-  <div class="container mt-5">
-    <h2>Registrar Venta</h2>
-    <form id="addSaleForm">
-      <div class="form-group">
-        <label for="clientId">Cliente</label>
-        <select class="form-control" id="clientId" required>
-          <option value="">Selecciona un cliente</option>
-          <!-- Aquí se llenarán los clientes desde el backend -->
-        </select>
+  <div class="page-wrapper">
+    <div class="content-container">
+      <div class="container">
+        <div class="form-container fade-in">
+          <div class="form-header">
+            <i class="bi bi-cart-plus form-icon"></i>
+            <h1 class="form-title">Registrar Venta</h1>
+            <p class="form-subtitle">Registra una nueva venta en el sistema</p>
+          </div>
+          
+          <form id="addSaleForm">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-4">
+                  <label for="clientId" class="form-label">
+                    <i class="bi bi-person"></i>
+                    Cliente
+                  </label>
+                  <select class="form-control" id="clientId" required>
+                    <option value="">Selecciona un cliente</option>
+                    <!-- Aquí se llenarán los clientes desde el backend -->
+                  </select>
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="mb-4">
+                  <label for="saleDate" class="form-label">
+                    <i class="bi bi-calendar"></i>
+                    Fecha de Venta
+                  </label>
+                  <input type="date" class="form-control" id="saleDate" required>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Product Selection -->
+            <div class="mb-4">
+              <label class="form-label">
+                <i class="bi bi-box-seam"></i>
+                Productos
+              </label>
+              
+              <div id="productsContainer">
+                <!-- Primer producto -->
+                <div class="product-item">
+                  <div class="product-info">
+                    <select class="form-control product-select" required style="width: 250px;">
+                      <option value="">Selecciona un producto</option>
+                    </select>
+                  </div>
+                  <div class="d-flex align-items-center gap-3">
+                    <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 100px;">
+                    <span class="product-price">$0.00</span>
+                    <button type="button" class="btn btn-danger btn-sm remove-product">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <button type="button" class="add-product-btn mt-3" onclick="addProductField()">
+                <i class="bi bi-plus-circle me-2"></i>Agregar Producto
+              </button>
+            </div>
+            
+            <!-- Sale Summary -->
+            <div class="sale-summary">
+              <h5><i class="bi bi-receipt me-2"></i>Resumen de Venta</h5>
+              <div id="summaryItems">
+                <div class="summary-item">
+                  <span>Subtotal:</span>
+                  <span id="subtotal">$0.00</span>
+                </div>
+                <div class="summary-item">
+                  <span>IVA (16%):</span>
+                  <span id="tax">$0.00</span>
+                </div>
+                <div class="summary-item">
+                  <span>Total:</span>
+                  <span id="total">$0.00</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="d-flex gap-3 mt-4">
+              <button type="submit" class="btn-submit flex-fill">
+                <span class="btn-text">
+                  <i class="bi bi-check-circle me-2"></i>
+                  Registrar Venta
+                </span>
+                <div class="loading-spinner"></div>
+              </button>
+              
+              <a href="ventas.html" class="btn-back">
+                <i class="bi bi-arrow-left"></i>
+                Cancelar
+              </a>
+            </div>
+          </form>
+          
+          <div id="message"></div>
+        </div>
       </div>
-      <div class="form-group">
-        <label for="productId">Producto</label>
-        <select class="form-control" id="productId" required>
-          <option value="">Selecciona un producto</option>
-          <!-- Aquí se llenarán los productos desde el backend -->
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="quantity">Cantidad</label>
-        <input type="number" class="form-control" id="quantity" required min="1">
-      </div>
-      <div class="form-group">
-        <label for="totalPrice">Precio Total</label>
-        <input type="number" class="form-control" id="totalPrice" required readonly>
-      </div>
-      <div class="form-group">
-        <label for="saleDate">Fecha de Venta</label>
-        <input type="date" class="form-control" id="saleDate" required>
-      </div>
-      <button type="submit" class="btn btn-primary">Registrar Venta</button>
-    </form>
+    </div>
   </div>
 
-  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/scripts/main.js"></script>
   <script>
-    // Cargar clientes y productos al cargar la página
-    $(document).ready(function() {
-      // Obtener los clientes
-      $.ajax({
-        url: 'http://localhost:3000/clients',  // Endpoint para obtener los clientes
-        method: 'GET',
-        success: function(clients) {
+    // Variables globales
+    let products = [];
+    let clients = [];
+    
+    // Cargar datos al iniciar
+    document.addEventListener('DOMContentLoaded', function() {
+      loadClients();
+      loadProducts();
+      setTodayDate();
+    });
+    
+    // Establecer fecha actual
+    function setTodayDate() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('saleDate').value = today;
+    }
+    
+    // Cargar clientes
+    async function loadClients() {
+      try {
+        const response = await fetch('http://localhost:3000/clients', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (response.ok) {
+          clients = await response.json();
+          const select = document.getElementById('clientId');
           clients.forEach(client => {
-            $('#clientId').append(`<option value="${client.id}">${client.name}</option>`);
+            select.innerHTML += `<option value="${client.id}">${client.name}</option>`;
           });
-        },
-        error: function() {
-          alert('Error al obtener los clientes');
         }
-      });
-
-      // Obtener los productos
-      $.ajax({
-        url: 'http://localhost:3000/inventory',  // Endpoint para obtener los productos
-        method: 'GET',
-        success: function(products) {
-          products.forEach(product => {
-            $('#productId').append(`<option value="${product.id}">${product.product_name}</option>`);
-          });
-        },
-        error: function() {
-          alert('Error al obtener los productos');
+      } catch (error) {
+        console.error('Error al cargar clientes:', error);
+      }
+    }
+    
+    // Cargar productos
+    async function loadProducts() {
+      try {
+        const response = await fetch('http://localhost:3000/inventory', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (response.ok) {
+          products = await response.json();
+          updateProductSelects();
         }
+      } catch (error) {
+        console.error('Error al cargar productos:', error);
+      }
+    }
+    
+    // Actualizar selects de productos
+    function updateProductSelects() {
+      document.querySelectorAll('.product-select').forEach(select => {
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">Selecciona un producto</option>';
+        products.forEach(product => {
+          select.innerHTML += `<option value="${product.id}" data-price="${product.price}" data-stock="${product.stock}">${product.product_name} (Stock: ${product.stock})</option>`;
+        });
+        select.value = currentValue;
       });
-
-      // Calcular el precio total basado en el producto y cantidad seleccionados
-      $('#productId, #quantity').change(function() {
-        const productId = $('#productId').val();
-        const quantity = $('#quantity').val();
-
+    }
+    
+    // Agregar campo de producto
+    function addProductField() {
+      const container = document.getElementById('productsContainer');
+      const productCount = container.children.length;
+      
+      const productItem = document.createElement('div');
+      productItem.className = 'product-item';
+      productItem.innerHTML = `
+        <div class="product-info">
+          <select class="form-control product-select" required style="width: 250px;">
+            <option value="">Selecciona un producto</option>
+          </select>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 100px;">
+          <span class="product-price">$0.00</span>
+          <button type="button" class="btn btn-danger btn-sm remove-product">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      `;
+      
+      container.appendChild(productItem);
+      updateProductSelects();
+      
+      // Agregar event listeners
+      productItem.querySelector('.product-select').addEventListener('change', updateSummary);
+      productItem.querySelector('.quantity-input').addEventListener('input', updateSummary);
+      productItem.querySelector('.remove-product').addEventListener('click', function() {
+        productItem.remove();
+        updateSummary();
+      });
+    }
+    
+    // Actualizar resumen
+    function updateSummary() {
+      let subtotal = 0;
+      
+      document.querySelectorAll('.product-item').forEach(item => {
+        const select = item.querySelector('.product-select');
+        const quantity = parseInt(item.querySelector('.quantity-input').value) || 0;
+        const price = parseFloat(select.options[select.selectedIndex]?.dataset.price) || 0;
+        const total = price * quantity;
+        
+        item.querySelector('.product-price').textContent = `$${total.toFixed(2)}`;
+        subtotal += total;
+      });
+      
+      const tax = subtotal * 0.16;
+      const total = subtotal + tax;
+      
+      document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
+      document.getElementById('tax').textContent = `$${tax.toFixed(2)}`;
+      document.getElementById('total').textContent = `$${total.toFixed(2)}`;
+    }
+    
+    // Event listeners para el primer producto
+    document.querySelector('.product-select').addEventListener('change', updateSummary);
+    document.querySelector('.quantity-input').addEventListener('input', updateSummary);
+    document.querySelector('.remove-product').addEventListener('click', function() {
+      if (document.querySelectorAll('.product-item').length > 1) {
+        this.closest('.product-item').remove();
+        updateSummary();
+      }
+    });
+    
+    // Manejar envío del formulario
+    document.getElementById('addSaleForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      
+      const submitBtn = document.querySelector('.btn-submit');
+      const messageDiv = document.getElementById('message');
+      
+      // Validar productos
+      const saleProducts = [];
+      let hasError = false;
+      
+      document.querySelectorAll('.product-item').forEach(item => {
+        const productId = item.querySelector('.product-select').value;
+        const quantity = parseInt(item.querySelector('.quantity-input').value);
+        
         if (productId && quantity) {
-          // Obtener el producto seleccionado
-          $.ajax({
-            url: `http://localhost:3000/inventory/${productId}`,  // Endpoint para obtener el producto seleccionado
-            method: 'GET',
-            success: function(product) {
-              const totalPrice = product.price * quantity;
-              $('#totalPrice').val(totalPrice);  // Actualizar el precio total
-            },
-            error: function() {
-              alert('Error al obtener el producto');
+          const product = products.find(p => p.id == productId);
+          if (product && quantity <= product.stock) {
+            saleProducts.push({ productId, quantity });
+          } else {
+            hasError = true;
+            messageDiv.innerHTML = '<div class="alert alert-danger">Stock insuficiente para uno de los productos</div>';
+          }
+        }
+      });
+      
+      if (hasError || saleProducts.length === 0) {
+        if (!hasError) {
+          messageDiv.innerHTML = '<div class="alert alert-danger">Debes agregar al menos un producto</div>';
+        }
+        return;
+      }
+      
+      const saleData = {
+        clientId: document.getElementById('clientId').value,
+        products: saleProducts,
+        saleDate: document.getElementById('saleDate').value
+      };
+      
+      // Mostrar loading
+      submitBtn.classList.add('loading');
+      submitBtn.disabled = true;
+      messageDiv.innerHTML = '';
+      
+      try {
+        const response = await fetch('http://localhost:3000/sales', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify(saleData),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          messageDiv.innerHTML = '<div class="alert alert-success">¡Venta registrada con éxito!</div>';
+          document.getElementById('addSaleForm').reset();
+          setTodayDate();
+          
+          // Resetear productos
+          document.getElementById('productsContainer').innerHTML = `
+            <div class="product-item">
+              <div class="product-info">
+                <select class="form-control product-select" required style="width: 250px;">
+                  <option value="">Selecciona un producto</option>
+                </select>
+              </div>
+              <div class="d-flex align-items-center gap-3">
+                <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 100px;">
+                <span class="product-price">$0.00</span>
+                <button type="button" class="btn btn-danger btn-sm remove-product">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          `;
+          
+          updateProductSelects();
+          updateSummary();
+          
+          // Re-agregar event listeners
+          document.querySelector('.product-select').addEventListener('change', updateSummary);
+          document.querySelector('.quantity-input').addEventListener('input', updateSummary);
+          document.querySelector('.remove-product').addEventListener('click', function() {
+            if (document.querySelectorAll('.product-item').length > 1) {
+              this.closest('.product-item').remove();
+              updateSummary();
             }
           });
+          
+          setTimeout(() => {
+            window.location.href = 'ventas.html';
+          }, 2000);
+        } else {
+          throw new Error(data.message || 'Error al registrar la venta');
         }
-      });
-
-      // Manejar el envío del formulario
-      $('#addSaleForm').submit(function(event) {
-        event.preventDefault();
-
-        const saleData = {
-          clientId: $('#clientId').val(),
-          productId: $('#productId').val(),
-          quantity: $('#quantity').val(),
-          totalPrice: $('#totalPrice').val(),
-          saleDate: $('#saleDate').val()
-        };
-
-        $.ajax({
-          url: 'http://localhost:3000/sales',  // Endpoint para registrar la venta
-          method: 'POST',
-          data: JSON.stringify(saleData),
-          contentType: 'application/json',
-          success: function(response) {
-            alert(response.message);
-            $('#addSaleForm')[0].reset();  // Limpiar el formulario
-          },
-          error: function(xhr, status, error) {
-            alert('Error al registrar la venta');
-          }
-        });
-      });
+      } catch (error) {
+        console.error('Error:', error);
+        messageDiv.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+      } finally {
+        submitBtn.classList.remove('loading');
+        submitBtn.disabled = false;
+      }
     });
   </script>
+  
+  <!-- Footer con Copyright -->
+  <footer class="text-center py-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); color: white; position: relative; z-index: 2; margin-top: 40px; border-radius: 15px;">
+    <p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
+  </footer>
 </body>
 </html>

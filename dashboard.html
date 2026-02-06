@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Business Control</title>
+  <meta name="author" content="Cristian David Ruiz">
+  <meta name="description" content="Dashboard de gestión empresarial - Business Control por Cristian David Ruiz">
+  <link rel="stylesheet" href="/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -46,64 +49,70 @@
           <!-- Cards Section -->
           <div class="row g-4">
             <div class="col-md-3">
-              <div class="card bg-primary text-white text-center">
-                <div class="card-body">
-                  <i class="bi bi-people-fill display-4 mb-3"></i>
+              <div class="dashboard-card primary fade-in-up">
+                <div class="card-body text-center">
+                  <i class="bi bi-people-fill card-icon"></i>
                   <h5 class="card-title">Clientes</h5>
-                  <p class="card-text">Total: <span id="totalClientes">50</span></p>
+                  <p class="card-text">50</p>
                 </div>
               </div>
             </div>
             <div class="col-md-3">
-              <div class="card bg-success text-white text-center">
-                <div class="card-body">
-                  <i class="bi bi-cart-fill display-4 mb-3"></i>
+              <div class="dashboard-card success fade-in-up" style="animation-delay: 0.1s">
+                <div class="card-body text-center">
+                  <i class="bi bi-cart-fill card-icon"></i>
                   <h5 class="card-title">Ventas</h5>
-                  <p class="card-text">Total: <span id="totalVentas">120</span></p>
+                  <p class="card-text">120</p>
                 </div>
               </div>
             </div>
             <div class="col-md-3">
-              <div class="card bg-warning text-white text-center">
-                <div class="card-body">
-                  <i class="bi bi-box-seam display-4 mb-3"></i>
+              <div class="dashboard-card warning fade-in-up" style="animation-delay: 0.2s">
+                <div class="card-body text-center">
+                  <i class="bi bi-box-seam card-icon"></i>
                   <h5 class="card-title">Inventario</h5>
-                  <p class="card-text">Productos: <span id="totalProductos">300</span></p>
+                  <p class="card-text">300</p>
                 </div>
               </div>
             </div>
             <div class="col-md-3">
-              <div class="card bg-danger text-white text-center">
-                <div class="card-body">
-                  <i class="bi bi-graph-up-arrow display-4 mb-3"></i>
+              <div class="dashboard-card danger fade-in-up" style="animation-delay: 0.3s">
+                <div class="card-body text-center">
+                  <i class="bi bi-graph-up-arrow card-icon"></i>
                   <h5 class="card-title">Reportes</h5>
-                  <p class="card-text">Generados: <span id="totalReportes">15</span></p>
+                  <p class="card-text">15</p>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Table Section -->
-          <div class="table-responsive mt-5">
-            <h4>Actividades recientes</h4>
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Acción</th>
-                  <th>Usuario</th>
-                  <th>Detalles</th>
-                </tr>
-              </thead>
-              <tbody id="activityTable">
-                <tr>
-                  <td>2024-11-20</td>
-                  <td>Creación de cliente</td>
-                  <td>Juan Pérez</td>
-                  <td>Nuevo cliente registrado</td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="table-responsive mt-5 slide-in-left">
+            <div class="card">
+              <div class="card-header">
+                <h4 class="mb-0"><i class="bi bi-clock-history me-2"></i>Actividades Recientes</h4>
+              </div>
+              <div class="card-body">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th><i class="bi bi-calendar me-1"></i>Fecha</th>
+                      <th><i class="bi bi-activity me-1"></i>Acción</th>
+                      <th><i class="bi bi-person me-1"></i>Usuario</th>
+                      <th><i class="bi bi-info-circle me-1"></i>Detalles</th>
+                    </tr>
+                  </thead>
+                  <tbody id="activityTable">
+                    <tr>
+                      <td>2024-11-20</td>
+                      <td><span class="badge bg-success">Creación de cliente</span></td>
+                      <td>Juan Pérez</td>
+                      <td>Nuevo cliente registrado</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -111,11 +120,34 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/scripts/main.js"></script>
   <script>
     document.getElementById('logout').addEventListener('click', () => {
       localStorage.removeItem('token');
       window.location.href = '/login.html';
     });
+
+    // Agregar contadores animados
+    document.addEventListener('DOMContentLoaded', function() {
+      const counters = [
+        { id: 'clientes', target: 50, suffix: '' },
+        { id: 'ventas', target: 120, suffix: '' },
+        { id: 'productos', target: 300, suffix: '' },
+        { id: 'reportes', target: 15, suffix: '' }
+      ];
+
+      counters.forEach(counter => {
+        const element = document.querySelector(`.dashboard-card.primary .card-text, .dashboard-card.success .card-text, .dashboard-card.warning .card-text, .dashboard-card.danger .card-text`);
+        if (element) {
+          element.setAttribute('data-counter', counter.target);
+        }
+      });
+    });
   </script>
+  
+  <!-- Footer con Copyright -->
+  <footer class="text-center py-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); color: white; position: relative; z-index: 2; margin-top: 40px; border-radius: 15px; margin-left: 15px; margin-right: 15px;">
+    <p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
+  </footer>
 </body>
 </html>
