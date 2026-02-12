@@ -12,7 +12,7 @@ app.use(express.json());
 
 // *** CORRECCIÓN CRÍTICA: Servir archivos estáticos (HTML, CSS, JS) ***
 // Esto permite que el navegador cargue tus archivos del frontend.
-app.use(express.static('public'));
+app.use(express.static(__dirname));
 app.use(cors());
 
 // Configurar la conexión a MySQL. Usaremos mysql2 para soporte de promesas y transacciones más limpias.
@@ -37,7 +37,7 @@ console.log('Pool de conexiones a la base de datos configurado.');
 app.get('/', (req, res) => {
   // Con la nueva estructura, esto servirá `public/index.html` automáticamente.
   // Eliminamos esta respuesta para que express.static sirva el index.html
-  res.sendFile(__dirname + '/public/index.html');
+  res.sendFile(__dirname + '/index.html');
 });
 
 // Ruta para /dashboard
