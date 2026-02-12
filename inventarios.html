@@ -6,272 +6,17 @@
   <title>Inventario - Business Control</title>
   <meta name="author" content="Cristian David Ruiz">
   <meta name="description" content="Sistema de gestión de inventario - Business Control por Cristian David Ruiz">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="css/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-  <style>
-    .page-wrapper {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      background-attachment: fixed;
-      position: relative;
-    }
-    
-    .page-wrapper::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
-      pointer-events: none;
-    }
-    
-    .content-container {
-      position: relative;
-      z-index: 2;
-      padding: 40px 20px;
-    }
-    
-    .page-header {
-      background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(20px);
-      border-radius: 20px;
-      padding: 30px;
-      margin-bottom: 30px;
-      box-shadow: var(--shadow-xl);
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-    
-    .page-title {
-      background: var(--primary-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      font-weight: 700;
-      font-size: 2.5rem;
-      margin-bottom: 0;
-    }
-    
-    .table-container {
-      background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(20px);
-      border-radius: 20px;
-      padding: 30px;
-      box-shadow: var(--shadow-xl);
-      border: 1px solid rgba(255,255,255,0.2);
-      overflow: hidden;
-    }
-    
-    .btn-back {
-      background: rgba(255,255,255,0.2);
-      backdrop-filter: blur(10px);
-      border: 2px solid rgba(255,255,255,0.3);
-      color: white;
-      padding: 12px 24px;
-      border-radius: 50px;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.3s ease;
-      font-weight: 600;
-    }
-    
-    .btn-back:hover {
-      background: rgba(255,255,255,0.3);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-lg);
-      color: white;
-      text-decoration: none;
-    }
-    
-    .btn-add {
-      background: var(--success-gradient);
-      border: none;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 50px;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.3s ease;
-      font-weight: 600;
-      box-shadow: var(--shadow-md);
-    }
-    
-    .btn-add:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-lg);
-      color: white;
-      text-decoration: none;
-    }
-    
-    .table-custom {
-      border-radius: 12px;
-      overflow: hidden;
-      border: none;
-    }
-    
-    .table-custom thead {
-      background: var(--primary-gradient);
-      color: white;
-    }
-    
-    .table-custom thead th {
-      font-weight: 600;
-      padding: 20px 15px;
-      border: none;
-      text-transform: uppercase;
-      font-size: 0.85rem;
-      letter-spacing: 0.5px;
-    }
-    
-    .table-custom tbody tr {
-      transition: all 0.3s ease;
-    }
-    
-    .table-custom tbody tr:hover {
-      background: rgba(102, 126, 234, 0.05);
-      transform: scale(1.01);
-    }
-    
-    .table-custom tbody td {
-      padding: 18px 15px;
-      border-bottom: 1px solid rgba(0,0,0,0.05);
-      vertical-align: middle;
-    }
-    
-    .table-custom tbody tr:last-child td {
-      border-bottom: none;
-    }
-    
-    .action-buttons {
-      display: flex;
-      gap: 8px;
-    }
-    
-    .btn-action {
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: none;
-      font-size: 0.875rem;
-      font-weight: 500;
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-    
-    .btn-edit {
-      background: var(--warning-gradient);
-      color: white;
-    }
-    
-    .btn-edit:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
-    
-    .btn-delete {
-      background: var(--danger-gradient);
-      color: white;
-    }
-    
-    .btn-delete:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
-    
-    .stock-badge {
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.875rem;
-      font-weight: 600;
-    }
-    
-    .stock-high {
-      background: var(--success-gradient);
-      color: white;
-    }
-    
-    .stock-medium {
-      background: var(--warning-gradient);
-      color: white;
-    }
-    
-    .stock-low {
-      background: var(--danger-gradient);
-      color: white;
-    }
-    
-    .price-tag {
-      font-weight: 700;
-      color: var(--primary-color);
-      font-size: 1.1rem;
-    }
-    
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text-light);
-    }
-    
-    .empty-state i {
-      font-size: 4rem;
-      color: var(--primary-color);
-      margin-bottom: 20px;
-    }
-    
-    .loading-skeleton {
-      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-      background-size: 200% 100%;
-      animation: loading 1.5s infinite;
-      border-radius: 4px;
-      height: 40px;
-      margin: 10px 0;
-    }
-    
-    @keyframes loading {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-    
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-    
-    .stat-card {
-      background: rgba(255,255,255,0.1);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 15px;
-      padding: 20px;
-      text-align: center;
-    }
-    
-    .stat-card h4 {
-      color: white;
-      font-size: 2rem;
-      font-weight: 700;
-      margin: 0;
-    }
-    
-    .stat-card p {
-      color: rgba(255,255,255,0.8);
-      margin: 5px 0 0 0;
-    }
-  </style>
+  <link rel="stylesheet" href="css/footer-elegant.css">
 </head>
 <body>
   <div class="page-wrapper">
     <div class="content-container">
       <div class="container">
         <!-- Header -->
-        <div class="page-header fade-in-up">
+        <div class="page-header fade-in">
           <div class="d-flex justify-content-between align-items-center">
             <div>
               <h1 class="page-title">
@@ -279,7 +24,7 @@
               </h1>
               <p class="text-muted mb-0 mt-2">Controla tu stock y productos de manera eficiente</p>
             </div>
-            <a href="/dashboard.html" class="btn-back">
+            <a href="dashboard.html" class="btn-back">
               <i class="bi bi-arrow-left"></i>
               Regresar al Dashboard
             </a>
@@ -287,7 +32,7 @@
         </div>
 
         <!-- Stats Cards -->
-        <div class="stats-row fade-in-up" style="animation-delay: 0.1s">
+        <div class="stats-row fade-in" style="animation-delay: 0.1s">
           <div class="stat-card">
             <h4 id="totalProducts">0</h4>
             <p>Total Productos</p>
@@ -307,12 +52,12 @@
         </div>
 
         <!-- Table Container -->
-        <div class="table-container fade-in-up" style="animation-delay: 0.2s">
+        <div class="table-container fade-in" style="animation-delay: 0.2s">
           <div class="d-flex justify-content-between align-items-center mb-4">
             <h3 class="mb-0">
               <i class="bi bi-list-ul me-2"></i>Lista de Productos
             </h3>
-            <a href="/addInventory.html" class="btn-add">
+            <a href="addInventory.html" class="btn-add">
               <i class="bi bi-plus-circle"></i>
               Agregar Producto
             </a>
@@ -326,29 +71,15 @@
             <i class="bi bi-box-seam"></i>
             <h4>No hay productos en el inventario</h4>
             <p>Comienza agregando productos para gestionar tu stock</p>
-            <a href="/addInventory.html" class="btn-add">
+            <a href="addInventory.html" class="btn-add">
               <i class="bi bi-plus-circle"></i>
               Agregar Primer Producto
             </a>
           </div>
           
-          <!-- Table -->
-          <div class="table-responsive">
-            <table class="table table-custom" id="inventoryTable" style="display: none;">
-              <thead>
-                <tr>
-                  <th><i class="bi bi-hash me-1"></i>ID</th>
-                  <th><i class="bi bi-box me-1"></i>Producto</th>
-                  <th><i class="bi bi-layers me-1"></i>Stock</th>
-                  <th><i class="bi bi-currency-dollar me-1"></i>Precio</th>
-                  <th><i class="bi bi-graph-up me-1"></i>Valor Total</th>
-                  <th><i class="bi bi-gear me-1"></i>Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="inventoryTableBody">
-                <!-- Contenido dinámico generado con JavaScript -->
-              </tbody>
-            </table>
+          <!-- Inventory Grid -->
+          <div id="inventoryGrid" class="row g-4" style="display: none;">
+            <!-- Generated by JS -->
           </div>
         </div>
       </div>
@@ -371,21 +102,20 @@
         }
 
         const products = await response.json();
-        const tbody = document.querySelector('#inventoryTableBody');
+        const grid = document.querySelector('#inventoryGrid');
         const loadingState = document.getElementById('loadingState');
         const emptyState = document.getElementById('emptyState');
-        const inventoryTable = document.getElementById('inventoryTable');
 
         // Ocultar loading
         loadingState.style.display = 'none';
 
         // Limpiar tabla
-        tbody.innerHTML = '';
+        grid.innerHTML = '';
 
         if (products.length === 0) {
           emptyState.style.display = 'block';
         } else {
-          inventoryTable.style.display = 'table';
+          grid.style.display = 'flex';
           
           let totalProducts = 0;
           let totalStock = 0;
@@ -399,32 +129,47 @@
             
             const totalProductValue = product.stock * product.price;
             
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td><strong>${index + 1}</strong></td>
-              <td>
-                <div class="d-flex align-items-center">
-                  <i class="bi bi-box-seam me-2 text-primary"></i>
-                  <strong>${product.product_name}</strong>
+            const cardHtml = `
+              <div class="col-md-6 col-lg-4 fade-in">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 15px;">
+                  <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                      <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-light p-2 me-3 text-primary">
+                          <i class="bi bi-box-seam fs-4"></i>
+                        </div>
+                        <div>
+                          <h5 class="card-title mb-0 fw-bold">${product.product_name}</h5>
+                          <small class="text-muted">ID: #${product.id || index + 1}</small>
+                        </div>
+                      </div>
+                      <span class="stock-badge ${stockBadge}">${stockText}</span>
+                    </div>
+                    
+                    <div class="row g-2 mb-4">
+                      <div class="col-6">
+                        <small class="text-muted d-block">Precio</small>
+                        <span class="fw-bold">$${product.price.toFixed(2)}</span>
+                      </div>
+                      <div class="col-6">
+                        <small class="text-muted d-block">Stock</small>
+                        <span class="fw-bold">${product.stock} un.</span>
+                      </div>
+                    </div>
+
+                    <div class="d-flex gap-2 pt-3 border-top">
+                      <button class="btn btn-light flex-fill text-primary btn-sm" onclick="editProduct(${product.id})">
+                        <i class="bi bi-pencil me-1"></i> Editar
+                      </button>
+                      <button class="btn btn-light flex-fill text-danger btn-sm" onclick="deleteProduct(${product.id})">
+                        <i class="bi bi-trash me-1"></i> Eliminar
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </td>
-              <td>
-                <span class="stock-badge ${stockBadge}">${product.stock} - ${stockText}</span>
-              </td>
-              <td><span class="price-tag">$${product.price.toFixed(2)}</span></td>
-              <td><span class="price-tag">$${totalProductValue.toFixed(2)}</span></td>
-              <td>
-                <div class="action-buttons">
-                  <button class="btn-action btn-edit" onclick="editProduct(${product.id})">
-                    <i class="bi bi-pencil"></i> Editar
-                  </button>
-                  <button class="btn-action btn-delete" onclick="deleteProduct(${product.id})">
-                    <i class="bi bi-trash"></i> Eliminar
-                  </button>
-                </div>
-              </td>
+              </div>
             `;
-            tbody.appendChild(row);
+            grid.insertAdjacentHTML('beforeend', cardHtml);
 
             // Actualizar estadísticas
             totalProducts++;

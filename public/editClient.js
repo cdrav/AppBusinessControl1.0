@@ -1,29 +1,3 @@
-// Reutilizamos la lógica de notificaciones (idealmente esto estaría en un archivo JS compartido)
-if (!document.getElementById('notification-container')) {
-  const container = document.createElement('div');
-  container.id = 'notification-container';
-  container.className = 'notification-container';
-  document.body.appendChild(container);
-}
-
-function showToast(message, isError = false) {
-  const container = document.getElementById('notification-container');
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.textContent = message;
-  if (isError) {
-    toast.style.backgroundColor = '#dc3545';
-  } else {
-    toast.style.backgroundColor = '#28a745';
-  }
-  container.appendChild(toast);
-  setTimeout(() => toast.classList.add('show'), 10);
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => container.removeChild(toast), 500);
-  }, 3000);
-}
-
 // Leer el ID del cliente desde la URL
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get('id');
@@ -76,8 +50,8 @@ document.getElementById('editClientForm').addEventListener('submit', function (e
       const data = await response.json();
       throw new Error(data.message || 'No se pudo actualizar el cliente');
     }
-    showToast('Cliente actualizado exitosamente');
-    setTimeout(() => window.location.href = '/public/clients.html', 1500);
+    showToast('Cliente actualizado exitosamente', false);
+    setTimeout(() => window.location.href = '/clients.html', 1500);
   })
   .catch(error => {
     console.error('Error al actualizar cliente:', error);

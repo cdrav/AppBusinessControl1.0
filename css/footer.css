@@ -1,0 +1,46 @@
+/* Business Control - Footer Styles */
+/* Footer limpio y minimalista */
+
+footer {
+  background: var(--bg-primary);
+  border-top: 1px solid var(--bg-tertiary);
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+  margin-top: auto;
+}
+
+footer p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+footer strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Responsive footer */
+@media (max-width: 768px) {
+  footer {
+    padding: 16px;
+  }
+  
+  footer p {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  footer {
+    padding: 12px;
+  }
+  
+  footer p {
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+}

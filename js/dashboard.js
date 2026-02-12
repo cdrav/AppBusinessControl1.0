@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   loadStats();
   animateCounters();
+  updateDate(); // Cargar fecha actual
 });
 
 // Load statistics
@@ -67,4 +68,13 @@ function animateCounter(element, start, end, duration) {
     }
     element.textContent = Math.floor(current).toLocaleString();
   }, 16);
+}
+
+// Update current date in welcome banner
+function updateDate() {
+  const dateElement = document.getElementById('currentDate');
+  if (dateElement) {
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    dateElement.textContent = new Date().toLocaleDateString('es-ES', options);
+  }
 }

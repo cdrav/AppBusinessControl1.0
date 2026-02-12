@@ -9,6 +9,10 @@ const fs = require('fs');
 // Crear la aplicación Express
 const app = express();
 app.use(express.json()); 
+
+// *** CORRECCIÓN CRÍTICA: Servir archivos estáticos (HTML, CSS, JS) ***
+// Esto permite que el navegador cargue tus archivos del frontend.
+app.use(express.static('public'));
 app.use(cors());
 
 // Configurar la conexión a MySQL. Usaremos mysql2 para soporte de promesas y transacciones más limpias.
@@ -121,53 +125,81 @@ app.post('/login', (req, res) => {
   });
 });
 
-// Rutas para la gestión de clientes
-app.get('/clients', authenticateToken, (req, res) => {
-  const query = 'SELECT * FROM clients'; 
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error al obtener los clientes:', err);
-      return res.status(500).json({ message: 'Error del servidor' });
-    }
+// ==================================================================
+// RUTAS DE CLIENTES REFACTORIZADAS CON ASYNC/AWAIT
+// ==================================================================
+
+// Obtener todos los clientes
+app.get('/clients', authenticateToken, async (req, res) => {
+  try {
+    const [results] = await db.query('SELECT * FROM clients ORDER BY name ASC');
     res.status(200).json(results);
-  });
+  } catch (error) {
+    console.error('Error al obtener los clientes:', error);
+    res.status(500).json({ message: 'Error del servidor al obtener clientes' });
+  }
 });
 
-// Ruta para agregar un nuevo cliente
-app.post('/clients', authenticateToken, (req, res) => {
+// Agregar un nuevo cliente
+app.post('/clients', authenticateToken, async (req, res) => {
   const { name, email, phone, address } = req.body;
-
-  // Validación básica
   if (!name || !email || !phone) {
     return res.status(400).json({ message: 'Nombre, email y teléfono son obligatorios' });
   }
-
-  const query = 'INSERT INTO clients (name, email, phone, address) VALUES (?, ?, ?, ?)';
-  db.query(query, [name, email, phone, address], (err, result) => {
-    if (err) {
-      console.error('Error al agregar cliente:', err);
-      return res.status(500).json({ message: 'Error del servidor' });
-    }
+  try {
+    const [result] = await db.query('INSERT INTO clients (name, email, phone, address) VALUES (?, ?, ?, ?)', [name, email, phone, address]);
     res.status(201).json({ message: 'Cliente agregado con éxito', clienteId: result.insertId });
-  });
+  } catch (error) {
+    console.error('Error al agregar cliente:', error);
+    res.status(500).json({ message: 'Error del servidor al agregar cliente' });
+  }
 });
 
-// Ruta para obtener un cliente específico por ID
-app.get('/clients/:id', authenticateToken, (req, res) => {
+// Obtener un cliente específico por ID
+app.get('/clients/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const query = 'SELECT id, name, email, phone, address FROM clients WHERE id = ?';
-  db.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error al obtener el cliente:', err);
-      return res.status(500).json({ message: 'Error del servidor' });
-    }
+  try {
+    const [results] = await db.query('SELECT id, name, email, phone, address FROM clients WHERE id = ?', [id]);
     if (results.length === 0) {
       return res.status(404).json({ message: 'Cliente no encontrado' });
     }
     res.status(200).json(results[0]);
-  });
+  } catch (error) {
+    console.error('Error al obtener el cliente:', error);
+    res.status(500).json({ message: 'Error del servidor al obtener el cliente' });
+  }
 });
 
+// *** CORRECCIÓN CRÍTICA: Ruta para actualizar un cliente (PUT) ***
+app.put('/clients/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, address } = req.body;
+  if (!name || !email || !phone) {
+    return res.status(400).json({ message: 'Nombre, email y teléfono son obligatorios' });
+  }
+  try {
+    await db.query('UPDATE clients SET name = ?, email = ?, phone = ?, address = ? WHERE id = ?', [name, email, phone, address, id]);
+    res.status(200).json({ message: 'Cliente actualizado con éxito' });
+  } catch (error) {
+    console.error('Error al actualizar cliente:', error);
+    res.status(500).json({ message: 'Error del servidor al actualizar cliente' });
+  }
+});
+
+// *** CORRECCIÓN CRÍTICA: Ruta para eliminar un cliente (DELETE) ***
+app.delete('/clients/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [result] = await db.query('DELETE FROM clients WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Cliente no encontrado' });
+    }
+    res.status(200).json({ message: 'Cliente eliminado con éxito' });
+  } catch (error) {
+    console.error('Error al eliminar cliente:', error);
+    res.status(500).json({ message: 'Error del servidor al eliminar cliente' });
+  }
+});
 
 // Middleware para verificar JWT
 function authenticateToken(req, res, next) {

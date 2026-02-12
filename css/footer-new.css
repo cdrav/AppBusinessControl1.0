@@ -1,0 +1,61 @@
+/* Business Control - Footer Styles */
+/* Footer vibrante con glassmorphism */
+
+footer {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--glass-border);
+  padding: 30px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+  margin-top: auto;
+}
+
+footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--primary-gradient);
+  animation: borderGlow 3s ease-in-out infinite;
+}
+
+footer p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 400;
+  text-shadow: 0 0 8px rgba(255, 107, 107, 0.6);
+  letter-spacing: 0.5px;
+}
+
+footer strong {
+  color: var(--text-accent);
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+}
+
+/* Responsive footer */
+@media (max-width: 768px) {
+  footer {
+    padding: 24px;
+  }
+  
+  footer p {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  footer {
+    padding: 20px;
+  }
+  
+  footer p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+}
