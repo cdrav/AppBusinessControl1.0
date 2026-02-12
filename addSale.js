@@ -21,7 +21,7 @@ function setupEventListeners() {
         item.remove();
         calculateTotals();
       } else {
-        showNotification('Debe haber al menos un producto', 'warning');
+        showToast('Debe haber al menos un producto', true); // Usar showToast para consistencia
       }
     }
   });
@@ -143,11 +143,62 @@ function calculateTotals() {
 
 async function handleFormSubmit(e) {
   e.preventDefault();
-  // Lógica de envío similar a la explicada anteriormente, 
-  // recolectando clientId, saleDate y construyendo el array de productos.
-  // ...
-  showNotification('Funcionalidad de guardado en desarrollo (Backend integration)', 'info');
-  setTimeout(() => {
-      window.location.href = 'ventas.html';
-  }, 1500);
+
+  const submitBtn = document.querySelector('.btn-submit');
+  const clientId = document.getElementById('clientId').value;
+  const saleDate = document.getElementById('saleDate').value;
+  const productItems = document.querySelectorAll('.product-item');
+
+  const products = [];
+  for (const item of productItems) {
+    const productId = item.querySelector('.product-select').value;
+    const quantity = parseInt(item.querySelector('.quantity-input').value, 10);
+
+    if (productId && quantity > 0) {
+      products.push({ productId, quantity });
+    }
+  }
+
+  if (!clientId || !saleDate || products.length === 0) {
+    showToast('Por favor, completa cliente, fecha y al menos un producto.', true);
+    return;
+  }
+
+  const saleData = {
+    clientId,
+    saleDate,
+    products
+  };
+
+  submitBtn.classList.add('loading');
+  submitBtn.disabled = true;
+
+  try {
+    const response = await fetch(`${API_URL}/sales`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      },
+      body: JSON.stringify(saleData)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Error al registrar la venta');
+    }
+
+    showToast('Venta registrada con éxito', false);
+    setTimeout(() => {
+      window.location.href = '/ventas.html';
+    }, 1500);
+
+  } catch (error) {
+    console.error('Error al registrar la venta:', error);
+    showToast(error.message, true);
+  } finally {
+    submitBtn.classList.remove('loading');
+    submitBtn.disabled = false;
+  }
 }

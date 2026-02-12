@@ -30,8 +30,8 @@ function initializeCharts() {
       datasets: [{
         label: 'Ventas',
         data: [185000, 223000, 198000, 287000, 312000, 345000],
-        borderColor: '#007bff',
-        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.1)',
         borderWidth: 2,
         tension: 0.4,
         fill: true
@@ -104,7 +104,7 @@ function initializeCharts() {
       datasets: [{
         data: [35, 25, 20, 12, 8],
         backgroundColor: [
-          '#007bff',
+          '#2563eb',
           '#28a745',
           '#ffc107',
           '#dc3545',
@@ -131,7 +131,7 @@ function initializeCharts() {
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
           titleColor: '#fff',
           bodyColor: '#fff',
-          borderColor: '#007bff',
+          borderColor: '#2563eb',
           borderWidth: 1,
           padding: 12,
           callbacks: {

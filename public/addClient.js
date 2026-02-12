@@ -32,7 +32,7 @@ document.getElementById('addClientForm').addEventListener('submit', function (ev
     })
     .then(data => {
         showToast(data.message || 'Cliente agregado exitosamente');
-        setTimeout(() => window.location.href = '/public/clients.html', 1500); // Redirigir tras un momento
+        setTimeout(() => window.location.href = '/clients.html', 1500); // Redirigir tras un momento
     })
     .catch(error => {
         console.error('Error al agregar cliente:', error);

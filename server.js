@@ -19,110 +19,89 @@ app.use(cors());
 // Por favor, ejecuta: npm install mysql2
 const mysql = require('mysql2/promise');
 
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,  
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
-// La conexión con mysql2/promise se maneja de forma diferente, no se llama a .connect() al inicio.
-// Las conexiones se gestionan por consulta. Para transacciones, crearemos una conexión específica.
-console.log('Pool de conexión a la base de datos configurado.');
+console.log('Pool de conexiones a la base de datos configurado.');
 
 
 // Ruta de prueba
 app.get('/', (req, res) => {
-  res.send('Bienvenido a Business Control API');
+  // Con la nueva estructura, esto servirá `public/index.html` automáticamente.
+  // Eliminamos esta respuesta para que express.static sirva el index.html
+  res.sendFile(__dirname + '/public/index.html');
 });
 
 // Ruta para /dashboard
 app.get('/dashboard', authenticateToken, (req, res) => {
+  // Esta ruta debería servir el archivo HTML o ser usada para obtener datos del dashboard.
+  // Dado que tienes `dashboard.html`, devolvemos JSON solo si es una petición de API explícita
   res.json({ message: 'Bienvenido al Dashboard' });
 });
 
 // Ruta para registrar un nuevo usuario
-app.post('/register', (req, res) => {
+app.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
 
-  // Validación básica
   if (!username || !email || !password) {
     return res.status(400).json({ message: 'Todos los campos son obligatorios' });
   }
 
-  // Verificar si el usuario ya existe
-  const checkUserQuery = 'SELECT * FROM users WHERE email = ? OR username = ?';
-  db.query(checkUserQuery, [email, username], (err, results) => {
-    if (err) {
-      console.error('Error al verificar usuario:', err);
-      return res.status(500).json({ message: 'Error del servidor' });
-    }
+  try {
+    const [existingUsers] = await db.query('SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
 
-    if (results.length > 0) {
+    if (existingUsers.length > 0) {
       return res.status(409).json({ message: 'El usuario o correo ya existe' });
     }
 
-    // Cifrar la contraseña
-    bcrypt.hash(password, 10, (err, hashedPassword) => {
-      if (err) {
-        console.error('Error al cifrar la contraseña:', err);
-        return res.status(500).json({ message: 'Error del servidor' });
-      }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Insertar el nuevo usuario en la base de datos
-      const insertUserQuery = 'INSERT INTO users (username, email, password) VALUES (?, ?, ?)';
-      db.query(insertUserQuery, [username, email, hashedPassword], (err, result) => {
-        if (err) {
-          console.error('Error al registrar usuario:', err);
-          return res.status(500).json({ message: 'Error del servidor' });
-        }
+    await db.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword]);
 
-        res.status(201).json({ message: 'Usuario registrado con éxito' });
-      });
-    });
-  });
+    res.status(201).json({ message: 'Usuario registrado con éxito' });
+  } catch (error) {
+    console.error('Error al registrar usuario:', error);
+    res.status(500).json({ message: 'Error del servidor' });
+  }
 });
 
 // Ruta para iniciar sesión
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ message: 'Todos los campos son obligatorios' });
   }
 
-  const query = 'SELECT * FROM users WHERE email = ?';
-  db.query(query, [email.toLowerCase()], (err, results) => {
-    if (err) {
-      console.error('Error al verificar usuario:', err);
-      return res.status(500).json({ message: 'Error del servidor' });
-    }
+  try {
+    const [results] = await db.query('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
 
     if (results.length === 0) {
       return res.status(401).json({ message: 'Correo electrónico o contraseña incorrectos' });
     }
 
     const user = results[0];
-    bcrypt.compare(password, user.password, (err, isMatch) => {
-      if (err) {
-        console.error('Error al verificar contraseña:', err);
-        return res.status(500).json({ message: 'Error del servidor' });
-      }
+    const isMatch = await bcrypt.compare(password, user.password);
 
-      if (!isMatch) {
-        return res.status(401).json({ message: 'Correo electrónico o contraseña incorrectos' });
-      }
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Correo electrónico o contraseña incorrectos' });
+    }
 
-      const token = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h' }
-      );
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-      res.status(200).json({ message: 'Inicio de sesión exitoso', token });
-    });
-  });
+    res.status(200).json({ message: 'Inicio de sesión exitoso', token });
+  } catch (error) {
+    console.error('Error al iniciar sesión:', error);
+    res.status(500).json({ message: 'Error del servidor' });
+  }
 });
 
 // ==================================================================
@@ -201,96 +180,76 @@ app.delete('/clients/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Middleware para verificar JWT
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; 
+// ==================================================================
+// RUTAS DE INVENTARIO REFACTORIZADAS CON ASYNC/AWAIT
+// ==================================================================
 
-  if (!token) {
-    return res.status(401).json({ message: 'Acceso no autorizado' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: 'Token inválido o expirado' });
-    }
-
-    req.user = user; // Almacena los datos del usuario en la solicitud
-    next(); // Llama al siguiente middleware o controlador de ruta
-  });
-}
-
-// Puerto del servidor Express
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
-});
-
-// inventarios
 // Obtener todos los productos
-app.get('/inventory', authenticateToken, (req, res) => {
-    const query = 'SELECT * FROM inventory'; // Asegúrate de que esta tabla exista
-    db.query(query, (err, results) => {
-      if (err) {
-        console.error('Error al obtener el inventario:', err);
-        return res.status(500).json({ message: 'Error del servidor' });
-      }
-      res.status(200).json(results);
-    });
-  });
+app.get('/inventory', authenticateToken, async (req, res) => {
+  try {
+    const [results] = await db.query('SELECT * FROM inventory ORDER BY product_name ASC');
+    res.status(200).json(results);
+  } catch (error) {
+    console.error('Error al obtener el inventario:', error);
+    res.status(500).json({ message: 'Error del servidor al obtener el inventario' });
+  }
+});
   
   // Agregar un producto
-  app.post('/inventory', authenticateToken, (req, res) => {
-    const { name, quantity, price } = req.body;
+  app.post('/inventory', authenticateToken, async (req, res) => {
+    const { name, quantity, price, category, description } = req.body;
   
     if (!name || !quantity || !price) {
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
     }
   
-    
-    const query = 'INSERT INTO inventory (product_name, stock, price) VALUES (?, ?, ?)';
-    db.query(query, [name, quantity, price], (err, result) => {
-      if (err) {
-        console.error('Error al agregar producto:', err);
-        return res.status(500).json({ message: 'Error del servidor' });
-      }
+    try {
+      // Asumimos que la tabla `inventory` tiene las columnas `category` y `description`.
+      const query = 'INSERT INTO inventory (product_name, stock, price, category, description) VALUES (?, ?, ?, ?, ?)';
+      const [result] = await db.query(query, [name, quantity, price, category || null, description || null]);
       res.status(201).json({ message: 'Producto agregado con éxito', productId: result.insertId });
-    });
+    } catch (error) {
+      console.error('Error al agregar producto:', error);
+      res.status(500).json({ message: 'Error del servidor al agregar producto' });
+    }
   });
   
   // Editar un producto
-  app.put('/inventory/:id', authenticateToken, (req, res) => {
+  app.put('/inventory/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const { name, quantity, price } = req.body;
+    const { name, quantity, price, category, description } = req.body;
   
     if (!name || !quantity || !price) {
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
     }
   
-    
-    const query = 'UPDATE inventory SET product_name = ?, stock = ?, price = ? WHERE id = ?';
-    db.query(query, [name, quantity, price, id], (err) => {
-      if (err) {
-        console.error('Error al actualizar producto:', err);
-        return res.status(500).json({ message: 'Error del servidor' });
+    try {
+      const query = 'UPDATE inventory SET product_name = ?, stock = ?, price = ?, category = ?, description = ? WHERE id = ?';
+      const [result] = await db.query(query, [name, quantity, price, category, description, id]);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Producto no encontrado' });
       }
       res.status(200).json({ message: 'Producto actualizado con éxito' });
-    });
+    } catch (error) {
+      console.error('Error al actualizar producto:', error);
+      res.status(500).json({ message: 'Error del servidor al actualizar producto' });
+    }
   });
   
   // Eliminar un producto
-  app.delete('/inventory/:id', authenticateToken, (req, res) => {
+  app.delete('/inventory/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
   
-    const query = 'DELETE FROM inventory WHERE id = ?';
-    db.query(query, [id], (err) => {
-      if (err) {
-        console.error('Error al eliminar producto:', err);
-        return res.status(500).json({ message: 'Error del servidor' });
+    try {
+      const [result] = await db.query('DELETE FROM inventory WHERE id = ?', [id]);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Producto no encontrado' });
       }
       res.status(200).json({ message: 'Producto eliminado con éxito' });
-    });
+    } catch (error) {
+      console.error('Error al eliminar producto:', error);
+      res.status(500).json({ message: 'Error del servidor al eliminar producto' });
+    }
   });
   
 // ==================================================================
@@ -361,13 +320,12 @@ app.post('/sales', authenticateToken, async (req, res) => {
 
     res.status(201).json({ message: 'Venta registrada con éxito', saleId });
 
-  } catch (error) { {
+  } catch (error) {
     // 5. Si algo falló, revertir todos los cambios
     if (connection) await connection.rollback();
     console.error('Error en la transacción de venta:', error);
     // Enviamos el mensaje de error específico al cliente
     res.status(500).json({ message: error.message || 'Error del servidor al procesar la venta.' });
-  }
   } finally {
     // 6. Liberar la conexión en cualquier caso
     if (connection) connection.release();
@@ -377,7 +335,7 @@ app.post('/sales', authenticateToken, async (req, res) => {
 
 
 // Ruta para obtener todas las ventas
-app.get('/sales', authenticateToken, (req, res) => {
+app.get('/sales', authenticateToken, async (req, res) => {
   const query = `
     SELECT 
       s.id, 
@@ -388,56 +346,81 @@ app.get('/sales', authenticateToken, (req, res) => {
     JOIN clients c ON s.client_id = c.id
     ORDER BY s.sale_date DESC
   `;
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error al obtener las ventas:', err);
-      return res.status(500).json({ message: 'Error del servidor' });
-    }
+  try {
+    const [results] = await db.query(query);
     res.status(200).json(results);
-  });
+  } catch (error) {
+    console.error('Error al obtener las ventas:', error);
+    res.status(500).json({ message: 'Error del servidor' });
+  }
 });
 
 // Ruta para generar el reporte en PDF
-app.get('/report', authenticateToken, (req, res) => {
-    // Crear un nuevo documento PDF
-    const doc = new PDFDocument();
-    
-    // Configurar la respuesta para enviar el PDF al cliente
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=report.pdf');
-    
-    // Pipe el documento PDF directamente al cliente
-    doc.pipe(res);
-    
-    // Agregar contenido al PDF
-    doc.fontSize(18).text('Reporte de Ventas', { align: 'center' });
-    doc.moveDown();
-    
-    // Aquí puedes obtener los datos de la base de datos, por ejemplo, ventas
+app.get('/report', authenticateToken, async (req, res) => {
+  const doc = new PDFDocument({ margin: 50 });
+
+  try {
     const query = `
       SELECT s.id, c.name AS client_name, s.total_price, s.sale_date
       FROM sales s
       JOIN clients c ON s.client_id = c.id
       ORDER BY s.sale_date DESC
     `;
+    const [sales] = await db.query(query);
 
-    db.query(query, (err, results) => {
-      if (err) {
-        console.error('Error al obtener los datos del reporte:', err);
-        return res.status(500).json({ message: 'Error al generar el reporte' });
-      }
-      
-      // Agregar cada venta al PDF
-      results.forEach(sale => {
-        doc.fontSize(12).text(`ID de Venta: ${sale.id}`);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=reporte-ventas.pdf');
+
+    doc.pipe(res);
+
+    // Contenido del PDF
+    doc.fontSize(18).text('Reporte de Ventas', { align: 'center' });
+    doc.moveDown();
+
+    if (sales.length === 0) {
+      doc.fontSize(12).text('No hay ventas registradas para generar un reporte.');
+    } else {
+      sales.forEach(sale => {
+        const saleDate = new Date(sale.sale_date).toLocaleDateString('es-GT');
+        doc.fontSize(12).text(`ID Venta: ${sale.id}`, { continued: true });
+        doc.fontSize(12).text(` - Fecha: ${saleDate}`, { align: 'right' });
         doc.text(`Cliente: ${sale.client_name}`);
-        doc.text(`Fecha de Venta: ${sale.sale_date}`);
         doc.text(`Total: Q${sale.total_price.toFixed(2)}`);
         doc.moveDown();
       });
-      
-      // Finalizar el documento PDF
-      doc.end();
-    });
+    }
+
+    doc.end();
+  } catch (error) {
+    console.error('Error al generar el reporte:', error);
+    // Si ocurre un error, no podemos enviar un JSON porque las cabeceras pueden estar ya enviadas.
+    // Lo mejor es terminar el stream y registrar el error.
+    res.status(500).end('Error al generar el reporte en PDF.');
+  }
+});
+
+// Middleware para verificar JWT
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Acceso no autorizado' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: 'Token inválido o expirado' });
+    }
+
+    req.user = user;
+    next();
   });
-  
+}
+
+// Puerto del servidor Express
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
+});

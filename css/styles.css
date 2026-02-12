@@ -6,21 +6,21 @@
 
 /* ===== VARIABLES GLOBALES ===== */
 :root {
-  --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); /* Indigo a Violeta más moderno */
+  --primary-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); /* Azul Real Profesional */
   --success-gradient: linear-gradient(135deg, #059669 0%, #34d399 100%);
   --danger-gradient: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
   --warning-gradient: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%);
   --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
   
-  --glass-bg: rgba(255, 255, 255, 0.15);
+  --glass-bg: rgba(255, 255, 255, 0.92); /* Aumentado para contraste perfecto y legibilidad */
   --glass-border: rgba(255, 255, 255, 0.25);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   
-  --text-primary: #2c3e50;
-  --text-secondary: #34495e;
-  --text-muted: #7f8c8d;
+  --text-primary: #111827; /* Más oscuro para mejor contraste */
+  --text-secondary: #374151; /* Gris oscuro legible */
+  --text-muted: #6b7280;
   --text-white: #ffffff;
-  --text-accent: #667eea;
+  --text-accent: #2563eb; /* Azul Real vibrante y legible */
   
   --bg-primary: #f3f4f6;
   --bg-secondary: rgba(255, 255, 255, 0.9);
@@ -66,6 +66,12 @@ body {
   font-size: 16px;
 }
 
+/* Selección de texto moderna */
+::selection {
+  background: var(--text-accent);
+  color: #ffffff;
+}
+
 /* Fondo decorativo moderno */
 body::before {
   content: '';
@@ -74,7 +80,7 @@ body::before {
   left: 0;
   width: 100%;
   height: 400px;
-  background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   clip-path: ellipse(150% 100% at 50% 0%);
   pointer-events: none;
   z-index: 1;
@@ -106,7 +112,7 @@ body::before {
 }
 
 .content-container {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.95); /* Mayor opacidad para evitar ruido visual */
   backdrop-filter: blur(25px);
   border-radius: var(--border-radius-lg);
   padding: 40px;
@@ -166,29 +172,27 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: 2.5rem;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: var(--text-primary); /* Color sólido en lugar de gradiente */
+  background: none;
+  -webkit-text-fill-color: initial;
+  text-shadow: none;
 }
 
 h2 {
   font-size: 2rem;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: initial;
 }
 
 h3 {
   font-size: 1.5rem;
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 h4 {
   font-size: 1.25rem;
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 p {
@@ -233,10 +237,9 @@ p {
 }
 
 .form-title {
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: initial;
   font-weight: 700;
   font-size: 2rem;
   margin-bottom: 10px;
@@ -245,7 +248,7 @@ p {
   justify-content: center;
   gap: 14px;
   text-shadow: none;
-  animation: glow 3s ease-in-out infinite alternate;
+  animation: none;
 }
 
 .form-subtitle {
@@ -493,10 +496,9 @@ p {
 }
 
 .card-title {
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: initial;
   font-size: 1.4rem;
   font-weight: 600;
   margin-bottom: 15px;
@@ -564,7 +566,7 @@ p {
 
 .stat-icon {
   font-size: 3.5rem;
-  color: #4f46e5;
+  color: #2563eb;
   margin-bottom: 20px;
   display: block;
   text-shadow: none;
@@ -739,10 +741,9 @@ p {
 
 .feature-icon {
   font-size: 3rem;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-accent);
+  background: none;
+  -webkit-text-fill-color: initial;
   margin-bottom: 16px;
   display: block;
   text-align: center;
@@ -759,7 +760,7 @@ p {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-left: 5px solid #4f46e5;
+  border-left: 5px solid #2563eb;
 }
 
 .quick-action-card {
@@ -781,14 +782,15 @@ p {
 .quick-action-card:hover {
   transform: translateY(-5px);
   box-shadow: var(--shadow-md);
-  border-color: #4f46e5;
-  color: #4f46e5;
+  border-color: transparent;
+  background: var(--primary-gradient);
+  color: white;
 }
 
 .quick-action-icon {
   font-size: 2rem;
   margin-bottom: 10px;
-  color: #4f46e5;
+  color: #2563eb;
   background: #eef2ff;
   width: 60px;
   height: 60px;
@@ -800,8 +802,9 @@ p {
 }
 
 .quick-action-card:hover .quick-action-icon {
-  background: #4f46e5;
-  color: white;
+  background: white;
+  color: #2563eb;
+  box-shadow: var(--shadow-sm);
 }
 
 /* ===== TIPOGRAFÍA MEJORADA ===== */
@@ -816,38 +819,35 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: 2.8rem;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: initial;
   text-shadow: none;
-  animation: glow 3s ease-in-out infinite alternate;
+  animation: none;
 }
 
 h2 {
   font-size: 2.2rem;
-  background: var(--info-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: initial;
   text-shadow: none;
-  animation: glow 3s ease-in-out infinite alternate;
+  animation: none;
 }
 
 h3 {
   font-size: 1.8rem;
-  background: var(--success-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-secondary);
+  background: none;
+  -webkit-text-fill-color: initial;
   text-shadow: none;
-  animation: glow 3s ease-in-out infinite alternate;
+  animation: none;
 }
 
 h4 {
   font-size: 1.4rem;
-  color: var(--text-accent);
-  text-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+  color: var(--text-primary);
+  text-shadow: none;
 }
 
 p {
@@ -855,6 +855,10 @@ p {
   color: var(--text-secondary);
   font-weight: 400;
   line-height: 1.7;
+}
+
+.text-primary {
+  color: var(--text-accent) !important; /* Azul para resaltar sobre fondos claros */
 }
 
 @keyframes glow {
