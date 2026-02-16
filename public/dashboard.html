@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Business Control</title>
+  <meta name="author" content="Cristian David Ruiz">
+  <meta name="description" content="Panel principal de control - Business Control por Cristian David Ruiz">
+  <link rel="stylesheet" href="css/styles.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="page-wrapper">
+    <div class="content-container">
+      <div class="container">
+        <!-- Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-5 fade-in gap-3">
+          <div class="d-flex align-items-center w-100 w-md-auto justify-content-center justify-content-md-start">
+            <div>
+              <h2 class="mb-0 fw-bold">Business Control</h2>
+              <p class="text-muted mb-0">Panel de Administración</p>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <div class="text-end d-none d-md-block">
+              <span class="d-block fw-bold text-dark">Administrador</span>
+              <small class="text-muted">admin@business.com</small>
+            </div>
+            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; font-size: 1.2rem;">
+              A
+            </div>
+            <a href="index.html" class="btn btn-light btn-sm ms-2" title="Cerrar Sesión">
+              <i class="bi bi-box-arrow-right"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- Welcome Banner -->
+        <div class="welcome-banner fade-in-up">
+          <div>
+            <h3 class="mb-1">¡Hola de nuevo! 👋</h3>
+            <p class="mb-0 text-muted">Aquí tienes el resumen de la actividad de tu negocio hoy.</p>
+          </div>
+          <div class="d-none d-md-block text-end">
+            <h4 class="mb-0 text-primary" id="currentDate">Cargando fecha...</h4>
+            <small class="text-muted">Actualizado en tiempo real</small>
+          </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="row g-4 mb-4 fade-in" style="animation-delay: 0.1s">
+              <div class="col-md-3">
+                <div class="stat-card h-100 text-start p-4 border-start border-4 border-primary">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <p class="text-muted mb-1">Ingresos Totales</p>
+                      <h3 class="mb-0" id="totalRevenue">$0</h3>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 text-primary rounded p-2">
+                      <i class="bi bi-currency-dollar fs-4"></i>
+                    </div>
+                  </div>
+                  <div class="mt-3">
+                    <span class="badge bg-success bg-opacity-10 text-success">+12.5%</span>
+                    <small class="text-muted ms-2">vs mes anterior</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card h-100 text-start p-4 border-start border-4 border-success">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <p class="text-muted mb-1">Ventas Realizadas</p>
+                      <h3 class="mb-0" id="totalSales" data-counter="0">0</h3>
+                    </div>
+                    <div class="bg-success bg-opacity-10 text-success rounded p-2">
+                      <i class="bi bi-cart-check fs-4"></i>
+                    </div>
+                  </div>
+                  <div class="mt-3">
+                    <span class="badge bg-success bg-opacity-10 text-success">+5</span>
+                    <small class="text-muted ms-2">nuevas hoy</small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card h-100 text-start p-4 border-start border-4 border-info">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <p class="text-muted mb-1">Clientes Activos</p>
+                      <h3 class="mb-0" id="totalClients" data-counter="0">0</h3>
+                    </div>
+                    <div class="bg-info bg-opacity-10 text-info rounded p-2">
+                      <i class="bi bi-people fs-4"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card h-100 text-start p-4 border-start border-4 border-warning">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <p class="text-muted mb-1">Productos en Stock</p>
+                      <h3 class="mb-0" id="totalProducts" data-counter="0">0</h3>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 text-warning rounded p-2">
+                      <i class="bi bi-box-seam fs-4"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+          <!-- Main Chart Column -->
+          <div class="col-lg-8 fade-in" style="animation-delay: 0.2s">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+              <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="mb-0 fw-bold text-dark">Resumen de Ingresos</h5>
+                <select class="form-select form-select-sm w-auto border-0 bg-light">
+                  <option>Últimos 7 días</option>
+                  <option>Este mes</option>
+                </select>
+              </div>
+              <div class="chart-container" style="position: relative; height: 300px;">
+                <canvas id="revenueChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity Column -->
+          <div class="col-lg-4 fade-in" style="animation-delay: 0.3s">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+              <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="mb-0 fw-bold text-dark">Actividad Reciente</h5>
+              </div>
+              <div class="activity-list">
+                <!-- Item 1 -->
+                <div class="d-flex align-items-center mb-3 pb-3 border-bottom border-light">
+                  <div class="rounded-circle bg-success bg-opacity-10 text-success p-3 me-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                    <i class="bi bi-cart-check fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="mb-0 fw-bold">Nueva Venta</h6>
+                    <small class="text-muted">Cliente: Juan Pérez</small>
+                  </div>
+                  <div class="text-end">
+                    <span class="d-block fw-bold text-dark">+$150.00</span>
+                    <small class="text-muted" style="font-size: 0.75rem;">Hace 2h</small>
+                  </div>
+                </div>
+                <!-- Item 2 -->
+                <div class="d-flex align-items-center mb-3 pb-3 border-bottom border-light">
+                  <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-3 me-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                    <i class="bi bi-person-plus fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="mb-0 fw-bold">Nuevo Cliente</h6>
+                    <small class="text-muted">Ana García</small>
+                  </div>
+                  <div class="text-end">
+                    <span class="d-block fw-bold text-muted">-</span>
+                    <small class="text-muted" style="font-size: 0.75rem;">Ayer</small>
+                  </div>
+                </div>
+                <!-- Item 3 -->
+                <div class="d-flex align-items-center">
+                  <div class="rounded-circle bg-warning bg-opacity-10 text-warning p-3 me-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                    <i class="bi bi-box-seam fs-5"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="mb-0 fw-bold">Stock Bajo</h6>
+                    <small class="text-muted">Producto: Laptop HP</small>
+                  </div>
+                  <div class="text-end">
+                    <span class="badge bg-warning text-dark rounded-pill">Alerta</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions Row -->
+          <div class="col-12 fade-in" style="animation-delay: 0.4s">
+            <h5 class="mb-3 fw-bold text-dark">Accesos Rápidos</h5>
+            <div class="row g-3">
+              <div class="col-6 col-md-3">
+                <a href="addSale.html" class="quick-action-card">
+                  <div class="quick-action-icon">
+                    <i class="bi bi-cart-plus"></i>
+                  </div>
+                  <span class="fw-bold">Nueva Venta</span>
+                </a>
+              </div>
+              <div class="col-6 col-md-3">
+                <a href="addClient.html" class="quick-action-card">
+                  <div class="quick-action-icon">
+                    <i class="bi bi-person-plus"></i>
+                  </div>
+                  <span class="fw-bold">Nuevo Cliente</span>
+                </a>
+              </div>
+              <div class="col-6 col-md-3">
+                <a href="addInventory.html" class="quick-action-card">
+                  <div class="quick-action-icon">
+                    <i class="bi bi-box-seam"></i>
+                  </div>
+                  <span class="fw-bold">Agregar Producto</span>
+                </a>
+              </div>
+              <div class="col-6 col-md-3">
+                <a href="reportes.html" class="quick-action-card">
+                  <div class="quick-action-icon">
+                    <i class="bi bi-file-earmark-bar-graph"></i>
+                  </div>
+                  <span class="fw-bold">Ver Reportes</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/dashboard.js"></script>
+  
+  <!-- Footer con Copyright -->
+  <footer class="main-footer">
+    <p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
+  </footer>
+</body>
+</html>

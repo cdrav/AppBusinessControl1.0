@@ -17,6 +17,12 @@ async function loadInventory() {
     const response = await fetch(INVENTORY_ENDPOINT, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
+
+    if (response.status === 401 || response.status === 403) {
+      window.location.href = 'login.html';
+      return;
+    }
+
     if (!response.ok) {
       throw new Error('Error al cargar el inventario');
     }
@@ -120,7 +126,5 @@ async function deleteProduct(id) {
 }
 
 function editProduct(id) {
-  // Lógica para redirigir a una página de edición, por ejemplo:
-  // window.location.href = `/editInventory.html?id=${id}`;
-  alert(`Función para editar producto con ID: ${id} no implementada.`);
+  window.location.href = `editInventory.html?id=${id}`;
 }

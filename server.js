@@ -5,14 +5,15 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
+const path = require('path');
 
 // Crear la aplicación Express
 const app = express();
 app.use(express.json()); 
 
 // *** CORRECCIÓN CRÍTICA: Servir archivos estáticos (HTML, CSS, JS) ***
-// Esto permite que el navegador cargue tus archivos del frontend.
-app.use(express.static(__dirname));
+// Servimos solo la carpeta 'public' para proteger el código fuente del backend.
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
 // Configurar la conexión a MySQL. Usaremos mysql2 para soporte de promesas y transacciones más limpias.
@@ -35,9 +36,8 @@ console.log('Pool de conexiones a la base de datos configurado.');
 
 // Ruta de prueba
 app.get('/', (req, res) => {
-  // Con la nueva estructura, esto servirá `public/index.html` automáticamente.
-  // Eliminamos esta respuesta para que express.static sirva el index.html
-  res.sendFile(__dirname + '/index.html');
+  // Servir explícitamente el index.html desde la carpeta public
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Ruta para /dashboard
@@ -192,6 +192,21 @@ app.get('/inventory', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error al obtener el inventario:', error);
     res.status(500).json({ message: 'Error del servidor al obtener el inventario' });
+  }
+});
+
+// Obtener un producto específico por ID (Para edición)
+app.get('/inventory/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [results] = await db.query('SELECT * FROM inventory WHERE id = ?', [id]);
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+    res.status(200).json(results[0]);
+  } catch (error) {
+    console.error('Error al obtener el producto:', error);
+    res.status(500).json({ message: 'Error del servidor al obtener el producto' });
   }
 });
   
@@ -352,6 +367,111 @@ app.get('/sales', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error al obtener las ventas:', error);
     res.status(500).json({ message: 'Error del servidor' });
+  }
+});
+
+// Ruta para eliminar una venta y restaurar el stock
+app.delete('/sales/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  let connection;
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Obtener los detalles de la venta para saber qué productos devolver al stock
+    const [details] = await connection.query('SELECT product_id, quantity FROM sale_details WHERE sale_id = ?', [id]);
+    
+    if (details.length === 0) {
+        // Verificar si la venta existe (podría ser una venta antigua sin detalles o error)
+        const [sale] = await connection.query('SELECT id FROM sales WHERE id = ?', [id]);
+        if (sale.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Venta no encontrada' });
+        }
+    }
+
+    // 2. Restaurar stock de cada producto
+    for (const item of details) {
+        await connection.query('UPDATE inventory SET stock = stock + ? WHERE id = ?', [item.quantity, item.product_id]);
+    }
+
+    // 3. Eliminar la venta (la base de datos debería eliminar los detalles automáticamente si hay ON DELETE CASCADE, pero lo hacemos manual por seguridad)
+    await connection.query('DELETE FROM sale_details WHERE sale_id = ?', [id]);
+    await connection.query('DELETE FROM sales WHERE id = ?', [id]);
+
+    await connection.commit();
+    res.status(200).json({ message: 'Venta eliminada y stock restaurado correctamente' });
+
+  } catch (error) {
+    if (connection) await connection.rollback();
+    console.error('Error al eliminar venta:', error);
+    res.status(500).json({ message: 'Error al eliminar la venta' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+// Ruta para generar ticket de venta individual (PDF)
+app.get('/sales/:id/ticket', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    // 1. Obtener datos de la venta y cliente
+    const [saleRows] = await db.query(`
+      SELECT s.id, s.sale_date, s.total_price, c.name as client_name, c.address, c.phone
+      FROM sales s
+      JOIN clients c ON s.client_id = c.id
+      WHERE s.id = ?
+    `, [id]);
+
+    if (saleRows.length === 0) return res.status(404).send('Venta no encontrada');
+    const sale = saleRows[0];
+
+    // 2. Obtener detalles de productos
+    const [details] = await db.query(`
+      SELECT i.product_name, sd.quantity, sd.subtotal, i.price
+      FROM sale_details sd
+      JOIN inventory i ON sd.product_id = i.id
+      WHERE sd.sale_id = ?
+    `, [id]);
+
+    // 3. Generar PDF
+    const doc = new PDFDocument({ margin: 50, size: 'A4' }); // Puedes cambiar a [226, 600] para impresoras térmicas de 80mm
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=ticket-${id}.pdf`);
+
+    doc.pipe(res);
+
+    // Encabezado
+    doc.fontSize(20).text('Business Control', { align: 'center' });
+    doc.fontSize(10).text('Ticket de Venta', { align: 'center' });
+    doc.moveDown();
+    doc.text(`Folio: #${sale.id} - Fecha: ${new Date(sale.sale_date).toLocaleString()}`);
+    doc.text(`Cliente: ${sale.client_name}`);
+    doc.moveDown();
+
+    // Tabla (Usamos fuente Courier para alinear columnas fácilmente)
+    doc.font('Courier').fontSize(10);
+    doc.text('Cant.  Descripción                    Precio    Total');
+    doc.text('-------------------------------------------------------');
+    
+    details.forEach(item => {
+       const name = item.product_name.substring(0, 25).padEnd(25);
+       const qty = item.quantity.toString().padEnd(5);
+       const price = item.price.toFixed(2).padEnd(8);
+       const total = item.subtotal.toFixed(2);
+       doc.text(`${qty}  ${name}  $${price}  $${total}`);
+    });
+    
+    doc.text('-------------------------------------------------------');
+    doc.moveDown();
+    doc.font('Helvetica-Bold').fontSize(14).text(`TOTAL: $${parseFloat(sale.total_price).toFixed(2)}`, { align: 'right' });
+    doc.fontSize(10).moveDown().text('¡Gracias por su compra!', { align: 'center' });
+
+    doc.end();
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error al generar ticket');
   }
 });
 

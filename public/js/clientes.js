@@ -27,6 +27,12 @@ async function loadClients() {
         'Authorization': 'Bearer ' + localStorage.getItem('token'),
       },
     });
+
+    if (response.status === 401 || response.status === 403) {
+      window.location.href = 'login.html';
+      return;
+    }
+
     if (response.ok) {
       clients = await response.json();
       renderClients(clients);
@@ -149,7 +155,7 @@ function editClient(id) {
   const client = clients.find(c => c.id === id);
   if (client) {
     // Redirige a la página de edición. Asegúrate que la ruta sea correcta.
-    window.location.href = `/editClient.html?id=${id}`;
+    window.location.href = `editClient.html?id=${id}`;
   }
 }
 

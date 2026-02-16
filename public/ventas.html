@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="css/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/footer-elegant.css">
 </head>
 <body>
   <div class="page-wrapper">
@@ -17,8 +16,8 @@
       <div class="container">
         <!-- Header -->
         <div class="page-header fade-in">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 mb-4">
+            <div class="text-center text-md-start">
               <h1 class="page-title">
                 <i class="bi bi-cart-check me-3"></i>Gestión de Ventas
               </h1>
@@ -53,18 +52,18 @@
 
         <!-- Filter Section -->
         <div class="filters-section fade-in" style="animation-delay: 0.2s">
-          <div class="row">
-            <div class="col-md-4">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
               <label for="filterDate">Filtrar por fecha</label>
               <input type="date" class="form-control" id="filterDate">
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label for="filterClient">Filtrar por cliente</label>
               <select class="form-control" id="filterClient">
                 <option value="">Todos los clientes</option>
               </select>
             </div>
-            <div class="col-md-4 d-flex align-items-end">
+            <div class="col-12 col-md-4 d-flex align-items-end">
               <button class="btn btn-light w-100" onclick="applyFilters()">
                 <i class="bi bi-funnel me-2"></i>Aplicar Filtros
               </button>
@@ -74,11 +73,11 @@
 
         <!-- Table Container -->
         <div class="table-container fade-in" style="animation-delay: 0.3s">
-          <div class="d-flex justify-content-between align-items-center mb-4">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
             <h3 class="mb-0">
               <i class="bi bi-list-ul me-2"></i>Historial de Ventas
             </h3>
-            <a href="/addSale.html" class="btn-add">
+            <a href="addSale.html" class="btn-add">
               <i class="bi bi-plus-circle"></i>
               Nueva Venta
             </a>
@@ -92,7 +91,7 @@
             <i class="bi bi-cart-x"></i>
             <h4>No hay ventas registradas</h4>
             <p>Comienza registrando tu primera venta</p>
-            <a href="/addSale.html" class="btn-add">
+            <a href="addSale.html" class="btn-add">
               <i class="bi bi-plus-circle"></i>
               Registrar Primera Venta
             </a>
@@ -123,11 +122,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/scripts/main.js"></script>
-  <script src="/js/ventas.js"></script>
+  <script src="js/ventas.js"></script>
   
   <!-- Footer con Copyright -->
-  <footer class="text-center py-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); color: white; position: relative; z-index: 2; margin-top: 40px; border-radius: 15px;">
+  <footer class="main-footer">
     <p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
   </footer>
 </body>

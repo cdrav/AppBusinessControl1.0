@@ -17,6 +17,11 @@ async function loadSales() {
       headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
     });
     
+    if (response.status === 401 || response.status === 403) {
+      window.location.href = 'login.html';
+      return;
+    }
+
     if (!response.ok) throw new Error('Error al cargar ventas');
     
     allSales = await response.json();
@@ -124,5 +129,27 @@ window.applyFilters = function() {
 }
 
 window.printTicket = function(id) {
-  alert(`Funcionalidad de impresión para venta #${id} en desarrollo`);
+  const btn = document.querySelector(`button[onclick="printTicket(${id})"]`);
+  const originalContent = btn.innerHTML;
+  
+  // Mostrar indicador de carga
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  btn.disabled = true;
+
+  fetch(`${API_URL}/sales/${id}/ticket`, {
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+  })
+  .then(res => {
+    if(res.ok) return res.blob();
+    throw new Error('Error al generar ticket');
+  })
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank'); // Abre el PDF en nueva pestaña
+  })
+  .catch(err => alert('No se pudo imprimir el ticket.'))
+  .finally(() => {
+    btn.innerHTML = originalContent;
+    btn.disabled = false;
+  });
 }

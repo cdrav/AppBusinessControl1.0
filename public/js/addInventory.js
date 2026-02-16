@@ -61,7 +61,7 @@ async function handleAddProduct(event) {
       messageDiv.innerHTML = '<div class="alert alert-success">¡Producto agregado con éxito!</div>';
       document.getElementById('addProductForm').reset();
       
-      setTimeout(() => window.location.href = 'inventarios.html', 2000);
+      setTimeout(() => window.location.href = 'inventarios.html', 1500);
       
     } catch (error) {
       console.error('Error:', error.message);

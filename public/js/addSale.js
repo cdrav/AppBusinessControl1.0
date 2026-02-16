@@ -48,15 +48,29 @@ async function loadProducts() {
   }
 }
 
-// Actualizar selects de productos
+// Llenar un select específico con opciones de productos
+function populateProductSelect(selectElement) {
+  const currentValue = selectElement.value;
+  // Guardamos la opción por defecto
+  selectElement.innerHTML = '<option value="">Selecciona un producto</option>';
+  
+  if (products.length > 0) {
+    products.forEach(product => {
+      const option = document.createElement('option');
+      option.value = product.id;
+      option.dataset.price = product.price;
+      option.dataset.stock = product.stock;
+      option.textContent = `${product.product_name} (Stock: ${product.stock})`;
+      selectElement.appendChild(option);
+    });
+  }
+  selectElement.value = currentValue;
+}
+
+// Actualizar todos los selects (solo se llama al cargar productos inicialmente)
 function updateProductSelects() {
   document.querySelectorAll('.product-select').forEach(select => {
-    const currentValue = select.value;
-    select.innerHTML = '<option value="">Selecciona un producto</option>';
-    products.forEach(product => {
-      select.innerHTML += `<option value="${product.id}" data-price="${product.price}" data-stock="${product.stock}">${product.product_name} (Stock: ${product.stock})</option>`;
-    });
-    select.value = currentValue;
+    populateProductSelect(select);
   });
 }
 
@@ -83,15 +97,39 @@ function addProductField() {
   `;
   
   container.appendChild(productItem);
-  updateProductSelects();
+  
+  // Llenar solo el nuevo select, no recargar todos
+  populateProductSelect(productItem.querySelector('.product-select'));
   
   // Agregar event listeners
   productItem.querySelector('.product-select').addEventListener('change', updateSummary);
-  productItem.querySelector('.quantity-input').addEventListener('input', updateSummary);
+  productItem.querySelector('.quantity-input').addEventListener('input', (e) => {
+    validateStock(e.target);
+    updateSummary();
+  });
   productItem.querySelector('.remove-product').addEventListener('click', function() {
     productItem.remove();
     updateSummary();
   });
+}
+
+// Validar stock en tiempo real
+function validateStock(inputElement) {
+  const row = inputElement.closest('.product-item');
+  const select = row.querySelector('.product-select');
+  const selectedOption = select.options[select.selectedIndex];
+  
+  if (selectedOption && selectedOption.value) {
+    const stock = parseInt(selectedOption.dataset.stock || 0);
+    const quantity = parseInt(inputElement.value || 0);
+    
+    if (quantity > stock) {
+      inputElement.classList.add('is-invalid'); // Clase de Bootstrap para error
+      // Opcional: mostrar mensaje visual
+    } else {
+      inputElement.classList.remove('is-invalid');
+    }
+  }
 }
 
 // Actualizar resumen
@@ -118,7 +156,10 @@ function updateSummary() {
 
 // Event listeners para el primer producto
 document.querySelector('.product-select').addEventListener('change', updateSummary);
-document.querySelector('.quantity-input').addEventListener('input', updateSummary);
+document.querySelector('.quantity-input').addEventListener('input', (e) => {
+  validateStock(e.target);
+  updateSummary();
+});
 document.querySelector('.remove-product').addEventListener('click', function() {
   if (document.querySelectorAll('.product-item').length > 1) {
     this.closest('.product-item').remove();

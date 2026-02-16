@@ -4,7 +4,7 @@ document.getElementById('loginForm').addEventListener('submit', async function (
 
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
-  const submitBtn = document.querySelector('.btn-login');
+  const submitBtn = document.querySelector('button[type="submit"]');
   const messageDiv = document.getElementById('message');
 
   // Validación básica
@@ -34,7 +34,7 @@ document.getElementById('loginForm').addEventListener('submit', async function (
     if (response.ok) {
       localStorage.setItem('token', data.token);
       setTimeout(() => {
-        window.location.href = '/dashboard.html';
+        window.location.href = 'dashboard.html';
       }, 1500);
     }
   } catch (error) {

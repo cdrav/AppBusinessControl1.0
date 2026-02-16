@@ -30,6 +30,7 @@
       opacity: 0.08;
       z-index: 0;
       animation: float-shape 10s infinite alternate;
+      max-width: 100%; /* Evitar desbordamiento en móvil */
     }
     
     .shape-1 { top: -150px; right: -100px; }
@@ -99,10 +100,10 @@
         <ul class="navbar-nav ms-auto align-items-center">
           <li class="nav-item"><a class="nav-link" href="#features">Características</a></li>
           <li class="nav-item ms-lg-3">
-            <a href="/login.html" class="btn btn-outline-primary px-4 rounded-pill fw-medium">Iniciar Sesión</a>
+            <a href="login.html" class="btn btn-outline-primary px-4 rounded-pill fw-medium">Iniciar Sesión</a>
           </li>
           <li class="nav-item ms-2">
-            <a href="/register.html" class="btn btn-primary px-4 rounded-pill fw-medium">Registrarse</a>
+            <a href="register.html" class="btn btn-primary px-4 rounded-pill fw-medium">Registrarse</a>
           </li>
         </ul>
       </div>
@@ -119,7 +120,7 @@
         <div class="row align-items-center">
           <div class="col-lg-6 mb-5 mb-lg-0 fade-in">
             <span class="badge bg-primary text-white mb-3 px-3 py-2 rounded-pill fw-semibold shadow-sm">v1.0 Disponible Ahora</span>
-            <h1 class="display-4 fw-bold mb-4" style="line-height: 1.15; letter-spacing: -1px; color: var(--text-primary);">
+            <h1 class="display-4 fw-bold mb-4 text-center text-lg-start" style="line-height: 1.15; letter-spacing: -1px; color: var(--text-primary);">
               Gestiona tu negocio <br>
               <span class="text-primary">sin complicaciones</span>
             </h1>
@@ -128,7 +129,7 @@
               Optimiza tus procesos y toma decisiones basadas en datos reales.
             </p>
             <div class="d-flex gap-3 flex-column flex-sm-row">
-              <a href="/register.html" class="btn btn-primary btn-lg rounded-pill px-5 shadow-lg">
+              <a href="register.html" class="btn btn-primary btn-lg rounded-pill px-5 shadow-lg">
                 Comenzar Gratis <i class="bi bi-arrow-right ms-2"></i>
               </a>
               <a href="#features" class="btn btn-light btn-lg rounded-pill px-5 border">
@@ -254,7 +255,7 @@
         <div class="position-relative z-2">
           <h2 class="fw-bold mb-4 display-6">¿Listo para optimizar tu negocio?</h2>
           <p class="lead mb-5 opacity-75">Únete a cientos de empresas que ya están creciendo con Business Control.</p>
-          <a href="/register.html" class="btn btn-light btn-lg rounded-pill px-5 text-primary fw-bold shadow-sm">
+          <a href="register.html" class="btn btn-light btn-lg rounded-pill px-5 text-primary fw-bold shadow-sm">
             Crear Cuenta Gratis
           </a>
         </div>
@@ -270,7 +271,7 @@
   <script src="/js/index.js"></script>
   
   <!-- Footer con Copyright -->
-  <footer class="text-center py-3" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); color: white; position: relative; z-index: 2; margin-top: 40px; border-radius: 15px;">
+  <footer class="main-footer" style="background: transparent; border-top: none;">
     <p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
   </footer>
 </body>

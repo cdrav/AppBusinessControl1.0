@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const email = document.getElementById('email').value;
     const password = passwordInput.value;
     const confirmPassword = confirmPasswordInput.value;
-    const submitBtn = form.querySelector('.btn-register');
+    const submitBtn = form.querySelector('button[type="submit"]');
 
     // Validación básica
     if (!username || !email || !password || !confirmPassword) {
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
         passwordStrengthDiv.innerHTML = '';
         
         setTimeout(() => {
-          window.location.href = '/login.html';
+          window.location.href = 'login.html';
         }, 2000);
       }
     } catch (error) {
