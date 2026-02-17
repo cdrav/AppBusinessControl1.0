@@ -25,7 +25,10 @@
                 <a href="dashboard.html" class="btn-back">
                   <i class="bi bi-arrow-left"></i> Dashboard
                 </a>
-                <a href="addInventory.html" class="btn-add">
+                <button onclick="exportInventory()" class="btn btn-outline-success admin-only">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Exportar
+                </button>
+                <a href="addInventory.html" class="btn-add admin-only">
                   <i class="bi bi-plus-circle"></i> Nuevo Producto
                 </a>
             </div>

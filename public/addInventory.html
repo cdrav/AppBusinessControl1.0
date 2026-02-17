@@ -21,6 +21,14 @@
       
       <form id="addProductForm">
         <div class="mb-4">
+          <label for="productBarcode" class="form-label">
+            <i class="bi bi-upc-scan"></i>
+            Código de Barras (Opcional)
+          </label>
+          <input type="text" class="form-control" id="productBarcode" placeholder="Escanea o escribe el código" autofocus>
+        </div>
+
+        <div class="mb-4">
           <label for="productName" class="form-label">
             <i class="bi bi-tag"></i>
             Nombre del Producto
@@ -71,7 +79,7 @@
         </div>
         
         <div class="d-flex gap-3">
-          <button type="submit" class="btn btn-primary flex-fill">
+          <button type="submit" class="btn btn-primary flex-fill btn-submit">
             <i class="bi bi-plus-circle me-2"></i>
             Agregar Producto
           </button>

@@ -1,4 +1,5 @@
 // Clientes Page JavaScript
+const API_URL = ''; // Ruta relativa para producción
 let clients = [];
 
 // Initialize page
@@ -22,7 +23,7 @@ function setupEventListeners() {
 // Load clients from API
 async function loadClients() {
   try {
-    const response = await fetch('http://localhost:3000/clients', {
+    const response = await fetch(`${API_URL}/clients`, {
       headers: {
         'Authorization': 'Bearer ' + localStorage.getItem('token'),
       },
@@ -112,6 +113,9 @@ function renderClients(clientsToRender) {
             </div>
 
             <div class="d-flex gap-2 pt-3 border-top">
+              <button class="btn btn-light flex-fill text-info btn-sm" onclick="viewClientHistory(${client.id})">
+                <i class="bi bi-clock-history me-1"></i> Historial
+              </button>
               <button class="btn btn-light flex-fill text-primary btn-sm" onclick="editClient(${client.id})">
                 <i class="bi bi-pencil me-1"></i> Editar
               </button>
@@ -163,7 +167,7 @@ function editClient(id) {
 async function deleteClient(id) {
   if (confirm('¿Está seguro de que desea eliminar este cliente?')) {
     try {
-      const response = await fetch(`http://localhost:3000/clients/${id}`, {
+      const response = await fetch(`${API_URL}/clients/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': 'Bearer ' + localStorage.getItem('token'),
@@ -181,6 +185,74 @@ async function deleteClient(id) {
       showMessage('Hubo un error al eliminar el cliente.', 'danger');
     }
   }
+}
+
+async function viewClientHistory(id) {
+    const modal = new bootstrap.Modal(document.getElementById('historyModal'));
+    modal.show();
+    
+    const loader = document.getElementById('historyLoader');
+    const table = document.getElementById('historyTable');
+    const empty = document.getElementById('historyEmpty');
+    const tbody = document.getElementById('historyTableBody');
+    
+    loader.style.display = 'block';
+    table.style.display = 'none';
+    empty.style.display = 'none';
+    tbody.innerHTML = '';
+
+    try {
+        const response = await fetch(`${API_URL}/clients/${id}/sales`, {
+             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        
+        if(!response.ok) throw new Error('Error al cargar historial');
+        
+        const sales = await response.json();
+        
+        loader.style.display = 'none';
+        
+        if(sales.length === 0) {
+            empty.style.display = 'block';
+        } else {
+            table.style.display = 'table';
+            sales.forEach(sale => {
+                const date = new Date(sale.sale_date).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+                const row = `
+                    <tr>
+                        <td><span class="fw-bold">#${sale.id}</span></td>
+                        <td>${date}</td>
+                        <td class="text-center">${sale.item_count}</td>
+                        <td class="text-end fw-bold">$${parseFloat(sale.total_price).toFixed(2)}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary" onclick="printTicket(${sale.id})" title="Reimprimir Ticket">
+                                <i class="bi bi-printer"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+    } catch (e) {
+        console.error(e);
+        loader.innerHTML = '<p class="text-danger">Error al cargar datos</p>';
+    }
+}
+
+window.printTicket = function(id) {
+  fetch(`${API_URL}/sales/${id}/ticket`, {
+    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+  })
+  .then(res => {
+    if(res.ok) return res.blob();
+    throw new Error('Error al generar ticket');
+  })
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  })
+  .catch(err => alert('No se pudo imprimir el ticket.'));
 }
 
 // Show message

@@ -1,5 +1,5 @@
 // Edit Inventory Page JavaScript
-const API_URL = 'http://localhost:3000';
+const API_URL = ''; // Ruta relativa para producción
 const params = new URLSearchParams(window.location.search);
 const productId = params.get('id');
 
@@ -26,6 +26,7 @@ async function loadProductData() {
         const product = await response.json();
 
         document.getElementById('productId').value = product.id;
+        document.getElementById('productBarcode').value = product.barcode || '';
         document.getElementById('productName').value = product.product_name;
         document.getElementById('productQuantity').value = product.stock;
         document.getElementById('productPrice').value = product.price;
@@ -45,6 +46,7 @@ async function handleEditProduct(event) {
     const messageDiv = document.getElementById('message');
     
     const productData = {
+        barcode: document.getElementById('productBarcode').value.trim(),
         name: document.getElementById('productName').value,
         quantity: document.getElementById('productQuantity').value,
         price: document.getElementById('productPrice').value,

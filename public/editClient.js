@@ -51,7 +51,7 @@ document.getElementById('editClientForm').addEventListener('submit', function (e
       throw new Error(data.message || 'No se pudo actualizar el cliente');
     }
     showToast('Cliente actualizado exitosamente', false);
-    setTimeout(() => window.location.href = 'clients.html', 1500);
+    setTimeout(() => window.location.href = 'clientes.html', 1500);
   })
   .catch(error => {
     console.error('Error al actualizar cliente:', error);

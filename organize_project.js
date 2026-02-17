@@ -53,7 +53,7 @@ fs.readdirSync(rootDir).forEach(file => {
 });
 
 // 4. Mover archivos JS sueltos de la raíz a public/js
-const jsFilesToMove = ['ventas.js', 'addInventory.js', 'reportes.js', 'index.js', 'utils.js', 'clientes.js', 'addSale.js', 'login.js', 'register.js', 'dashboard.js', 'addClient.js', 'inventario.js', 'editInventory.js'];
+const jsFilesToMove = ['ventas.js', 'addInventory.js', 'reportes.js', 'index.js', 'utils.js', 'clientes.js', 'addSale.js', 'login.js', 'register.js', 'dashboard.js', 'addClient.js', 'inventario.js', 'editInventory.js', 'editClient.js', 'cupones.js', 'configuracion.js', 'perfil.js', 'usuarios.js'];
 const jsDir = path.join(publicDir, 'js');
 if (!fs.existsSync(jsDir)) fs.mkdirSync(jsDir);
 

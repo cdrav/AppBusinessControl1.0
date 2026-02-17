@@ -19,7 +19,7 @@ document.getElementById('loginForm').addEventListener('submit', async function (
   messageDiv.innerHTML = '';
 
   try {
-    const response = await fetch('http://localhost:3000/login', {
+    const response = await fetch('/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),

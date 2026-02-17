@@ -1,382 +1,304 @@
 // Reportes Page JavaScript
 let salesChart = null;
 let distributionChart = null;
+let clientsChart = null;
+const API_URL = ''; // Ruta relativa para producción
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
   initializeCharts();
-  loadStats();
   setDefaultDates();
+  
+  const startDateInput = document.getElementById('start-date');
+  const endDateInput = document.getElementById('end-date');
+  
+  startDateInput.addEventListener('change', fetchAndDisplayStats);
+  endDateInput.addEventListener('change', fetchAndDisplayStats);
+
+  // Initial data load after setting dates
+  fetchAndDisplayStats();
 });
 
 // Set default dates (last 30 days)
 function setDefaultDates() {
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 30);
+  startDate.setDate(endDate.getDate() - 29); // Last 30 days
   
   document.getElementById('start-date').value = startDate.toISOString().split('T')[0];
   document.getElementById('end-date').value = endDate.toISOString().split('T')[0];
 }
 
-// Initialize charts
+// Initialize charts with empty data but with full options
 function initializeCharts() {
-  // Sales trend chart
-  const salesCtx = document.getElementById('salesChart').getContext('2d');
-  salesChart = new Chart(salesCtx, {
-    type: 'line',
-    data: {
-      labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
-      datasets: [{
-        label: 'Ventas',
-        data: [185000, 223000, 198000, 287000, 312000, 345000],
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
-        borderWidth: 2,
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: false
-        },
-        tooltip: {
-          mode: 'index',
-          intersect: false,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          titleColor: '#fff',
-          bodyColor: '#fff',
-          borderColor: '#007bff',
-          borderWidth: 1,
-          padding: 12,
-          displayColors: false,
-          callbacks: {
-            label: function(context) {
-              return 'Ventas: $' + context.parsed.y.toLocaleString();
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid: {
-            display: false
-          },
-          ticks: {
-            font: {
-              size: 12
-            }
-          }
-        },
-        y: {
-          beginAtZero: true,
-          grid: {
-            color: 'rgba(0, 0, 0, 0.05)'
-          },
-          ticks: {
-            font: {
-              size: 11
-            },
-            callback: function(value) {
-              return '$' + (value / 1000) + 'k';
-            }
-          }
-        }
-      },
-      interaction: {
-        mode: 'nearest',
-        axis: 'x',
-        intersect: false
-      }
-    }
-  });
-
-  // Distribution chart
-  const distCtx = document.getElementById('distributionChart').getContext('2d');
-  distributionChart = new Chart(distCtx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Electrónicos', 'Ropa', 'Alimentos', 'Hogar', 'Otros'],
-      datasets: [{
-        data: [35, 25, 20, 12, 8],
-        backgroundColor: [
-          '#2563eb',
-          '#28a745',
-          '#ffc107',
-          '#dc3545',
-          '#6c757d'
-        ],
-        borderWidth: 2,
-        borderColor: '#fff'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            padding: 15,
-            font: {
-              size: 11
-            }
-          }
-        },
-        tooltip: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          titleColor: '#fff',
-          bodyColor: '#fff',
+  const salesCtx = document.getElementById('salesChart')?.getContext('2d');
+  if (salesCtx) {
+    salesChart = new Chart(salesCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Ventas',
+          data: [],
           borderColor: '#2563eb',
-          borderWidth: 1,
-          padding: 12,
-          callbacks: {
-            label: function(context) {
-              return context.label + ': ' + context.parsed + '%';
+          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            padding: 12,
+            callbacks: {
+              label: function(context) {
+                return 'Ventas: $' + (context.parsed.y || 0).toLocaleString();
+              }
             }
           }
-        }
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+            ticks: {
+              callback: function(value) {
+                if (value >= 1000) return '$' + (value / 1000) + 'k';
+                return '$' + value;
+              }
+            }
+          }
+        },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+      }
+    });
+  }
+
+  const distCtx = document.getElementById('distributionChart')?.getContext('2d');
+  if (distCtx) {
+    distributionChart = new Chart(distCtx, {
+      type: 'doughnut',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          backgroundColor: ['#2563eb', '#28a745', '#ffc107', '#dc3545', '#6c757d', '#17a2b8', '#fd7e14'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
       },
-      cutout: '60%'
-    }
-  });
-}
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { padding: 15 } },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                const value = context.parsed || 0;
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+              }
+            }
+          }
+        },
+        cutout: '60%'
+      }
+    });
+  }
 
-// Load statistics
-async function loadStats() {
-  try {
-    // Simular datos realistas para mejor visualización
-    const stats = {
-      totalRevenue: 2857500,
-      totalSales: 1247,
-      totalClients: 384,
-      totalProducts: 156
-    };
-
-    // Actualizar tarjetas de estadísticas con animación
-    animateValue('totalRevenue', 0, stats.totalRevenue, 2000, '$');
-    animateValue('totalSales', 0, stats.totalSales, 2000);
-    animateValue('totalClients', 0, stats.totalClients, 2000);
-    animateValue('totalProducts', 0, stats.totalProducts, 2000);
-
-    // Actualizar gráficos con datos realistas
-    updateChartsWithRealisticData();
-
-  } catch (error) {
-    console.error('Error loading stats:', error);
-    // Cargar datos de ejemplo si hay error
-    loadFallbackStats();
+  const clientsCtx = document.getElementById('clientsChart')?.getContext('2d');
+  if (clientsCtx) {
+    clientsChart = new Chart(clientsCtx, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Total Comprado',
+          data: [],
+          backgroundColor: 'rgba(16, 185, 129, 0.2)', // Verde suave
+          borderColor: '#10b981', // Verde fuerte
+          borderWidth: 2,
+          borderRadius: 5
+        }]
+      },
+      options: {
+        indexAxis: 'y', // Gráfico horizontal
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return 'Total: $' + (context.parsed.x || 0).toLocaleString();
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+            ticks: {
+              callback: function(value) { return '$' + value; }
+            }
+          },
+          y: { grid: { display: false } }
+        }
+      }
+    });
   }
 }
 
-// Actualizar gráficos con datos realistas
-function updateChartsWithRealisticData() {
-  if (!salesChart || !distributionChart) return;
+// Fetch data from backend and update UI
+async function fetchAndDisplayStats() {
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
 
-  // Datos realistas para gráfico de tendencia
-  const realisticMonthlyData = {
-    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
-    values: [185000, 223000, 198000, 287000, 312000, 345000]
-  };
-  
-  // Actualizar gráfico de ventas
-  salesChart.data.labels = realisticMonthlyData.labels;
-  salesChart.data.datasets[0].data = realisticMonthlyData.values;
-  salesChart.update();
+    if (!startDate || !endDate) return;
 
-  // Datos realistas para gráfico de distribución
-  const realisticCategoryData = {
-    labels: ['Electrónicos', 'Ropa', 'Alimentos', 'Hogar', 'Otros'],
-    values: [35, 25, 20, 12, 8]
-  };
-  
-  // Actualizar gráfico de distribución
-  distributionChart.data.labels = realisticCategoryData.labels;
-  distributionChart.data.datasets[0].data = realisticCategoryData.values;
-  distributionChart.update();
+    const url = new URL(`${API_URL}/api/statistics`);
+    url.searchParams.append('startDate', startDate);
+    url.searchParams.append('endDate', endDate);
+
+    try {
+        const response = await fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            window.location.href = 'login.html';
+            return;
+        }
+        if (!response.ok) throw new Error('No se pudieron cargar las estadísticas.');
+
+        const stats = await response.json();
+
+        // Update stat cards
+        animateValue('totalRevenue', 0, stats.totalRevenue, 1500, '$');
+        animateValue('totalSales', 0, stats.totalSales, 1500);
+        document.getElementById('totalClients').textContent = stats.newClients;
+        document.getElementById('totalProducts').textContent = stats.totalProducts;
+
+        // Update sales trend chart
+        if (salesChart) {
+            const trendLabels = stats.salesTrend.map(d => new Date(d.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }));
+            const trendData = stats.salesTrend.map(d => parseFloat(d.total));
+            salesChart.data.labels = trendLabels;
+            salesChart.data.datasets[0].data = trendData;
+            salesChart.update();
+        }
+
+        // Update category distribution chart
+        if (distributionChart) {
+            const categoryLabels = stats.categoryDistribution.map(d => d.category);
+            const categoryData = stats.categoryDistribution.map(d => parseFloat(d.total));
+            distributionChart.data.labels = categoryLabels;
+            distributionChart.data.datasets[0].data = categoryData;
+            distributionChart.update();
+        }
+
+        // Update top clients chart
+        if (clientsChart) {
+            const clientLabels = stats.topClients.map(c => c.name);
+            const clientData = stats.topClients.map(c => parseFloat(c.total));
+            clientsChart.data.labels = clientLabels;
+            clientsChart.data.datasets[0].data = clientData;
+            clientsChart.update();
+        }
+
+    } catch (error) {
+        console.error('Error loading stats:', error);
+        alert('Error al cargar las estadísticas. Verifique la consola.');
+    }
 }
 
-// Cargar estadísticas de respaldo
-function loadFallbackStats() {
-  const stats = {
-    totalRevenue: 2857500,
-    totalSales: 1247,
-    totalClients: 384,
-    totalProducts: 156
-  };
-
-  animateValue('totalRevenue', 0, stats.totalRevenue, 2000, '$');
-  animateValue('totalSales', 0, stats.totalSales, 2000);
-  animateValue('totalClients', 0, stats.totalClients, 2000);
-  animateValue('totalProducts', 0, stats.totalProducts, 2000);
-}
-
-// Animate numeric values
+// Animate numeric values for stat cards
 function animateValue(id, start, end, duration, prefix = '') {
   const element = document.getElementById(id);
-  const range = end - start;
-  const increment = range / (duration / 16);
-  let current = start;
+  if (!element) return;
   
-  const timer = setInterval(() => {
-    current += increment;
-    if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-      current = end;
-      clearInterval(timer);
+  let startTimestamp = null;
+  const step = (timestamp) => {
+    if (!startTimestamp) startTimestamp = timestamp;
+    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+    const currentValue = Math.floor(progress * (end - start) + start);
+    element.textContent = prefix + currentValue.toLocaleString('en-US');
+    if (progress < 1) {
+      window.requestAnimationFrame(step);
+    } else {
+      // Ensure final value is exact, especially for currency
+      element.textContent = prefix + parseFloat(end).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
-    element.textContent = prefix + Math.floor(current).toLocaleString();
-  }, 16);
+  };
+  window.requestAnimationFrame(step);
 }
 
-// Generate report
-async function generateReport() {
+// Generate and download PDF report
+window.generateReport = async function() {
   const startDate = document.getElementById('start-date').value;
   const endDate = document.getElementById('end-date').value;
   const reportType = document.getElementById('report-type').value;
 
   if (!startDate || !endDate) {
-    showNotification('Por favor, selecciona las fechas de inicio y fin', 'error');
+    alert('Por favor, selecciona las fechas de inicio y fin.');
     return;
   }
+  
+  if (reportType !== 'sales') {
+      alert('De momento, solo la descarga del Reporte de Ventas está implementada.');
+      return;
+  }
 
-  const btn = document.querySelector('.btn-primary-custom');
-  btn.classList.add('loading');
+  const btn = document.querySelector('button[onclick="generateReport()"]');
   btn.disabled = true;
+  btn.classList.add('loading');
 
   try {
-    // Simulate report generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const url = new URL(`${API_URL}/report`);
+    url.searchParams.append('startDate', startDate);
+    url.searchParams.append('endDate', endDate);
+    url.searchParams.append('type', reportType);
 
-    // Generate PDF
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    // Add header
-    doc.setFontSize(20);
-    doc.text('Business Control - Reporte', 20, 20);
-    
-    doc.setFontSize(12);
-    doc.text(`Tipo: ${getReportTypeName(reportType)}`, 20, 35);
-    doc.text(`Período: ${startDate} - ${endDate}`, 20, 45);
-    
-    // Add stats
-    doc.setFontSize(14);
-    doc.text('Resumen', 20, 65);
-    
-    doc.setFontSize(11);
-    doc.text(`Ingresos Totales: $${document.getElementById('totalRevenue').textContent}`, 20, 80);
-    doc.text(`Ventas Realizadas: ${document.getElementById('totalSales').textContent}`, 20, 90);
-    doc.text(`Clientes Activos: ${document.getElementById('totalClients').textContent}`, 20, 100);
-    doc.text(`Productos en Stock: ${document.getElementById('totalProducts').textContent}`, 20, 110);
-
-    // Add sample data table
-    doc.setFontSize(14);
-    doc.text('Detalles de Ventas', 20, 130);
-    
-    doc.setFontSize(10);
-    let yPosition = 145;
-    const sampleData = [
-      ['Producto', 'Cantidad', 'Total'],
-      ['Laptop Dell', 5, '$2,500'],
-      ['Mouse Logitech', 10, '$500'],
-      ['Teclado Mecánico', 8, '$800']
-    ];
-
-    sampleData.forEach(row => {
-      doc.text(row.join(' - '), 20, yPosition);
-      yPosition += 10;
+    const response = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
     });
 
-    // Save PDF
-    doc.save(`reporte_${reportType}_${startDate}_${endDate}.pdf`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error del servidor: ${errorText}`);
+    }
 
-    // Show preview
-    showReportPreview(reportType);
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = downloadUrl;
+    a.download = `reporte-${reportType}-${startDate}-a-${endDate}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(downloadUrl);
+    a.remove();
     
-    showNotification('Reporte generado con éxito', 'success');
+    alert('Reporte PDF generado y descargado con éxito.');
+
   } catch (error) {
     console.error('Error generating report:', error);
-    showNotification('Error al generar el reporte', 'error');
+    alert('Error al generar el reporte: ' + error.message);
   } finally {
-    btn.classList.remove('loading');
     btn.disabled = false;
+    btn.classList.remove('loading');
   }
-}
-
-// Get report type name
-function getReportTypeName(type) {
-  const types = {
-    'sales': 'Reporte de Ventas',
-    'inventory': 'Reporte de Inventario',
-    'clients': 'Reporte de Clientes',
-    'complete': 'Reporte Completo'
-  };
-  return types[type] || 'Reporte';
-}
-
-// Show report preview
-function showReportPreview(reportType) {
-  const preview = document.getElementById('reportPreview');
-  const content = document.getElementById('previewContent');
-  
-  content.innerHTML = `
-    <div class="alert-custom">
-      <i class="bi bi-info-circle"></i>
-      <strong>Reporte generado:</strong> ${getReportTypeName(reportType)}
-    </div>
-    <table class="preview-table">
-      <thead>
-        <tr>
-          <th>Métrica</th>
-          <th>Valor</th>
-          <th>Periodo</th>
-          <th>Estado</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>
-            <i class="bi bi-currency-dollar me-2"></i>Ingresos Totales
-          </td>
-          <td><strong>${document.getElementById('totalRevenue').textContent}</strong></td>
-          <td>${document.getElementById('start-date').value} - ${document.getElementById('end-date').value}</td>
-          <td><span class="badge-custom badge-success">Actualizado</span></td>
-        </tr>
-        <tr>
-          <td>
-            <i class="bi bi-cart-check me-2"></i>Ventas Realizadas
-          </td>
-          <td><strong>${document.getElementById('totalSales').textContent}</strong></td>
-          <td>${document.getElementById('start-date').value} - ${document.getElementById('end-date').value}</td>
-          <td><span class="badge-custom badge-success">Actualizado</span></td>
-        </tr>
-        <tr>
-          <td>
-            <i class="bi bi-people me-2"></i>Clientes Activos
-          </td>
-          <td><strong>${document.getElementById('totalClients').textContent}</strong></td>
-          <td>${document.getElementById('start-date').value} - ${document.getElementById('end-date').value}</td>
-          <td><span class="badge-custom badge-success">Actualizado</span></td>
-        </tr>
-        <tr>
-          <td>
-            <i class="bi bi-box-seam me-2"></i>Productos en Stock
-          </td>
-          <td><strong>${document.getElementById('totalProducts').textContent}</strong></td>
-          <td>Tiempo real</td>
-          <td><span class="badge-custom badge-info">En vivo</span></td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="alert-custom">
-      <i class="bi bi-check-circle"></i>
-      <strong>Validación completada:</strong> Todos los datos han sido verificados y corresponden al período seleccionado. El reporte PDF ha sido generado exitosamente.
-    </div>
-  `;
-  
-  preview.style.display = 'block';
 }

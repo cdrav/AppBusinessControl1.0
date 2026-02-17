@@ -1,12 +1,18 @@
 // Variables globales
+const API_URL = ''; // Ruta relativa para producción
 let products = [];
 let clients = [];
+let currentCoupon = null; // Almacenar cupón activo
 
 // Cargar datos al iniciar
 document.addEventListener('DOMContentLoaded', function() {
   loadClients();
   loadProducts();
   setTodayDate();
+  setupBarcodeScanner();
+  
+  // Listener para cálculo de cambio
+  document.getElementById('amountPaid').addEventListener('input', calculateChange);
 });
 
 // Establecer fecha actual
@@ -15,10 +21,53 @@ function setTodayDate() {
   document.getElementById('saleDate').value = today;
 }
 
+function setupBarcodeScanner() {
+    const scannerInput = document.getElementById('barcodeScannerInput');
+    if (scannerInput) {
+        // Usamos 'change' porque los scanners suelen simular un Enter al final.
+        scannerInput.addEventListener('change', handleBarcodeScan); 
+    }
+}
+
+async function handleBarcodeScan() {
+    const barcode = this.value.trim();
+    const scanMessage = document.getElementById('scanMessage');
+    if (!barcode) return;
+
+    scanMessage.innerHTML = `<span class="text-muted">Buscando...</span>`;
+
+    try {
+        const response = await fetch(`${API_URL}/inventory/barcode/${barcode}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                scanMessage.innerHTML = `<span class="text-danger fw-bold">Producto no encontrado.</span>`;
+            } else {
+                throw new Error('Error del servidor');
+            }
+            return;
+        }
+
+        const product = await response.json();
+        scanMessage.innerHTML = `<span class="text-success fw-bold">Agregado: ${product.product_name}</span>`;
+        addProductToSale(product);
+
+    } catch (error) {
+        console.error('Error al escanear:', error);
+        scanMessage.innerHTML = `<span class="text-danger fw-bold">Error al buscar producto.</span>`;
+    } finally {
+        // Limpiar y re-enfocar para el siguiente escaneo
+        this.value = ''; 
+        this.focus(); 
+    }
+}
+
 // Cargar clientes
 async function loadClients() {
   try {
-    const response = await fetch('http://localhost:3000/clients', {
+    const response = await fetch(`${API_URL}/clients`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
     if (response.ok) {
@@ -36,7 +85,7 @@ async function loadClients() {
 // Cargar productos
 async function loadProducts() {
   try {
-    const response = await fetch('http://localhost:3000/inventory', {
+    const response = await fetch(`${API_URL}/inventory`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
     if (response.ok) {
@@ -113,6 +162,54 @@ function addProductField() {
   });
 }
 
+function addProductToSale(product) {
+    const container = document.getElementById('productsContainer');
+    let productExists = false;
+
+    // 1. Revisa si el producto ya está en la lista y, si es así, incrementa la cantidad.
+    container.querySelectorAll('.product-item').forEach(item => {
+        if (productExists) return; // Optimización para no seguir buscando
+        const select = item.querySelector('.product-select');
+        if (select.value == product.id) {
+            const quantityInput = item.querySelector('.quantity-input');
+            const currentQuantity = parseInt(quantityInput.value) || 0;
+            quantityInput.value = currentQuantity + 1;
+            productExists = true;
+        }
+    });
+
+    if (productExists) {
+        updateSummary();
+        return; // Termina la función si ya se actualizó un producto existente.
+    }
+
+    // 2. Si no existe, busca la primera fila vacía para usarla.
+    let emptyRowUsed = false;
+    container.querySelectorAll('.product-item').forEach(item => {
+        if (emptyRowUsed) return;
+        const select = item.querySelector('.product-select');
+        if (!select.value) { // Si el select no tiene valor, la fila está vacía.
+            select.value = product.id;
+            const quantityInput = item.querySelector('.quantity-input');
+            quantityInput.value = 1;
+            emptyRowUsed = true;
+        }
+    });
+
+    // 3. Si no se encontró una fila vacía, crea una nueva.
+    if (!emptyRowUsed) {
+        addProductField(); // Crea y añade una nueva fila de producto.
+        const newRow = container.lastElementChild;
+        const select = newRow.querySelector('.product-select');
+        const quantityInput = newRow.querySelector('.quantity-input');
+        
+        select.value = product.id;
+        quantityInput.value = 1;
+    }
+
+    updateSummary(); // Finalmente, actualiza el resumen total.
+}
+
 // Validar stock en tiempo real
 function validateStock(inputElement) {
   const row = inputElement.closest('.product-item');
@@ -132,6 +229,34 @@ function validateStock(inputElement) {
   }
 }
 
+// Aplicar cupón
+window.applyCoupon = async function() {
+    const code = document.getElementById('couponCode').value.trim().toUpperCase();
+    const msgDiv = document.getElementById('couponMessage');
+    
+    if (!code) return;
+
+    try {
+        const response = await fetch(`${API_URL}/coupons/validate/${code}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+
+        if (response.ok) {
+            currentCoupon = await response.json();
+            msgDiv.innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> Cupón aplicado: ${currentCoupon.discount_type === 'percent' ? currentCoupon.value + '%' : '$' + currentCoupon.value}</span>`;
+            updateSummary();
+        } else {
+            currentCoupon = null;
+            const err = await response.json();
+            msgDiv.innerHTML = `<span class="text-danger">${err.message}</span>`;
+            updateSummary();
+        }
+    } catch (error) {
+        console.error(error);
+        msgDiv.innerHTML = `<span class="text-danger">Error al validar</span>`;
+    }
+}
+
 // Actualizar resumen
 function updateSummary() {
   let subtotal = 0;
@@ -146,12 +271,39 @@ function updateSummary() {
     subtotal += total;
   });
   
-  const tax = subtotal * 0.16;
-  const total = subtotal + tax;
+  // Calcular descuento
+  let discount = 0;
+  if (currentCoupon) {
+      if (currentCoupon.discount_type === 'percent') {
+          discount = subtotal * (currentCoupon.value / 100);
+      } else {
+          discount = parseFloat(currentCoupon.value);
+      }
+      // Mostrar fila de descuento
+      document.getElementById('discountRow').style.display = 'flex';
+      document.getElementById('discountValue').textContent = `-$${discount.toFixed(2)}`;
+  } else {
+      document.getElementById('discountRow').style.display = 'none';
+  }
+
+  const tax = (subtotal - discount) * 0.16;
+  const total = Math.max(0, (subtotal - discount) + tax);
   
   document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
   document.getElementById('tax').textContent = `$${tax.toFixed(2)}`;
   document.getElementById('total').textContent = `$${total.toFixed(2)}`;
+  
+  // Recalcular cambio si cambia el total
+  calculateChange();
+}
+
+function calculateChange() {
+    const totalText = document.getElementById('total').textContent.replace('$', '').replace(',', '');
+    const total = parseFloat(totalText) || 0;
+    const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
+    
+    const change = Math.max(0, paid - total);
+    document.getElementById('changeAmount').textContent = `$${change.toFixed(2)}`;
 }
 
 // Event listeners para el primer producto
@@ -203,7 +355,9 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
   const saleData = {
     clientId: document.getElementById('clientId').value,
     products: saleProducts,
-    saleDate: document.getElementById('saleDate').value
+    saleDate: document.getElementById('saleDate').value,
+    couponCode: currentCoupon ? currentCoupon.code : null,
+    notes: document.getElementById('saleNotes').value
   };
   
   // Mostrar loading
@@ -212,7 +366,7 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
   messageDiv.innerHTML = '';
   
   try {
-    const response = await fetch('http://localhost:3000/sales', {
+    const response = await fetch(`${API_URL}/sales`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,5 +1,5 @@
 // Add Inventory Page JavaScript
-const API_URL = (typeof CONFIG !== 'undefined' && CONFIG.API_URL) ? CONFIG.API_URL : 'http://localhost:3000';
+const API_URL = ''; // Ruta relativa para producción
 
 document.addEventListener('DOMContentLoaded', function() {
     // Efecto de entrada para los inputs

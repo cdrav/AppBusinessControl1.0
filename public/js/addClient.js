@@ -1,5 +1,5 @@
 // Add Client Page JavaScript
-const API_URL = 'http://localhost:3000';
+const API_URL = ''; // Ruta relativa para producción
 
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('addClientForm');
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.ok) {
                 alert('Cliente agregado exitosamente');
-                window.location.href = 'clients.html';
+                window.location.href = 'clientes.html';
             } else {
                 const data = await response.json();
                 alert('Error: ' + (data.message || 'No se pudo agregar el cliente'));

@@ -1,5 +1,5 @@
 // Ventas Page JavaScript
-const API_URL = (typeof CONFIG !== 'undefined' && CONFIG.API_URL) ? CONFIG.API_URL : 'http://localhost:3000';
+const API_URL = ''; // Ruta relativa para producción
 let allSales = [];
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -70,6 +70,9 @@ function renderSalesTable(sales) {
         <td class="text-muted small">${date}</td>
         <td><span class="badge bg-success bg-opacity-10 text-success rounded-pill">Completado</span></td>
         <td>
+          <button class="btn btn-sm btn-light text-danger me-1" onclick="processReturn(${sale.id})" title="Devolución">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>
           <button class="btn btn-sm btn-light text-primary" onclick="printTicket(${sale.id})" title="Imprimir Ticket">
             <i class="bi bi-printer"></i>
           </button>
@@ -152,4 +155,26 @@ window.printTicket = function(id) {
     btn.innerHTML = originalContent;
     btn.disabled = false;
   });
+}
+
+window.processReturn = async function(saleId) {
+    if (!confirm('¿Desea procesar una devolución completa para esta venta? Esto restaurará el stock de todos los productos.')) return;
+
+    // Para esta versión simplificada, usamos la ruta de eliminación que ya restaura el stock
+    // En una versión avanzada, usaríamos la ruta /return para devoluciones parciales
+    try {
+        const response = await fetch(`${API_URL}/sales/${saleId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+
+        if (response.ok) {
+            alert('Devolución procesada correctamente. El stock ha sido restaurado.');
+            loadSales();
+        } else {
+            throw new Error('No se pudo procesar la devolución');
+        }
+    } catch (error) {
+        alert(error.message);
+    }
 }

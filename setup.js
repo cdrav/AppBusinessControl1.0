@@ -103,6 +103,56 @@ async function setup() {
       console.log('✅ Productos de prueba insertados.');
     }
 
+    // 5.5. Migración: Agregar columna 'barcode' si no existe
+    const [columns] = await connection.query("SHOW COLUMNS FROM inventory LIKE 'barcode'");
+    if (columns.length === 0) {
+      await connection.query("ALTER TABLE inventory ADD COLUMN barcode VARCHAR(50) UNIQUE AFTER id");
+      console.log("✅ Columna 'barcode' agregada a la tabla inventory.");
+    }
+
+    // 5.6. Crear tabla de configuración
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id INT PRIMARY KEY,
+        company_name VARCHAR(255) DEFAULT 'Business Control',
+        company_address VARCHAR(255) DEFAULT 'Calle Principal #123',
+        company_phone VARCHAR(50) DEFAULT '555-0000',
+        company_email VARCHAR(100) DEFAULT 'contacto@empresa.com'
+      )
+    `);
+    // Insertar configuración por defecto si no existe (usamos INSERT IGNORE para MySQL)
+    await connection.query(`INSERT IGNORE INTO settings (id, company_name) VALUES (1, 'Business Control')`);
+    console.log('✅ Tabla de configuración verificada.');
+
+    // 5.7. Migración: Agregar columna 'company_logo' si no existe
+    const [settingsColumns] = await connection.query("SHOW COLUMNS FROM settings LIKE 'company_logo'");
+    if (settingsColumns.length === 0) {
+      await connection.query("ALTER TABLE settings ADD COLUMN company_logo VARCHAR(255) AFTER company_email");
+      console.log("✅ Columna 'company_logo' agregada a la tabla settings.");
+    }
+
+    // 5.8. Crear tabla de cupones
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS coupons (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(50) NOT NULL UNIQUE,
+        discount_type ENUM('percent', 'fixed') NOT NULL,
+        value DECIMAL(10, 2) NOT NULL,
+        active BOOLEAN DEFAULT TRUE,
+        expiration_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // 5.9. Migración: Agregar columnas de descuento a ventas
+    await connection.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS discount DECIMAL(10, 2) DEFAULT 0 AFTER total_price");
+    await connection.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS coupon_code VARCHAR(50) AFTER discount");
+    console.log("✅ Soporte para descuentos y cupones agregado.");
+
+    // 5.10. Migración: Agregar columna 'notes' a ventas
+    await connection.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS notes TEXT AFTER coupon_code");
+    console.log("✅ Columna 'notes' agregada a la tabla sales.");
+
     // 6. Crear Usuario Admin (Si no existe)
     const adminEmail = 'admin@business.com';
     const [users] = await connection.query('SELECT * FROM users WHERE email = ?', [adminEmail]);

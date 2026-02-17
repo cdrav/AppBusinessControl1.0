@@ -26,15 +26,17 @@
           </div>
           <div class="d-flex align-items-center gap-3">
             <div class="text-end d-none d-md-block">
-              <span class="d-block fw-bold text-dark">Administrador</span>
-              <small class="text-muted">admin@business.com</small>
+              <span id="usernameDisplay" class="d-block fw-bold text-dark">Cargando...</span>
+              <small id="userRoleDisplay" class="text-muted">Usuario</small>
             </div>
-            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; font-size: 1.2rem;">
-              A
-            </div>
-            <a href="index.html" class="btn btn-light btn-sm ms-2" title="Cerrar Sesión">
-              <i class="bi bi-box-arrow-right"></i>
+            <a href="perfil.html" class="text-decoration-none">
+                <div id="userInitialDisplay" class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px; font-size: 1.2rem;" title="Ir a mi perfil">
+                  ?
+                </div>
             </a>
+            <button id="logoutButton" class="btn btn-light btn-sm ms-2" title="Cerrar Sesión">
+              <i class="bi bi-box-arrow-right"></i>
+            </button>
           </div>
         </div>
 
@@ -196,6 +198,22 @@
                 </a>
               </div>
               <div class="col-6 col-md-3">
+                <a href="ventas.html" class="quick-action-card">
+                  <div class="quick-action-icon">
+                    <i class="bi bi-receipt-cutoff"></i>
+                  </div>
+                  <span class="fw-bold">Ver Ventas</span>
+                </a>
+              </div>
+              <div class="col-6 col-md-3">
+                <a href="addInventory.html" class="quick-action-card admin-only">
+                  <div class="quick-action-icon">
+                    <i class="bi bi-plus-square-dotted"></i>
+                  </div>
+                  <span class="fw-bold">Agregar Producto</span>
+                </a>
+              </div>
+              <div class="col-6 col-md-3">
                 <a href="addClient.html" class="quick-action-card">
                   <div class="quick-action-icon">
                     <i class="bi bi-person-plus"></i>
@@ -204,23 +222,92 @@
                 </a>
               </div>
               <div class="col-6 col-md-3">
-                <a href="addInventory.html" class="quick-action-card">
+                <a href="#" class="quick-action-card" data-bs-toggle="modal" data-bs-target="#cashSummaryModal">
                   <div class="quick-action-icon">
-                    <i class="bi bi-box-seam"></i>
+                    <i class="bi bi-cash-coin"></i>
                   </div>
-                  <span class="fw-bold">Agregar Producto</span>
-                </a>
-              </div>
-              <div class="col-6 col-md-3">
-                <a href="reportes.html" class="quick-action-card">
-                  <div class="quick-action-icon">
-                    <i class="bi bi-file-earmark-bar-graph"></i>
-                  </div>
-                  <span class="fw-bold">Ver Reportes</span>
+                  <span class="fw-bold">Cierre de Caja</span>
                 </a>
               </div>
             </div>
           </div>
+
+          <!-- Management Modules Row -->
+          <div class="col-12 fade-in mt-4" style="animation-delay: 0.5s">
+            <h5 class="mb-3 fw-bold text-dark">Módulos de Gestión</h5>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <a href="clientes.html" class="quick-action-card">
+                  <div class="quick-action-icon"><i class="bi bi-people"></i></div>
+                  <span class="fw-bold">Administrar Clientes</span>
+                </a>
+              </div>
+              <div class="col-md-4">
+                <a href="inventarios.html" class="quick-action-card">
+                  <div class="quick-action-icon"><i class="bi bi-boxes"></i></div>
+                  <span class="fw-bold">Gestionar Inventario</span>
+                </a>
+              </div>
+              <div class="col-md-4">
+                <a href="reportes.html" class="quick-action-card admin-only">
+                  <div class="quick-action-icon"><i class="bi bi-graph-up"></i></div>
+                  <span class="fw-bold">Análisis y Reportes</span>
+                </a>
+              </div>
+              <div class="col-md-4">
+                <a href="usuarios.html" class="quick-action-card admin-only">
+                  <div class="quick-action-icon"><i class="bi bi-shield-lock"></i></div>
+                  <span class="fw-bold">Gestión de Usuarios</span>
+                </a>
+              </div>
+              <div class="col-md-4">
+                <a href="configuracion.html" class="quick-action-card admin-only">
+                  <div class="quick-action-icon"><i class="bi bi-gear"></i></div>
+                  <span class="fw-bold">Configuración Empresa</span>
+                </a>
+              </div>
+              <div class="col-md-4">
+                <a href="cupones.html" class="quick-action-card admin-only">
+                  <div class="quick-action-icon"><i class="bi bi-ticket-perforated"></i></div>
+                  <span class="fw-bold">Gestión de Cupones</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cash Summary Modal -->
+  <div class="modal fade" id="cashSummaryModal" tabindex="-1" aria-labelledby="cashSummaryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold" id="cashSummaryModalLabel">
+              <i class="bi bi-calendar-check me-2 text-primary"></i>
+              Resumen de Caja del Día
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <p class="text-muted small">Mostrando el total de ventas registradas para la fecha seleccionada.</p>
+          <div class="mb-3">
+              <label for="summaryDate" class="form-label small fw-medium">Seleccionar Fecha:</label>
+              <input type="date" id="summaryDate" class="form-control">
+          </div>
+          <div id="summaryContent" class="text-center p-4 bg-light rounded-3 mt-3">
+              <!-- Content will be loaded here by JavaScript -->
+              <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Cargando...</span>
+              </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
+          <button type="button" class="btn btn-primary" onclick="printDailySummary()">
+              <i class="bi bi-printer me-1"></i> Imprimir Resumen
+          </button>
         </div>
       </div>
     </div>
