@@ -10,66 +10,68 @@
 </head>
 <body>
   <div class="page-wrapper">
-    <div class="form-container fade-in">
-      <div class="form-header">
-        <div class="rounded-circle bg-secondary bg-opacity-10 text-secondary d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px; font-size: 1.5rem;">
-            <i class="bi bi-gear-fill"></i>
-        </div>
-        <h1 class="form-title">Configuración de Empresa</h1>
-        <p class="form-subtitle">Personaliza los datos que aparecen en tus tickets</p>
-      </div>
-      
-      <form id="configForm">
-        <div class="mb-4">
-          <label class="form-label"><i class="bi bi-building"></i> Nombre de la Empresa</label>
-          <input type="text" class="form-control" id="companyName" required>
-        </div>
-        
-        <div class="mb-4">
-          <label class="form-label"><i class="bi bi-geo-alt"></i> Dirección</label>
-          <input type="text" class="form-control" id="companyAddress">
-        </div>
-        
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <label class="form-label"><i class="bi bi-telephone"></i> Teléfono</label>
-                <input type="text" class="form-control" id="companyPhone">
-            </div>
-            <div class="col-md-6">
-                <label class="form-label"><i class="bi bi-envelope"></i> Email de Contacto</label>
-                <input type="email" class="form-control" id="companyEmail">
-            </div>
-        </div>
-        
-        <div class="d-flex gap-3">
-          <button type="submit" class="btn btn-primary flex-fill btn-submit">
-            <i class="bi bi-save me-2"></i> Guardar Cambios
-          </button>
-          <a href="dashboard.html" class="btn-back">
-            <i class="bi bi-arrow-left"></i> Regresar
-          </a>
-        </div>
-      </form>
-
-      <!-- System Maintenance -->
-      <div class="card border-0 shadow-sm p-4 mt-5 bg-light">
-          <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-hdd-rack me-2"></i>Mantenimiento del Sistema</h5>
-          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-              <div>
-                  <h6 class="mb-1 fw-bold">Copia de Seguridad</h6>
-                  <p class="text-muted small mb-0">Descarga un archivo SQL con toda la base de datos para resguardar tu información.</p>
-              </div>
-              <button onclick="downloadBackup()" class="btn btn-outline-primary bg-white">
-                  <i class="bi bi-download me-2"></i>Descargar Backup
-              </button>
+    <div class="content-container">
+      <div class="container">
+        <div class="form-container fade-in">
+          <div class="form-header">
+            <i class="bi bi-gear-fill form-icon"></i>
+            <h1 class="form-title">Configuración de la Empresa</h1>
           </div>
+          
+          <div id="message" class="mb-3"></div>
+
+          <form id="configForm">
+            <div class="mb-3">
+              <label for="companyName" class="form-label">Nombre de la Empresa</label>
+              <input type="text" class="form-control" id="companyName" required>
+            </div>
+            <div class="mb-3">
+              <label for="companyAddress" class="form-label">Dirección</label>
+              <input type="text" class="form-control" id="companyAddress">
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="companyPhone" class="form-label">Teléfono</label>
+                    <input type="text" class="form-control" id="companyPhone">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="companyEmail" class="form-label">Correo Electrónico</label>
+                    <input type="email" class="form-control" id="companyEmail">
+                </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label fw-bold">Logo de la Empresa</label>
+              <div class="d-flex align-items-center gap-4">
+                <img id="logoPreview" src="https://placehold.co/80x80?text=Logo" alt="Logo Preview" class="rounded border p-1" style="width: 80px; height: 80px; object-fit: contain;">
+                <div>
+                  <input class="form-control" type="file" id="companyLogo" accept="image/png, image/jpeg">
+                  <div class="form-text mt-2">Sube una imagen PNG o JPG (max 2MB).</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+                <label for="ticketFormat" class="form-label fw-bold">Formato de Ticket</label>
+                <select class="form-select" id="ticketFormat">
+                    <option value="A4">Hoja Carta / A4 (Estándar)</option>
+                    <option value="80mm">Impresora Térmica (80mm)</option>
+                </select>
+                <div class="form-text">Selecciona "Impresora Térmica" si usas una impresora de tickets POS.</div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+              <button type="submit" class="btn btn-primary flex-fill btn-submit">
+                <i class="bi bi-save me-2"></i> Guardar Cambios
+              </button>
+              <a href="dashboard.html" class="btn btn-outline-secondary">Volver</a>
+            </div>
+          </form>
+        </div>
       </div>
-      
-      <div id="message" class="mt-3"></div>
     </div>
   </div>
 
   <script src="js/configuracion.js"></script>
-  <footer class="main-footer"><p class="mb-0">&copy; 2026 Business Control.</p></footer>
 </body>
 </html>

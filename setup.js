@@ -131,6 +131,13 @@ async function setup() {
       console.log("✅ Columna 'company_logo' agregada a la tabla settings.");
     }
 
+    // 5.7.1. Migración: Agregar columna 'ticket_format' si no existe
+    const [ticketFormatCols] = await connection.query("SHOW COLUMNS FROM settings LIKE 'ticket_format'");
+    if (ticketFormatCols.length === 0) {
+      await connection.query("ALTER TABLE settings ADD COLUMN ticket_format VARCHAR(20) DEFAULT 'A4' AFTER company_logo");
+      console.log("✅ Columna 'ticket_format' agregada a la tabla settings.");
+    }
+
     // 5.8. Crear tabla de cupones
     await connection.query(`
       CREATE TABLE IF NOT EXISTS coupons (

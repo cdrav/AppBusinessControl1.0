@@ -2,6 +2,7 @@
 let salesChart = null;
 let distributionChart = null;
 let clientsChart = null;
+let hourlyChart = null;
 const API_URL = ''; // Ruta relativa para producción
 
 // Initialize page
@@ -160,6 +161,33 @@ function initializeCharts() {
       }
     });
   }
+
+  const hourlyCtx = document.getElementById('hourlyChart')?.getContext('2d');
+  if (hourlyCtx) {
+    hourlyChart = new Chart(hourlyCtx, {
+      type: 'bar',
+      data: {
+        labels: Array.from({length: 24}, (_, i) => `${i}:00`), // 0:00 a 23:00
+        datasets: [{
+          label: 'Transacciones',
+          data: [],
+          backgroundColor: 'rgba(13, 202, 240, 0.5)', // Info color (Cyan)
+          borderColor: '#0dcaf0',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1 } },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  }
 }
 
 // Fetch data from backend and update UI
@@ -169,7 +197,7 @@ async function fetchAndDisplayStats() {
 
     if (!startDate || !endDate) return;
 
-    const url = new URL(`${API_URL}/api/statistics`);
+    const url = new URL(`${API_URL}/api/statistics`, window.location.origin);
     url.searchParams.append('startDate', startDate);
     url.searchParams.append('endDate', endDate);
 
@@ -217,6 +245,16 @@ async function fetchAndDisplayStats() {
             clientsChart.data.labels = clientLabels;
             clientsChart.data.datasets[0].data = clientData;
             clientsChart.update();
+        }
+
+        // Update hourly chart
+        if (hourlyChart && stats.salesByHour) {
+            const hourlyData = new Array(24).fill(0);
+            stats.salesByHour.forEach(item => {
+                hourlyData[item.hour] = item.count;
+            });
+            hourlyChart.data.datasets[0].data = hourlyData;
+            hourlyChart.update();
         }
 
     } catch (error) {
@@ -267,7 +305,7 @@ window.generateReport = async function() {
   btn.classList.add('loading');
 
   try {
-    const url = new URL(`${API_URL}/report`);
+    const url = new URL(`${API_URL}/report`, window.location.origin);
     url.searchParams.append('startDate', startDate);
     url.searchParams.append('endDate', endDate);
     url.searchParams.append('type', reportType);

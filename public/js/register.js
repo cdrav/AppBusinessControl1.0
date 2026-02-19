@@ -1,5 +1,12 @@
 // Register Page JavaScript
+const API_URL = ''; // Ruta relativa para producción
+
 document.addEventListener('DOMContentLoaded', function() {
+  // Verificar si ya hay sesión iniciada
+  if (localStorage.getItem('token')) {
+    window.location.href = 'dashboard.html';
+  }
+
   const form = document.getElementById('registerForm');
   const passwordInput = document.getElementById('password');
   const confirmPasswordInput = document.getElementById('confirmPassword');
@@ -39,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     messageDiv.innerHTML = '';
 
     try {
-      const response = await fetch('/register', {
+      const response = await fetch(`${API_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password }),

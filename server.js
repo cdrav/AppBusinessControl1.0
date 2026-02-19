@@ -24,7 +24,7 @@ const upload = multer({ storage: storage });
 
 // Configuración de Nodemailer
 const transporter = nodemailer.createTransport({
-  service: 'hotmail', // Configurado para Hotmail/Outlook según tu .env
+  service: 'hotmail', // Actualizado para coincidir con el correo @hotmail.com del .env
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
@@ -39,28 +39,26 @@ async function sendLowStockAlert(products) {
     
     const mailOptions = {
         from: process.env.EMAIL_USER,
-        to: process.env.EMAIL_USER,
+        to: process.env.EMAIL_USER, // Se envía al mismo admin (o cambia esto por otro correo)
         subject: '⚠️ Alerta de Stock Bajo - Business Control',
         html: `<h3>Los siguientes productos tienen stock bajo:</h3><ul>${productList}</ul><p>Por favor, reabastece el inventario pronto.</p>`
     };
 
-    try { 
-        await transporter.sendMail(mailOptions); 
-        console.log('📧 Correo de alerta enviado'); 
-    } catch (error) { 
-        console.error('❌ Error enviando correo:', error); 
-    }
+    try { await transporter.sendMail(mailOptions); console.log('📧 Correo de alerta enviado'); } 
+    catch (error) { console.error('❌ Error enviando correo:', error); }
 }
 
 // Crear la aplicación Express
 const app = express();
 app.use(express.json()); 
 
-// Servir archivos estáticos
+// *** CORRECCIÓN CRÍTICA: Servir archivos estáticos (HTML, CSS, JS) ***
+// Servimos solo la carpeta 'public' para proteger el código fuente del backend.
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
-// Configurar la conexión a MySQL
+// Configurar la conexión a MySQL. Usaremos mysql2 para soporte de promesas y transacciones más limpias.
+// Por favor, ejecuta: npm install mysql2
 const mysql = require('mysql2/promise');
 
 const db = mysql.createPool({
@@ -74,21 +72,19 @@ const db = mysql.createPool({
   queueLimit: 0
 });
 
-// Verificación de conexión inicial
-db.getConnection().then(conn => {
-    console.log('✅ Base de datos conectada correctamente.');
-    conn.release();
-}).catch(err => {
-    console.error('❌ Error al conectar con la base de datos:', err.message);
-});
+console.log('Pool de conexiones a la base de datos configurado.');
+
 
 // Ruta de prueba
 app.get('/', (req, res) => {
+  // Servir explícitamente el index.html desde la carpeta public
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Ruta para /dashboard
 app.get('/dashboard', authenticateToken, (req, res) => {
+  // Esta ruta debería servir el archivo HTML o ser usada para obtener datos del dashboard.
+  // Dado que tienes `dashboard.html`, devolvemos JSON solo si es una petición de API explícita
   res.json({ message: 'Bienvenido al Dashboard' });
 });
 
@@ -97,18 +93,27 @@ app.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
+    // Validación simple
     if (!username || !email || !password) {
       return res.status(400).json({ message: 'Faltan datos requeridos para el registro.' });
     }
 
+    // Verificar duplicados
     const [usersFound] = await db.query('SELECT id FROM users WHERE email = ? OR username = ? LIMIT 1', [email, username]);
     
     if (usersFound.length > 0) {
       return res.status(409).json({ message: 'Este usuario o correo ya está en uso.' });
     }
 
+    // Asignar rol: el primer usuario es 'admin', los demás 'cajero'
+    const [userCount] = await db.query('SELECT COUNT(*) as count FROM users');
+    const role = userCount[0].count === 0 ? 'admin' : 'cajero';
+
     const passwordHash = await bcrypt.hash(password, 10);
-    await db.query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, passwordHash]);
+    await db.query(
+      'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+      [username, email, passwordHash, role]
+    );
 
     res.status(201).json({ message: 'Cuenta creada exitosamente.' });
   } catch (err) {
@@ -145,9 +150,10 @@ app.post('/login', async (req, res) => {
 });
 
 // ==================================================================
-// RUTAS DE CLIENTES
+// RUTAS DE CLIENTES REFACTORIZADAS CON ASYNC/AWAIT
 // ==================================================================
 
+// Obtener todos los clientes
 app.get('/clients', authenticateToken, async (req, res) => {
   try {
     const [results] = await db.query('SELECT * FROM clients ORDER BY name ASC');
@@ -158,6 +164,7 @@ app.get('/clients', authenticateToken, async (req, res) => {
   }
 });
 
+// Agregar un nuevo cliente
 app.post('/clients', authenticateToken, async (req, res) => {
   const { name, email, phone, address } = req.body;
   if (!name || !email || !phone) {
@@ -172,6 +179,7 @@ app.post('/clients', authenticateToken, async (req, res) => {
   }
 });
 
+// Obtener un cliente específico por ID
 app.get('/clients/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
@@ -186,6 +194,7 @@ app.get('/clients/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Obtener historial de compras de un cliente
 app.get('/clients/:id/sales', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
@@ -203,6 +212,7 @@ app.get('/clients/:id/sales', authenticateToken, async (req, res) => {
   }
 });
 
+// *** CORRECCIÓN CRÍTICA: Ruta para actualizar un cliente (PUT) ***
 app.put('/clients/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { name, email, phone, address } = req.body;
@@ -218,6 +228,7 @@ app.put('/clients/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// *** CORRECCIÓN CRÍTICA: Ruta para eliminar un cliente (DELETE) ***
 app.delete('/clients/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   const { id } = req.params;
   try {
@@ -233,9 +244,10 @@ app.delete('/clients/:id', authenticateToken, authorizeRole(['admin']), async (r
 });
 
 // ==================================================================
-// RUTAS DE INVENTARIO
+// RUTAS DE INVENTARIO REFACTORIZADAS CON ASYNC/AWAIT
 // ==================================================================
 
+// Obtener todos los productos
 app.get('/inventory', authenticateToken, async (req, res) => {
   try {
     const [results] = await db.query('SELECT * FROM inventory ORDER BY product_name ASC');
@@ -246,13 +258,19 @@ app.get('/inventory', authenticateToken, async (req, res) => {
   }
 });
 
+// Exportar inventario a CSV (MOVIDO AQUÍ PARA EVITAR CONFLICTO CON :id)
 app.get('/inventory/export', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const [results] = await db.query('SELECT * FROM inventory ORDER BY id ASC');
+    
+    // Cabeceras del CSV
     let csv = 'ID,Codigo Barras,Nombre,Stock,Precio,Categoria,Descripcion\n';
+    
+    // Filas
     results.forEach(row => {
       csv += `${row.id},"${(row.barcode || '').replace(/"/g, '""')}","${(row.product_name || '').replace(/"/g, '""')}",${row.stock},${row.price},"${(row.category || '').replace(/"/g, '""')}","${(row.description || '').replace(/"/g, '""')}"\n`;
     });
+
     res.header('Content-Type', 'text/csv');
     res.attachment('inventario.csv');
     res.send(csv);
@@ -262,6 +280,7 @@ app.get('/inventory/export', authenticateToken, authorizeRole(['admin']), async 
   }
 });
 
+// Obtener un producto específico por ID (Para edición)
 app.get('/inventory/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
@@ -276,83 +295,89 @@ app.get('/inventory/:id', authenticateToken, async (req, res) => {
   }
 });
   
-app.get('/inventory/barcode/:barcode', authenticateToken, async (req, res) => {
-  const { barcode } = req.params;
-  try {
-    const [results] = await db.query('SELECT * FROM inventory WHERE barcode = ?', [barcode]);
-    if (results.length === 0) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
+  // Obtener un producto por código de barras
+  app.get('/inventory/barcode/:barcode', authenticateToken, async (req, res) => {
+    const { barcode } = req.params;
+    try {
+      const [results] = await db.query('SELECT * FROM inventory WHERE barcode = ?', [barcode]);
+      if (results.length === 0) {
+        return res.status(404).json({ message: 'Producto no encontrado' });
+      }
+      res.status(200).json(results[0]);
+    } catch (error) {
+      console.error('Error al buscar producto por código de barras:', error);
+      res.status(500).json({ message: 'Error del servidor' });
     }
-    res.status(200).json(results[0]);
-  } catch (error) {
-    console.error('Error al buscar producto por código de barras:', error);
-    res.status(500).json({ message: 'Error del servidor' });
-  }
-});
+  });
 
-app.post('/inventory', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-  const { name, quantity, price, category, description, barcode } = req.body;
-
-  if (!name || !quantity || !price) {
-    return res.status(400).json({ message: 'Todos los campos son obligatorios' });
-  }
-
-  try {
-    const query = 'INSERT INTO inventory (product_name, stock, price, category, description, barcode) VALUES (?, ?, ?, ?, ?, ?)';
-    const [result] = await db.query(query, [name, quantity, price, category || null, description || null, barcode || null]);
-    res.status(201).json({ message: 'Producto agregado con éxito', productId: result.insertId });
-  } catch (error) {
-    console.error('Error al agregar producto:', error);
-    res.status(500).json({ message: 'Error del servidor al agregar producto' });
-  }
-});
+  // Agregar un producto
+  app.post('/inventory', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { name, quantity, price, category, description, barcode } = req.body;
   
-app.put('/inventory/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-  const { id } = req.params;
-  const { name, quantity, price, category, description, barcode } = req.body;
-
-  if (!name || !quantity || !price) {
-    return res.status(400).json({ message: 'Todos los campos son obligatorios' });
-  }
-
-  try {
-    const query = 'UPDATE inventory SET product_name = ?, stock = ?, price = ?, category = ?, description = ?, barcode = ? WHERE id = ?';
-    const [result] = await db.query(query, [name, quantity, price, category, description, barcode || null, id]);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
+    if (!name || !quantity || !price) {
+      return res.status(400).json({ message: 'Todos los campos son obligatorios' });
     }
-    res.status(200).json({ message: 'Producto actualizado con éxito' });
-  } catch (error) {
-    console.error('Error al actualizar producto:', error);
-    res.status(500).json({ message: 'Error del servidor al actualizar producto' });
-  }
-});
   
-app.delete('/inventory/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const [result] = await db.query('DELETE FROM inventory WHERE id = ?', [id]);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Producto no encontrado' });
+    try {
+      // Incluimos barcode en la inserción
+      const query = 'INSERT INTO inventory (product_name, stock, price, category, description, barcode) VALUES (?, ?, ?, ?, ?, ?)';
+      const [result] = await db.query(query, [name, quantity, price, category || null, description || null, barcode || null]);
+      res.status(201).json({ message: 'Producto agregado con éxito', productId: result.insertId });
+    } catch (error) {
+      console.error('Error al agregar producto:', error);
+      res.status(500).json({ message: 'Error del servidor al agregar producto' });
     }
-    res.status(200).json({ message: 'Producto eliminado con éxito' });
-  } catch (error) {
-    console.error('Error al eliminar producto:', error);
-    res.status(500).json({ message: 'Error del servidor al eliminar producto' });
-  }
-});
+  });
+  
+  // Editar un producto
+  app.put('/inventory/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { id } = req.params;
+    const { name, quantity, price, category, description, barcode } = req.body;
+  
+    if (!name || !quantity || !price) {
+      return res.status(400).json({ message: 'Todos los campos son obligatorios' });
+    }
+  
+    try {
+      const query = 'UPDATE inventory SET product_name = ?, stock = ?, price = ?, category = ?, description = ?, barcode = ? WHERE id = ?';
+      const [result] = await db.query(query, [name, quantity, price, category, description, barcode || null, id]);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Producto no encontrado' });
+      }
+      res.status(200).json({ message: 'Producto actualizado con éxito' });
+    } catch (error) {
+      console.error('Error al actualizar producto:', error);
+      res.status(500).json({ message: 'Error del servidor al actualizar producto' });
+    }
+  });
+  
+  // Eliminar un producto
+  app.delete('/inventory/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { id } = req.params;
+  
+    try {
+      const [result] = await db.query('DELETE FROM inventory WHERE id = ?', [id]);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Producto no encontrado' });
+      }
+      res.status(200).json({ message: 'Producto eliminado con éxito' });
+    } catch (error) {
+      console.error('Error al eliminar producto:', error);
+      res.status(500).json({ message: 'Error del servidor al eliminar producto' });
+    }
+  });
   
 // ==================================================================
-// RUTA DE VENTAS
+// RUTA DE VENTAS REFACTORIZADA CON TRANSACCIONES
 // ==================================================================
 app.post('/sales', authenticateToken, async (req, res) => {
   const { clientId, products, saleDate, couponCode, notes } = req.body;
 
   if (!clientId || !products || !Array.isArray(products) || products.length === 0 || !saleDate) {
-    return res.status(400).json({ message: 'Datos de venta inválidos.' });
+    return res.status(400).json({ message: 'Datos de venta inválidos. Se requiere cliente, fecha y un arreglo de productos.' });
   }
 
+  // Usaremos una conexión del pool para la transacción
   let connection;
   try {
     connection = await db.getConnection();
@@ -360,9 +385,9 @@ app.post('/sales', authenticateToken, async (req, res) => {
 
     let totalSalePrice = 0;
     const productDetails = [];
-    const lowStockItems = [];
+    const lowStockItems = []; // Lista para alertas
 
-    // 1. Validar stock y calcular totales
+    // 1. Validar stock y calcular totales (usando FOR...OF para usar await dentro)
     for (const product of products) {
       const { productId, quantity } = product;
       if (!productId || !quantity || quantity <= 0) {
@@ -384,12 +409,13 @@ app.post('/sales', authenticateToken, async (req, res) => {
       productDetails.push({ productId, quantity, subtotal });
     }
 
-    // 1.5 Calcular Descuento
+    // 1.5 Calcular Descuento (Si hay cupón)
     let discountAmount = 0;
     if (couponCode) {
         const [coupons] = await connection.query('SELECT * FROM coupons WHERE code = ? AND active = TRUE', [couponCode]);
         if (coupons.length > 0) {
             const coupon = coupons[0];
+            // Validar fecha de expiración
             if (!coupon.expiration_date || new Date(coupon.expiration_date) >= new Date()) {
                 if (coupon.discount_type === 'percent') {
                     discountAmount = totalSalePrice * (coupon.value / 100);
@@ -408,26 +434,31 @@ app.post('/sales', authenticateToken, async (req, res) => {
     );
     const saleId = saleResult.insertId;
 
-    // 3. Insertar detalles y actualizar stock
+    // 3. Insertar detalles de la venta y actualizar stock
     for (const detail of productDetails) {
+      // Insertar detalle
       await connection.query(
         'INSERT INTO sale_details (sale_id, product_id, quantity, subtotal) VALUES (?, ?, ?, ?)',
         [saleId, detail.productId, detail.quantity, detail.subtotal]
       );
 
+      // Actualizar stock
       await connection.query(
         'UPDATE inventory SET stock = stock - ? WHERE id = ?',
         [detail.quantity, detail.productId]
       );
 
+      // Verificar si el stock bajó del umbral (ej. 10 unidades)
       const [stockRows] = await connection.query('SELECT product_name, stock FROM inventory WHERE id = ?', [detail.productId]);
       if (stockRows.length > 0 && stockRows[0].stock <= 10) {
           lowStockItems.push({ name: stockRows[0].product_name, stock: stockRows[0].stock });
       }
     }
 
+    // 4. Si todo fue bien, confirmar la transacción
     await connection.commit();
 
+    // 5. Enviar alerta de correo (fuera de la transacción para no bloquear)
     if (lowStockItems.length > 0) {
         sendLowStockAlert(lowStockItems);
     }
@@ -435,14 +466,18 @@ app.post('/sales', authenticateToken, async (req, res) => {
     res.status(201).json({ message: 'Venta registrada con éxito', saleId });
 
   } catch (error) {
+    // 5. Si algo falló, revertir todos los cambios
     if (connection) await connection.rollback();
     console.error('Error en la transacción de venta:', error);
+    // Enviamos el mensaje de error específico al cliente
     res.status(500).json({ message: error.message || 'Error del servidor al procesar la venta.' });
   } finally {
+    // 6. Liberar la conexión en cualquier caso
     if (connection) connection.release();
   }
 });
 
+// Validar cupón (Endpoint para el frontend)
 app.get('/coupons/validate/:code', authenticateToken, async (req, res) => {
   const { code } = req.params;
   try {
@@ -460,6 +495,7 @@ app.get('/coupons/validate/:code', authenticateToken, async (req, res) => {
   }
 });
 
+// Crear cupón (Solo Admin)
 app.post('/coupons', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     const { code, discount_type, value, expiration_date } = req.body;
     try {
@@ -473,6 +509,7 @@ app.post('/coupons', authenticateToken, authorizeRole(['admin']), async (req, re
     }
 });
 
+// Obtener todos los cupones (Solo Admin)
 app.get('/coupons', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const [coupons] = await db.query('SELECT * FROM coupons ORDER BY created_at DESC');
@@ -483,6 +520,7 @@ app.get('/coupons', authenticateToken, authorizeRole(['admin']), async (req, res
   }
 });
 
+// Eliminar cupón (Solo Admin)
 app.delete('/coupons/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   const { id } = req.params;
   try {
@@ -494,6 +532,7 @@ app.delete('/coupons/:id', authenticateToken, authorizeRole(['admin']), async (r
   }
 });
 
+// Ruta para obtener todas las ventas
 app.get('/sales', authenticateToken, async (req, res) => {
   const query = `
     SELECT 
@@ -514,6 +553,7 @@ app.get('/sales', authenticateToken, async (req, res) => {
   }
 });
 
+// Ruta para eliminar una venta y restaurar el stock
 app.delete('/sales/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   const { id } = req.params;
   let connection;
@@ -521,9 +561,11 @@ app.delete('/sales/:id', authenticateToken, authorizeRole(['admin']), async (req
     connection = await db.getConnection();
     await connection.beginTransaction();
 
+    // 1. Obtener los detalles de la venta para saber qué productos devolver al stock
     const [details] = await connection.query('SELECT product_id, quantity FROM sale_details WHERE sale_id = ?', [id]);
     
     if (details.length === 0) {
+        // Verificar si la venta existe (podría ser una venta antigua sin detalles o error)
         const [sale] = await connection.query('SELECT id FROM sales WHERE id = ?', [id]);
         if (sale.length === 0) {
             await connection.rollback();
@@ -531,10 +573,12 @@ app.delete('/sales/:id', authenticateToken, authorizeRole(['admin']), async (req
         }
     }
 
+    // 2. Restaurar stock de cada producto
     for (const item of details) {
         await connection.query('UPDATE inventory SET stock = stock + ? WHERE id = ?', [item.quantity, item.product_id]);
     }
 
+    // 3. Eliminar la venta (la base de datos debería eliminar los detalles automáticamente si hay ON DELETE CASCADE, pero lo hacemos manual por seguridad)
     await connection.query('DELETE FROM sale_details WHERE sale_id = ?', [id]);
     await connection.query('DELETE FROM sales WHERE id = ?', [id]);
 
@@ -550,9 +594,10 @@ app.delete('/sales/:id', authenticateToken, authorizeRole(['admin']), async (req
   }
 });
 
+// Procesar devolución de productos
 app.post('/sales/:id/return', authenticateToken, authorizeRole(['admin', 'cajero']), async (req, res) => {
     const { id } = req.params;
-    const { items } = req.body;
+    const { items } = req.body; // Array de { productId, quantity }
 
     if (!items || items.length === 0) return res.status(400).json({ message: 'No se seleccionaron productos para devolver' });
 
@@ -562,10 +607,14 @@ app.post('/sales/:id/return', authenticateToken, authorizeRole(['admin', 'cajero
         await connection.beginTransaction();
 
         for (const item of items) {
+            // 1. Verificar que el producto estaba en la venta
             const [details] = await connection.query('SELECT quantity FROM sale_details WHERE sale_id = ? AND product_id = ?', [id, item.productId]);
             
             if (details.length > 0) {
+                // 2. Restaurar stock
                 await connection.query('UPDATE inventory SET stock = stock + ? WHERE id = ?', [item.quantity, item.productId]);
+                
+                // 3. Registrar la devolución (Podrías crear una tabla 'returns' para historial, aquí simplificamos actualizando la venta o notas)
                 await connection.query('UPDATE sales SET notes = CONCAT(IFNULL(notes, ""), " [Devolución: Prod ID ", ?, " Cant ", ?, "]") WHERE id = ?', [item.productId, item.quantity, id]);
             }
         }
@@ -581,12 +630,15 @@ app.post('/sales/:id/return', authenticateToken, authorizeRole(['admin', 'cajero
     }
 });
 
+// Ruta para generar ticket de venta individual (PDF)
 app.get('/sales/:id/ticket', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
+    // 0. Obtener configuración de la empresa
     const [settings] = await db.query('SELECT * FROM settings WHERE id = 1');
     const config = settings[0] || { company_name: 'Business Control' };
 
+    // 1. Obtener datos de la venta y cliente
     const [saleRows] = await db.query(`
       SELECT s.id, s.sale_date, s.total_price, s.notes, c.name as client_name, c.address, c.phone
       FROM sales s
@@ -597,6 +649,7 @@ app.get('/sales/:id/ticket', authenticateToken, async (req, res) => {
     if (saleRows.length === 0) return res.status(404).send('Venta no encontrada');
     const sale = saleRows[0];
 
+    // 2. Obtener detalles de productos
     const [details] = await db.query(`
       SELECT i.product_name, sd.quantity, sd.subtotal, i.price
       FROM sale_details sd
@@ -604,57 +657,178 @@ app.get('/sales/:id/ticket', authenticateToken, async (req, res) => {
       WHERE sd.sale_id = ?
     `, [id]);
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    // 3. Generar PDF
+    const isThermal = config.ticket_format === '80mm';
+    const pdfOptions = isThermal 
+        ? { margin: 15, size: [226, 800] } // 80mm width (approx 226 points)
+        : { margin: 50, size: 'A4' };
+
+    const doc = new PDFDocument(pdfOptions);
     
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename=ticket-${id}.pdf`);
 
     doc.pipe(res);
 
-    if (config.company_logo) {
-        const logoPath = path.join(__dirname, 'public', config.company_logo);
-        if (fs.existsSync(logoPath)) {
-            doc.image(logoPath, 50, 45, { width: 50 });
+    if (isThermal) {
+        // --- Logo para Ticket Térmico ---
+        if (config.company_logo && fs.existsSync(path.join(__dirname, 'public', config.company_logo))) {
+            doc.image(path.join(__dirname, 'public', config.company_logo), {
+                fit: [100, 50], // max width 100, max height 50
+                align: 'center'
+            });
+            doc.moveDown(0.5);
         }
-    }
-
-    doc.fontSize(20).text(config.company_name || 'Business Control', { align: 'center' });
-    if (config.company_address) doc.fontSize(10).text(config.company_address, { align: 'center' });
-    if (config.company_phone) doc.text(`Tel: ${config.company_phone}`, { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(10).text('Ticket de Venta', { align: 'center' });
-    doc.moveDown();
-    doc.text(`Folio: #${sale.id} - Fecha: ${new Date(sale.sale_date).toLocaleString()}`);
-    doc.text(`Cliente: ${sale.client_name || 'Cliente General'}`);
-    if (sale.notes) {
+        // --- DISEÑO TÉRMICO (80mm) ---
+        doc.font('Helvetica-Bold').fontSize(12).text(config.company_name || 'Business Control', { align: 'center' });
+        doc.font('Helvetica').fontSize(8);
+        if (config.company_address) doc.text(config.company_address, { align: 'center' });
+        if (config.company_phone) doc.text(`Tel: ${config.company_phone}`, { align: 'center' });
+        
         doc.moveDown(0.5);
-        doc.text(`Notas: ${sale.notes}`, { oblique: true });
-    }
-    doc.moveDown();
+        doc.text('------------------------------------------', { align: 'center' });
+        doc.text(`Folio: #${sale.id}`);
+        doc.text(`Fecha: ${new Date(sale.sale_date).toLocaleString()}`);
+        doc.text(`Cliente: ${sale.client_name || 'General'}`);
+        doc.text('------------------------------------------', { align: 'center' });
+        doc.moveDown(0.5);
 
-    doc.font('Courier').fontSize(10);
-    doc.text('Cant.  Descripción                    Precio    Total');
-    doc.text('-------------------------------------------------------');
-    
-    details.forEach(item => {
-       const name = (item.product_name || 'Producto Eliminado').substring(0, 25).padEnd(25);
-       const qty = item.quantity.toString().padEnd(5);
-       const priceVal = parseFloat(item.price) || (parseFloat(item.subtotal) / parseFloat(item.quantity));
-       const price = priceVal.toFixed(2).padEnd(8);
-       const total = parseFloat(item.subtotal).toFixed(2);
-       doc.text(`${qty}  ${name}  $${price}  $${total}`);
-    });
-    
-    doc.text('-------------------------------------------------------');
-    doc.moveDown();
-    doc.font('Helvetica-Bold').fontSize(14).text(`TOTAL: $${parseFloat(sale.total_price).toFixed(2)}`, { align: 'right' });
-    doc.fontSize(10).moveDown().text('¡Gracias por su compra!', { align: 'center' });
+        details.forEach(item => {
+            const name = item.product_name || 'Producto Eliminado';
+            doc.text(`${item.quantity} x ${name}`);
+            doc.text(`$${parseFloat(item.subtotal).toFixed(2)}`, { align: 'right' });
+            doc.moveDown(0.2);
+        });
+
+        doc.text('------------------------------------------', { align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(12).text(`TOTAL: $${parseFloat(sale.total_price).toFixed(2)}`, { align: 'right' });
+        doc.font('Helvetica').fontSize(8).moveDown().text('¡Gracias por su compra!', { align: 'center' });
+
+    } else {
+        // --- DISEÑO ESTÁNDAR (A4) ---
+        if (config.company_logo) {
+            const logoPath = path.join(__dirname, 'public', config.company_logo);
+            if (fs.existsSync(logoPath)) doc.image(logoPath, 50, 45, { width: 50 });
+        }
+
+        doc.fontSize(20).text(config.company_name || 'Business Control', { align: 'center' });
+        if (config.company_address) doc.fontSize(10).text(config.company_address, { align: 'center' });
+        if (config.company_phone) doc.text(`Tel: ${config.company_phone}`, { align: 'center' });
+        doc.moveDown();
+        doc.fontSize(10).text('Ticket de Venta', { align: 'center' });
+        doc.moveDown();
+        doc.text(`Folio: #${sale.id} - Fecha: ${new Date(sale.sale_date).toLocaleString()}`);
+        doc.text(`Cliente: ${sale.client_name || 'Cliente General'}`);
+        if (sale.notes) {
+            doc.moveDown(0.5);
+            doc.text(`Notas: ${sale.notes}`, { oblique: true });
+        }
+        doc.moveDown();
+
+        doc.font('Courier').fontSize(10);
+        doc.text('Cant.  Descripción                    Precio    Total');
+        doc.text('-------------------------------------------------------');
+        
+        details.forEach(item => {
+            const name = (item.product_name || 'Producto Eliminado').substring(0, 25).padEnd(25);
+            const qty = item.quantity.toString().padEnd(5);
+            const priceVal = parseFloat(item.price) || (parseFloat(item.subtotal) / parseFloat(item.quantity));
+            const price = priceVal.toFixed(2).padEnd(8);
+            const total = parseFloat(item.subtotal).toFixed(2);
+            doc.text(`${qty}  ${name}  $${price}  $${total}`);
+        });
+        
+        doc.text('-------------------------------------------------------');
+        doc.moveDown();
+        doc.font('Helvetica-Bold').fontSize(14).text(`TOTAL: $${parseFloat(sale.total_price).toFixed(2)}`, { align: 'right' });
+        doc.fontSize(10).moveDown().text('¡Gracias por su compra!', { align: 'center' });
+    }
 
     doc.end();
   } catch (error) {
     console.error(error);
     res.status(500).send('Error al generar ticket');
   }
+});
+
+// ==================================================================
+// RUTA DE ESTADÍSTICAS PARA REPORTES (GRÁFICOS Y TARJETAS)
+// ==================================================================
+
+// Endpoint optimizado para las tarjetas del Dashboard
+app.get('/api/dashboard-stats', authenticateToken, async (req, res) => {
+    try {
+        // 1. Ingresos y Ventas Totales
+        const [salesStats] = await db.query(
+            `SELECT 
+                COALESCE(SUM(total_price), 0) as totalRevenue, 
+                COUNT(id) as totalSales 
+             FROM sales`
+        );
+
+        // 2. Clientes Totales
+        const [clientStats] = await db.query(
+            `SELECT COUNT(id) as totalClients FROM clients`
+        );
+
+        // 3. Productos Totales y Stock Bajo
+        const [productStats] = await db.query(
+            `SELECT 
+                COUNT(id) as totalProducts,
+                SUM(CASE WHEN stock < 10 THEN 1 ELSE 0 END) as lowStockCount
+             FROM inventory`
+        );
+
+        // 4. Tendencia de ventas (Últimos 7 días para el gráfico)
+        const [salesTrend] = await db.query(`
+            SELECT DATE(sale_date) as date, SUM(total_price) as total
+            FROM sales
+            WHERE sale_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+            GROUP BY DATE(sale_date)
+            ORDER BY date ASC
+        `);
+
+        // 5. Top 5 Productos más vendidos
+        const [topProducts] = await db.query(`
+            SELECT i.product_name, SUM(sd.quantity) as totalSold
+            FROM sale_details sd
+            JOIN inventory i ON sd.product_id = i.id
+            GROUP BY sd.product_id
+            ORDER BY totalSold DESC
+            LIMIT 5
+        `);
+
+        // 6. Actividad Reciente (últimas 5 acciones)
+        const [recentActivity] = await db.query(`
+            (
+                SELECT 'sale' as type, s.id, c.name as text, s.total_price as value, s.created_at as date
+                FROM sales s
+                JOIN clients c ON s.client_id = c.id
+            )
+            UNION ALL
+            (
+                SELECT 'client' as type, c.id, c.name as text, NULL as value, c.created_at as date
+                FROM clients c
+            )
+            ORDER BY date DESC
+            LIMIT 5
+        `);
+
+        res.status(200).json({
+            totalRevenue: salesStats[0].totalRevenue,
+            totalSales: salesStats[0].totalSales,
+            totalClients: clientStats[0].totalClients,
+            totalProducts: productStats[0].totalProducts,
+            lowStockCount: productStats[0].lowStockCount || 0,
+            salesTrend,
+            topProducts,
+            recentActivity
+        });
+
+    } catch (error) {
+        console.error('Error cargando estadísticas del dashboard:', error);
+        res.status(500).json({ message: 'Error del servidor al obtener estadísticas del dashboard.' });
+    }
 });
 
 app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (req, res) => {
@@ -664,6 +838,7 @@ app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (r
         return res.status(400).json({ message: 'Se requieren fechas de inicio y fin.' });
     }
 
+    // Ajustar la fecha final para que incluya todo el día
     const endOfDay = new Date(endDate);
     endOfDay.setHours(23, 59, 59, 999);
 
@@ -671,6 +846,7 @@ app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (r
     try {
         connection = await db.getConnection();
 
+        // 1. Estadísticas principales (cards)
         const [salesStats] = await connection.query(
             `SELECT 
                 COALESCE(SUM(total_price), 0) as totalRevenue, 
@@ -689,6 +865,7 @@ app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (r
             `SELECT COALESCE(SUM(stock), 0) as totalProducts FROM inventory`
         );
 
+        // 2. Tendencia de ventas (para gráfico de líneas)
         const [salesTrend] = await connection.query(
             `SELECT 
                 DATE(sale_date) as date, 
@@ -700,6 +877,7 @@ app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (r
             [startDate, endOfDay]
         );
 
+        // 3. Distribución por categoría (para gráfico de dona)
         const [categoryDistribution] = await connection.query(
             `SELECT 
                 COALESCE(i.category, 'Sin Categoría') as category, 
@@ -713,6 +891,7 @@ app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (r
             [startDate, endOfDay]
         );
 
+        // 4. Top 5 Clientes (para gráfico de barras)
         const [topClients] = await connection.query(
             `SELECT 
                 c.name, 
@@ -726,6 +905,16 @@ app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (r
             [startDate, endOfDay]
         );
 
+        // 5. Ventas por hora (Horas Pico)
+        const [salesByHour] = await connection.query(
+            `SELECT HOUR(sale_date) as hour, COUNT(id) as count 
+             FROM sales 
+             WHERE sale_date BETWEEN ? AND ?
+             GROUP BY HOUR(sale_date)
+             ORDER BY hour ASC`,
+            [startDate, endOfDay]
+        );
+
         res.status(200).json({
             totalRevenue: salesStats[0].totalRevenue,
             totalSales: salesStats[0].totalSales,
@@ -733,7 +922,8 @@ app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (r
             totalProducts: inventoryStats[0].totalProducts,
             salesTrend,
             categoryDistribution,
-            topClients
+            topClients,
+            salesByHour
         });
 
     } catch (error) {
@@ -744,6 +934,9 @@ app.get('/api/statistics', authenticateToken, authorizeRole(['admin']), async (r
     }
 });
 
+// ==================================================================
+// RUTA PARA RESUMEN DIARIO (CIERRE DE CAJA)
+// ==================================================================
 app.get('/api/daily-summary', authenticateToken, async (req, res) => {
     const { date } = req.query;
 
@@ -779,6 +972,7 @@ app.get('/api/daily-summary', authenticateToken, async (req, res) => {
     }
 });
 
+// Ruta para generar el reporte en PDF
 app.get('/report', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   const { startDate, endDate, type } = req.query;
   const doc = new PDFDocument({ margin: 50 });
@@ -806,11 +1000,13 @@ app.get('/report', authenticateToken, authorizeRole(['admin']), async (req, res)
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
 
+    // Obtener configuración para el encabezado del reporte
     const [settings] = await db.query('SELECT * FROM settings WHERE id = 1');
     const config = settings[0] || { company_name: 'Business Control' };
 
     doc.pipe(res);
 
+    // Contenido del PDF
     doc.fontSize(20).text(config.company_name, { align: 'center' });
     doc.moveDown();
 
@@ -863,10 +1059,17 @@ app.get('/report', authenticateToken, authorizeRole(['admin']), async (req, res)
     doc.end();
   } catch (error) {
     console.error('Error al generar el reporte:', error);
+    // Si ocurre un error, no podemos enviar un JSON porque las cabeceras pueden estar ya enviadas.
+    // Lo mejor es terminar el stream y registrar el error.
     res.status(500).end('Error al generar el reporte en PDF.');
   }
 });
 
+// ==================================================================
+// GESTIÓN DE USUARIOS (SOLO ADMIN)
+// ==================================================================
+
+// Obtener configuración
 app.get('/settings', authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM settings WHERE id = 1');
@@ -876,27 +1079,33 @@ app.get('/settings', authenticateToken, async (req, res) => {
   }
 });
 
+// Guardar configuración
 app.put('/settings', authenticateToken, authorizeRole(['admin']), upload.single('company_logo'), async (req, res) => {
-  const { company_name, company_address, company_phone, company_email } = req.body;
-  let logoPath = null;
+  const { company_name, company_address, company_phone, company_email, ticket_format } = req.body;
   
+  let query = 'UPDATE settings SET company_name = ?, company_address = ?, company_phone = ?, company_email = ?, ticket_format = ?';
+  const params = [company_name, company_address, company_phone, company_email, ticket_format || 'A4'];
+
   if (req.file) {
-    logoPath = 'images/uploads/' + req.file.filename;
+    // Multer guarda el archivo y req.file contiene su información.
+    // Guardamos la ruta relativa para usarla en el frontend.
+    const logoPath = `images/uploads/${req.file.filename}`;
+    query += ', company_logo = ?';
+    params.push(logoPath);
   }
 
-  try {
-    let query = 'UPDATE settings SET company_name = ?, company_address = ?, company_phone = ?, company_email = ?';
-    let params = [company_name, company_address, company_phone, company_email];
-    if (logoPath) { query += ', company_logo = ?'; params.push(logoPath); }
-    query += ' WHERE id = 1';
+  query += ' WHERE id = 1';
 
+  try {
     await db.query(query, params);
     res.json({ message: 'Configuración actualizada correctamente' });
   } catch (error) {
+    console.error('Error al guardar configuración:', error);
     res.status(500).json({ message: 'Error al guardar configuración' });
   }
 });
 
+// Obtener todos los usuarios
 app.get('/users', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const [users] = await db.query('SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC');
@@ -907,6 +1116,7 @@ app.get('/users', authenticateToken, authorizeRole(['admin']), async (req, res) 
   }
 });
 
+// Crear nuevo usuario (con rol específico)
 app.post('/users', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   const { username, email, password, role } = req.body;
 
@@ -933,9 +1143,11 @@ app.post('/users', authenticateToken, authorizeRole(['admin']), async (req, res)
   }
 });
 
+// Eliminar usuario
 app.delete('/users/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   const { id } = req.params;
   
+  // Evitar que el admin se borre a sí mismo (comparando con el token)
   if (req.user.id == id) {
       return res.status(400).json({ message: 'No puedes eliminar tu propia cuenta' });
   }
@@ -949,20 +1161,23 @@ app.delete('/users/:id', authenticateToken, authorizeRole(['admin']), async (req
   }
 });
 
+// Generar Backup de la Base de Datos
 app.get('/api/backup', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     try {
         const [tables] = await db.query('SHOW TABLES');
-        let dump = `-- Backup Business Control\n-- Fecha: ${new Date().toLocaleString()}\n\n`;
+        let dump = `-- Backup Business Control \n-- Fecha: ${new Date().toLocaleString()}\n\n`;
         dump += `SET FOREIGN_KEY_CHECKS=0;\n\n`;
 
         for (const row of tables) {
             const tableName = Object.values(row)[0];
             
+            // 1. Estructura
             const [create] = await db.query(`SHOW CREATE TABLE \`${tableName}\``);
             dump += `-- Estructura de tabla \`${tableName}\`\n`;
             dump += `DROP TABLE IF EXISTS \`${tableName}\`;\n`;
             dump += `${create[0]['Create Table']};\n\n`;
 
+            // 2. Datos
             const [data] = await db.query(`SELECT * FROM \`${tableName}\``);
             if (data.length > 0) {
                 dump += `-- Datos de tabla \`${tableName}\`\n`;
@@ -990,6 +1205,7 @@ app.get('/api/backup', authenticateToken, authorizeRole(['admin']), async (req, 
     }
 });
 
+// Cambiar contraseña del usuario actual
 app.put('/profile/change-password', authenticateToken, async (req, res) => {
   const userId = req.user.id;
   const { currentPassword, newPassword } = req.body;

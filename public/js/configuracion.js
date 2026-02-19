@@ -3,6 +3,19 @@ const API_URL = ''; // Ruta relativa para producción
 document.addEventListener('DOMContentLoaded', function() {
     loadSettings();
     document.getElementById('configForm').addEventListener('submit', saveSettings);
+
+    // Previsualización inmediata del logo al seleccionar archivo
+    const logoInput = document.getElementById('companyLogo');
+    if (logoInput) {
+        logoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) { document.getElementById('logoPreview').src = e.target.result; };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
 });
 
 async function loadSettings() {
@@ -22,6 +35,14 @@ async function loadSettings() {
         document.getElementById('companyAddress').value = settings.company_address || '';
         document.getElementById('companyPhone').value = settings.company_phone || '';
         document.getElementById('companyEmail').value = settings.company_email || '';
+        document.getElementById('ticketFormat').value = settings.ticket_format || 'A4';
+
+        // Mostrar previsualización del logo
+        const logoPreview = document.getElementById('logoPreview');
+        if (settings.company_logo) {
+            // Añadimos un timestamp para evitar problemas de caché del navegador
+            logoPreview.src = `${settings.company_logo}?t=${new Date().getTime()}`;
+        }
 
     } catch (error) {
         console.error('Error:', error);
@@ -33,12 +54,18 @@ async function saveSettings(e) {
     const btn = document.querySelector('.btn-submit');
     const msg = document.getElementById('message');
     
-    const data = {
-        company_name: document.getElementById('companyName').value,
-        company_address: document.getElementById('companyAddress').value,
-        company_phone: document.getElementById('companyPhone').value,
-        company_email: document.getElementById('companyEmail').value
-    };
+    // Usamos FormData para poder enviar archivos y texto juntos
+    const formData = new FormData();
+    formData.append('company_name', document.getElementById('companyName').value);
+    formData.append('company_address', document.getElementById('companyAddress').value);
+    formData.append('company_phone', document.getElementById('companyPhone').value);
+    formData.append('company_email', document.getElementById('companyEmail').value);
+    formData.append('ticket_format', document.getElementById('ticketFormat').value);
+
+    const logoInput = document.getElementById('companyLogo');
+    if (logoInput.files[0]) {
+        formData.append('company_logo', logoInput.files[0]);
+    }
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
@@ -48,17 +75,19 @@ async function saveSettings(e) {
         const response = await fetch(`${API_URL}/settings`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
+                // NO establecer 'Content-Type', el navegador lo hace automáticamente para FormData
                 'Authorization': 'Bearer ' + localStorage.getItem('token')
             },
-            body: JSON.stringify(data)
+            body: formData
         });
 
-        if (!response.ok) throw new Error('Error al guardar');
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Error al guardar');
         
-        msg.innerHTML = '<div class="alert alert-success">Configuración actualizada correctamente</div>';
+        msg.innerHTML = `<div class="alert alert-success">${result.message}</div>`;
+        loadSettings(); // Recargar para mostrar el nuevo logo
     } catch (error) {
-        msg.innerHTML = '<div class="alert alert-danger">Error al guardar cambios</div>';
+        msg.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-save me-2"></i> Guardar Cambios';

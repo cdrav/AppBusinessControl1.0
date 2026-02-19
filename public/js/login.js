@@ -1,4 +1,12 @@
 // Login Page JavaScript
+const API_URL = ''; // Ruta relativa para producción
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (localStorage.getItem('token')) {
+    window.location.href = 'dashboard.html';
+  }
+});
+
 document.getElementById('loginForm').addEventListener('submit', async function (e) {
   e.preventDefault();
 
@@ -19,7 +27,7 @@ document.getElementById('loginForm').addEventListener('submit', async function (
   messageDiv.innerHTML = '';
 
   try {
-    const response = await fetch('/login', {
+    const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
