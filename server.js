@@ -144,6 +144,9 @@ app.post('/login', async (req, res) => {
 
     res.json({ message: 'Bienvenido de nuevo', token });
   } catch (err) {
+    if (err.code === 'ECONNREFUSED') {
+      console.error('\n❌ Error de Conexión: No se pudo conectar a la base de datos. Asegúrate de que MySQL (XAMPP) esté corriendo.');
+    }
     console.error('Error en login:', err);
     res.status(500).json({ message: 'Error interno.' });
   }
@@ -250,7 +253,12 @@ app.delete('/clients/:id', authenticateToken, authorizeRole(['admin']), async (r
 // Obtener todos los productos
 app.get('/inventory', authenticateToken, async (req, res) => {
   try {
-    const [results] = await db.query('SELECT * FROM inventory ORDER BY product_name ASC');
+    // Unimos con la tabla de proveedores para obtener el nombre
+    const [results] = await db.query(`
+      SELECT i.*, s.name as supplier_name 
+      FROM inventory i 
+      LEFT JOIN suppliers s ON i.supplier_id = s.id 
+      ORDER BY i.product_name ASC`);
     res.status(200).json(results);
   } catch (error) {
     console.error('Error al obtener el inventario:', error);
@@ -264,11 +272,11 @@ app.get('/inventory/export', authenticateToken, authorizeRole(['admin']), async 
     const [results] = await db.query('SELECT * FROM inventory ORDER BY id ASC');
     
     // Cabeceras del CSV
-    let csv = 'ID,Codigo Barras,Nombre,Stock,Precio,Categoria,Descripcion\n';
+    let csv = 'ID,Codigo Barras,Nombre,Stock,Precio,Costo,Categoria,Descripcion\n';
     
     // Filas
     results.forEach(row => {
-      csv += `${row.id},"${(row.barcode || '').replace(/"/g, '""')}","${(row.product_name || '').replace(/"/g, '""')}",${row.stock},${row.price},"${(row.category || '').replace(/"/g, '""')}","${(row.description || '').replace(/"/g, '""')}"\n`;
+      csv += `${row.id},"${(row.barcode || '').replace(/"/g, '""')}","${(row.product_name || '').replace(/"/g, '""')}",${row.stock},${row.price},${row.cost || 0},"${(row.category || '').replace(/"/g, '""')}","${(row.description || '').replace(/"/g, '""')}"\n`;
     });
 
     res.header('Content-Type', 'text/csv');
@@ -312,7 +320,7 @@ app.get('/inventory/:id', authenticateToken, async (req, res) => {
 
   // Agregar un producto
   app.post('/inventory', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    const { name, quantity, price, category, description, barcode } = req.body;
+    const { name, quantity, price, cost, category, supplier_id, description, barcode } = req.body;
   
     if (!name || !quantity || !price) {
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
@@ -320,8 +328,8 @@ app.get('/inventory/:id', authenticateToken, async (req, res) => {
   
     try {
       // Incluimos barcode en la inserción
-      const query = 'INSERT INTO inventory (product_name, stock, price, category, description, barcode) VALUES (?, ?, ?, ?, ?, ?)';
-      const [result] = await db.query(query, [name, quantity, price, category || null, description || null, barcode || null]);
+      const query = 'INSERT INTO inventory (product_name, stock, price, cost, category, supplier_id, description, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+      const [result] = await db.query(query, [name, quantity, price, cost || 0, category || null, supplier_id || null, description || null, barcode || null]);
       res.status(201).json({ message: 'Producto agregado con éxito', productId: result.insertId });
     } catch (error) {
       console.error('Error al agregar producto:', error);
@@ -332,15 +340,15 @@ app.get('/inventory/:id', authenticateToken, async (req, res) => {
   // Editar un producto
   app.put('/inventory/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     const { id } = req.params;
-    const { name, quantity, price, category, description, barcode } = req.body;
+    const { name, quantity, price, cost, category, supplier_id, description, barcode } = req.body;
   
     if (!name || !quantity || !price) {
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
     }
   
     try {
-      const query = 'UPDATE inventory SET product_name = ?, stock = ?, price = ?, category = ?, description = ?, barcode = ? WHERE id = ?';
-      const [result] = await db.query(query, [name, quantity, price, category, description, barcode || null, id]);
+      const query = 'UPDATE inventory SET product_name = ?, stock = ?, price = ?, cost = ?, category = ?, supplier_id = ?, description = ?, barcode = ? WHERE id = ?';
+      const [result] = await db.query(query, [name, quantity, price, cost || 0, category, supplier_id || null, description, barcode || null, id]);
       if (result.affectedRows === 0) {
         return res.status(404).json({ message: 'Producto no encontrado' });
       }
@@ -367,6 +375,51 @@ app.get('/inventory/:id', authenticateToken, async (req, res) => {
     }
   });
   
+// ==================================================================
+// RUTAS DE PROVEEDORES
+// ==================================================================
+
+// Obtener proveedores
+app.get('/suppliers', authenticateToken, async (req, res) => {
+  try {
+    const [suppliers] = await db.query('SELECT * FROM suppliers ORDER BY name ASC');
+    res.json(suppliers);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener proveedores' });
+  }
+});
+
+// Crear proveedor
+app.post('/suppliers', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  const { name, contact_name, phone, email, address } = req.body;
+  if (!name) return res.status(400).json({ message: 'El nombre de la empresa es obligatorio' });
+  
+  try {
+    await db.query(
+      'INSERT INTO suppliers (name, contact_name, phone, email, address) VALUES (?, ?, ?, ?, ?)',
+      [name, contact_name, phone, email, address]
+    );
+    res.status(201).json({ message: 'Proveedor registrado' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al registrar proveedor' });
+  }
+});
+
+// Eliminar proveedor
+app.delete('/suppliers/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Verificar si tiene productos asociados
+    const [products] = await db.query('SELECT id FROM inventory WHERE supplier_id = ? LIMIT 1', [id]);
+    if (products.length > 0) return res.status(400).json({ message: 'No se puede eliminar: Hay productos asociados a este proveedor.' });
+
+    await db.query('DELETE FROM suppliers WHERE id = ?', [id]);
+    res.json({ message: 'Proveedor eliminado' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar proveedor' });
+  }
+});
+
 // ==================================================================
 // RUTA DE VENTAS REFACTORIZADA CON TRANSACCIONES
 // ==================================================================
@@ -537,8 +590,9 @@ app.get('/sales', authenticateToken, async (req, res) => {
   const query = `
     SELECT 
       s.id, 
-      c.name AS client_name, 
-      s.total_price, 
+      c.name AS client_name,
+      c.email AS client_email,
+      s.total_price,
       s.sale_date
     FROM sales s
     JOIN clients c ON s.client_id = c.id
@@ -550,6 +604,106 @@ app.get('/sales', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error al obtener las ventas:', error);
     res.status(500).json({ message: 'Error del servidor' });
+  }
+});
+
+// Obtener detalles de una venta específica
+app.get('/sales/:id/details', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [details] = await db.query(`
+      SELECT 
+        sd.quantity, 
+        sd.subtotal, 
+        i.product_name, 
+        (sd.subtotal / sd.quantity) as unit_price
+      FROM sale_details sd
+      LEFT JOIN inventory i ON sd.product_id = i.id
+      WHERE sd.sale_id = ?
+    `, [id]);
+    
+    if (details.length === 0) {
+        const [sale] = await db.query('SELECT id FROM sales WHERE id = ?', [id]);
+        if (sale.length === 0) return res.status(404).json({ message: 'Venta no encontrada.' });
+    }
+
+    res.json(details);
+  } catch (error) {
+    console.error('Error al obtener detalles de la venta:', error);
+    res.status(500).json({ message: 'Error del servidor.' });
+  }
+});
+
+// Enviar ticket de venta por correo
+app.post('/sales/:id/ticket/email', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { email } = req.body; // Opcional: permitir especificar un correo distinto al del cliente
+
+  try {
+    // 1. Obtener datos
+    const [settings] = await db.query('SELECT * FROM settings WHERE id = 1');
+    const config = settings[0] || { company_name: 'Business Control' };
+
+    const [saleRows] = await db.query(`
+      SELECT s.id, s.sale_date, s.total_price, c.name as client_name, c.email as client_email
+      FROM sales s
+      LEFT JOIN clients c ON s.client_id = c.id
+      WHERE s.id = ?
+    `, [id]);
+
+    if (saleRows.length === 0) return res.status(404).json({ message: 'Venta no encontrada' });
+    const sale = saleRows[0];
+    const targetEmail = email || sale.client_email;
+
+    if (!targetEmail) {
+        return res.status(400).json({ message: 'El cliente no tiene correo registrado y no se proporcionó uno.' });
+    }
+
+    const [details] = await db.query(`
+      SELECT i.product_name, sd.quantity, sd.subtotal
+      FROM sale_details sd
+      LEFT JOIN inventory i ON sd.product_id = i.id
+      WHERE sd.sale_id = ?
+    `, [id]);
+
+    // 2. Generar PDF en memoria
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    let buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    
+    // Contenido del PDF (Simplificado para email)
+    doc.fontSize(20).text(config.company_name, { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Ticket de Venta #${sale.id}`, { align: 'center' });
+    doc.text(`Fecha: ${new Date(sale.sale_date).toLocaleString()}`, { align: 'center' });
+    doc.moveDown();
+    
+    details.forEach(item => {
+        doc.text(`${item.quantity} x ${item.product_name} - $${parseFloat(item.subtotal).toFixed(2)}`);
+    });
+    
+    doc.moveDown();
+    doc.font('Helvetica-Bold').text(`TOTAL: $${parseFloat(sale.total_price).toFixed(2)}`, { align: 'right' });
+    doc.end();
+
+    // 3. Enviar correo cuando el PDF esté listo
+    doc.on('end', async () => {
+        const pdfData = Buffer.concat(buffers);
+        
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: targetEmail,
+            subject: `Ticket de Compra #${sale.id} - ${config.company_name}`,
+            text: `Adjunto encontrarás tu ticket de compra. Gracias por tu preferencia.`,
+            attachments: [{ filename: `ticket-${sale.id}.pdf`, content: pdfData }]
+        });
+
+        res.json({ message: `Ticket enviado a ${targetEmail}` });
+    });
+
+  } catch (error) {
+    console.error('Error enviando ticket:', error);
+    res.status(500).json({ message: 'Error al enviar el correo' });
   }
 });
 
@@ -972,95 +1126,304 @@ app.get('/api/daily-summary', authenticateToken, async (req, res) => {
     }
 });
 
+// Enviar resumen diario por correo
+app.post('/api/daily-summary/email', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { date } = req.body;
+
+    if (!date || !process.env.EMAIL_USER) {
+        return res.status(400).json({ message: 'Fecha o email de destino no configurado.' });
+    }
+
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+
+    try {
+        const [sales] = await db.query(
+            `SELECT COALESCE(SUM(total_price), 0) as totalRevenue, COUNT(id) as totalSales FROM sales WHERE sale_date BETWEEN ? AND ?`,
+            [startDate, endDate]
+        );
+
+        const summary = sales[0];
+        const formattedDate = new Date(date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: process.env.EMAIL_USER, // Enviar al admin
+            subject: `Cierre de Caja - ${formattedDate}`,
+            html: `
+                <h1>Resumen de Caja</h1>
+                <p><strong>Fecha:</strong> ${formattedDate}</p>
+                <hr>
+                <p><strong>Ingresos Totales:</strong> <h2>$${parseFloat(summary.totalRevenue).toFixed(2)}</h2></p>
+                <p><strong>Número de Transacciones:</strong> <h2>${summary.totalSales}</h2></p>
+                <hr>
+                <p><small>Este es un correo generado automáticamente por Business Control.</small></p>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        res.json({ message: `Correo con el resumen del ${formattedDate} enviado a ${process.env.EMAIL_USER}` });
+
+    } catch (error) {
+        console.error('Error enviando correo de resumen:', error);
+        res.status(500).json({ message: 'Error al enviar el correo.' });
+    }
+});
+
+// ==================================================================
+// HELPERS PARA GENERACIÓN DE PDF
+// ==================================================================
+function generateHeader(doc, config) {
+  if (config.company_logo && fs.existsSync(path.join(__dirname, 'public', config.company_logo))) {
+    doc.image(path.join(__dirname, 'public', config.company_logo), 50, 45, { width: 50 });
+  }
+  doc.fillColor('#444444');
+  doc.fontSize(20).text(config.company_name || 'Business Control', 110, 57);
+  doc.fontSize(10).text(config.company_address || '', 200, 65, { align: 'right' });
+  doc.text(config.company_phone || '', 200, 80, { align: 'right' });
+  doc.moveDown(2);
+}
+
+function generateFooter(doc) {
+  doc.fontSize(8)
+    .fillColor('grey')
+    .text(`Página ${doc.page.count}`, 50, 720, { align: 'center', width: 500 });
+}
+
+function drawHorizontalLine(doc, y) {
+    doc.strokeColor("#aaaaaa").lineWidth(1).moveTo(50, y).lineTo(550, y).stroke();
+}
+
 // Ruta para generar el reporte en PDF
 app.get('/report', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   const { startDate, endDate, type } = req.query;
   const doc = new PDFDocument({ margin: 50 });
 
   try {
-    if (type !== 'low-stock' && (!startDate || !endDate)) {
+    if (type === 'sales' && (!startDate || !endDate)) {
       return res.status(400).send('Fechas de inicio y fin son requeridas para este reporte.');
     }
 
-    const query = `
-      SELECT s.id, c.name AS client_name, s.total_price, s.sale_date
-      FROM sales s
-      LEFT JOIN clients c ON s.client_id = c.id
-      WHERE s.sale_date BETWEEN ? AND ?
-      ORDER BY s.sale_date ASC
-    `;
-    
     let filename = 'reporte.pdf';
     if (type === 'sales') {
         filename = `reporte-ventas-${startDate}-a-${endDate}.pdf`;
     } else if (type === 'low-stock') {
         filename = `reporte-stock-bajo-${new Date().toISOString().split('T')[0]}.pdf`;
+    } else if (type === 'inventory') {
+        filename = `reporte-inventario-${new Date().toISOString().split('T')[0]}.pdf`;
+    } else if (type === 'clients') {
+        filename = `reporte-clientes-${new Date().toISOString().split('T')[0]}.pdf`;
+    } else if (type === 'profits') {
+        filename = `reporte-ganancias-${startDate}-a-${endDate}.pdf`;
     }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
 
-    // Obtener configuración para el encabezado del reporte
     const [settings] = await db.query('SELECT * FROM settings WHERE id = 1');
     const config = settings[0] || { company_name: 'Business Control' };
 
     doc.pipe(res);
 
-    // Contenido del PDF
-    doc.fontSize(20).text(config.company_name, { align: 'center' });
-    doc.moveDown();
+    // Registrar eventos para header y footer en cada página
+    doc.on('pageAdded', () => {
+        generateHeader(doc, config);
+        generateFooter(doc);
+    });
+
+    // Header y footer para la primera página
+    generateHeader(doc, config);
+    generateFooter(doc);
 
     if (type === 'sales') {
         const endOfDay = new Date(endDate);
         endOfDay.setHours(23, 59, 59, 999);
-        const [sales] = await db.query(query, [startDate, endOfDay]);
+        const [sales] = await db.query(`
+            SELECT s.id, c.name AS client_name, s.total_price, s.sale_date
+            FROM sales s LEFT JOIN clients c ON s.client_id = c.id
+            WHERE s.sale_date BETWEEN ? AND ? ORDER BY s.sale_date ASC
+        `, [startDate, endOfDay]);
 
-        doc.fontSize(16).text('Reporte de Ventas', { align: 'center' });
-        doc.fontSize(10).text(`Período: ${startDate} a ${endDate}`, { align: 'center' });
+        doc.fontSize(18).text('Reporte de Ventas', { align: 'center' });
+        doc.fontSize(12).text(`Período: ${startDate} a ${endDate}`, { align: 'center' });
         doc.moveDown();
 
         if (sales.length === 0) {
             doc.text('No hay ventas registradas en este período.');
         } else {
+            const tableTop = doc.y;
+            doc.font('Helvetica-Bold');
+            doc.text('Folio', 50, tableTop);
+            doc.text('Fecha', 120, tableTop);
+            doc.text('Cliente', 220, tableTop);
+            doc.text('Total', 450, tableTop, { align: 'right' });
+            drawHorizontalLine(doc, tableTop + 20);
+            doc.font('Helvetica');
+
             let totalRevenue = 0;
+            let y = tableTop + 30;
+
             sales.forEach(sale => {
+                if (y > 680) {
+                    doc.addPage();
+                    y = 120; // Posición inicial en nueva página
+                }
                 const saleDate = new Date(sale.sale_date).toLocaleDateString('es-ES');
-                doc.fontSize(10).text(`Folio #${sale.id} - ${saleDate} - ${sale.client_name || 'General'}`, { continued: true });
-                doc.text(`$${parseFloat(sale.total_price).toFixed(2)}`, { align: 'right' });
+                doc.text(`#${sale.id}`, 50, y);
+                doc.text(saleDate, 120, y);
+                doc.text((sale.client_name || 'General').substring(0, 25), 220, y);
+                doc.text(`$${parseFloat(sale.total_price).toFixed(2)}`, 450, y, { align: 'right' });
                 totalRevenue += parseFloat(sale.total_price);
+                y += 25;
             });
+            drawHorizontalLine(doc, y);
             doc.moveDown();
-            doc.font('Helvetica-Bold').fontSize(12).text(`Total Ingresos: $${totalRevenue.toFixed(2)}`, { align: 'right' });
+            doc.font('Helvetica-Bold').fontSize(14).text(`Total Ingresos: $${totalRevenue.toFixed(2)}`, { align: 'right' });
         }
+    } else if (type === 'profits') {
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        const [details] = await db.query(`
+            SELECT 
+                s.sale_date, i.product_name, sd.quantity, sd.subtotal as sale_price,
+                (IFNULL(i.cost, 0) * sd.quantity) as total_cost
+            FROM sale_details sd
+            JOIN sales s ON sd.sale_id = s.id
+            LEFT JOIN inventory i ON sd.product_id = i.id
+            WHERE s.sale_date BETWEEN ? AND ? ORDER BY s.sale_date ASC
+        `, [startDate, endOfDay]);
+
+        doc.fontSize(18).text('Reporte de Ganancias', { align: 'center' });
+        doc.fontSize(12).text(`Período: ${startDate} a ${endDate}`, { align: 'center' });
+        doc.moveDown();
+
+        const tableTop = doc.y;
+        doc.font('Helvetica-Bold');
+        doc.text('Producto', 50, tableTop, { width: 250 });
+        doc.text('Venta', 300, tableTop, { width: 70, align: 'right' });
+        doc.text('Costo', 370, tableTop, { width: 70, align: 'right' });
+        doc.text('Ganancia', 440, tableTop, { width: 70, align: 'right' });
+        drawHorizontalLine(doc, tableTop + 20);
+        doc.font('Helvetica');
+
+        let totalRevenue = 0;
+        let totalCost = 0;
+        let y = tableTop + 30;
+
+        details.forEach(item => {
+            if (y > 680) { doc.addPage(); y = 120; }
+            const saleVal = parseFloat(item.sale_price);
+            const costVal = parseFloat(item.total_cost || 0);
+            const profitVal = saleVal - costVal;
+
+            doc.text((item.product_name || 'Producto Borrado').substring(0, 40), 50, y, { width: 250 });
+            doc.text(`$${saleVal.toFixed(2)}`, 300, y, { width: 70, align: 'right' });
+            doc.text(`$${costVal.toFixed(2)}`, 370, y, { width: 70, align: 'right' });
+            
+            doc.fillColor(profitVal < 0 ? 'red' : 'green');
+            doc.text(`$${profitVal.toFixed(2)}`, 440, y, { width: 70, align: 'right' });
+            doc.fillColor('black');
+
+            totalRevenue += saleVal;
+            totalCost += costVal;
+            y += 25;
+        });
+
+        drawHorizontalLine(doc, y);
+        doc.moveDown();
+        doc.font('Helvetica-Bold');
+        doc.text(`Total Ventas: $${totalRevenue.toFixed(2)}`, { align: 'right' });
+        doc.text(`Total Costos: $${totalCost.toFixed(2)}`, { align: 'right' });
+        doc.moveDown(0.5).fontSize(14);
+        doc.text(`Ganancia Neta: $${(totalRevenue - totalCost).toFixed(2)}`, { align: 'right' });
+
     } else if (type === 'low-stock') {
         const [products] = await db.query('SELECT * FROM inventory WHERE stock < 10 ORDER BY stock ASC');
         
-        doc.fontSize(16).text('Reporte de Stock Bajo', { align: 'center' });
-        doc.fontSize(10).text(`Generado el: ${new Date().toLocaleDateString()}`, { align: 'center' });
+        doc.fontSize(18).text('Reporte de Stock Bajo', { align: 'center' });
+        doc.fontSize(12).text(`Generado el: ${new Date().toLocaleDateString()}`, { align: 'center' });
         doc.moveDown();
 
         if (products.length === 0) {
             doc.text('¡Excelente! No hay productos con stock bajo (menos de 10 unidades).');
         } else {
+            const tableTop = doc.y;
             doc.font('Helvetica-Bold');
-            doc.text('Producto', 50, doc.y, { width: 300 });
-            doc.text('Stock Actual', 350, doc.y, { width: 100, align: 'right' });
-            doc.moveDown();
+            doc.text('Producto', 50, tableTop, { width: 400 });
+            doc.text('Stock Actual', 450, tableTop, { width: 100, align: 'right' });
+            drawHorizontalLine(doc, tableTop + 20);
             doc.font('Helvetica');
             
+            let y = tableTop + 30;
             products.forEach(p => {
-                doc.text(p.product_name, 50, doc.y, { width: 300 });
-                doc.text(p.stock.toString(), 350, doc.y, { width: 100, align: 'right' });
-                doc.moveDown(0.5);
+                if (y > 680) { doc.addPage(); y = 120; }
+                doc.text(p.product_name, 50, y, { width: 400 });
+                doc.text(p.stock.toString(), 450, y, { width: 100, align: 'right' });
+                y += 25;
             });
         }
+    } else if (type === 'inventory') {
+        const [products] = await db.query('SELECT * FROM inventory ORDER BY product_name ASC');
+        
+        doc.fontSize(18).text('Reporte de Inventario Valorizado', { align: 'center' });
+        doc.fontSize(12).text(`Generado el: ${new Date().toLocaleDateString()}`, { align: 'center' });
+        doc.moveDown();
+
+        const tableTop = doc.y;
+        doc.font('Helvetica-Bold');
+        doc.text('Producto', 50, tableTop, { width: 250 });
+        doc.text('Stock', 300, tableTop, { width: 50, align: 'center' });
+        doc.text('Precio', 370, tableTop, { width: 80, align: 'right' });
+        doc.text('Valor Total', 450, tableTop, { width: 80, align: 'right' });
+        drawHorizontalLine(doc, tableTop + 20);
+        doc.font('Helvetica');
+        
+        let totalInventoryValue = 0;
+        let totalItems = 0;
+        let y = tableTop + 30;
+
+        products.forEach(p => {
+            if (y > 680) { doc.addPage(); y = 120; }
+            const totalVal = p.stock * p.price;
+            totalInventoryValue += totalVal;
+            totalItems += p.stock;
+
+            doc.text(p.product_name.substring(0, 40), 50, y, { width: 250 });
+            doc.text(p.stock.toString(), 300, y, { width: 50, align: 'center' });
+            doc.text(`$${parseFloat(p.price).toFixed(2)}`, 370, y, { width: 80, align: 'right' });
+            doc.text(`$${totalVal.toFixed(2)}`, 450, y, { width: 80, align: 'right' });
+            y += 25;
+        });
+        
+        drawHorizontalLine(doc, y);
+        doc.moveDown();
+        doc.font('Helvetica-Bold').fontSize(14).text(`Valor Total del Inventario: $${totalInventoryValue.toFixed(2)}`, { align: 'right' });
+        doc.fontSize(12).text(`Total de Unidades: ${totalItems}`, { align: 'right' });
+
+    } else if (type === 'clients') {
+        const [clients] = await db.query('SELECT * FROM clients ORDER BY name ASC');
+        
+        doc.fontSize(18).text('Directorio de Clientes', { align: 'center' });
+        doc.fontSize(12).text(`Total: ${clients.length} clientes`, { align: 'center' });
+        doc.moveDown();
+
+        let y = doc.y;
+        clients.forEach(c => {
+             if (y > 650) { doc.addPage(); y = 120; }
+             doc.font('Helvetica-Bold').text(c.name, 50, y);
+             doc.font('Helvetica').text(`Tel: ${c.phone || 'N/A'} | Email: ${c.email || 'N/A'}`, 50, y + 15);
+             doc.text(`Dir: ${c.address || 'N/A'}`, 50, y + 30);
+             drawHorizontalLine(doc, y + 50);
+             y += 60;
+        });
     }
 
     doc.end();
   } catch (error) {
     console.error('Error al generar el reporte:', error);
-    // Si ocurre un error, no podemos enviar un JSON porque las cabeceras pueden estar ya enviadas.
-    // Lo mejor es terminar el stream y registrar el error.
     res.status(500).end('Error al generar el reporte en PDF.');
   }
 });

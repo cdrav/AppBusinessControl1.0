@@ -133,11 +133,15 @@ function renderInventory(products) {
               ${barcodeHtml}
               
               <div class="row g-2 mb-4">
-                <div class="col-6">
+                <div class="col-4">
                   <small class="text-muted d-block">Precio</small>
                   <span class="fw-bold">$${parseFloat(product.price).toFixed(2)}</span>
                 </div>
-                <div class="col-6">
+                <div class="col-4">
+                  <small class="text-muted d-block">Costo</small>
+                  <span class="fw-bold text-secondary">$${parseFloat(product.cost || 0).toFixed(2)}</span>
+                </div>
+                <div class="col-4">
                   <small class="text-muted d-block">Stock</small>
                   <span class="fw-bold">${product.stock} un.</span>
                 </div>

@@ -121,7 +121,54 @@
     </div>
   </div>
 
+  <!-- Modal de Detalles de Venta -->
+  <div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-labelledby="saleDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="saleDetailsModalLabel">Detalles de la Venta</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="detailsModalBody">
+          <!-- El contenido dinámico se cargará aquí -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Enviar Ticket por Correo -->
+  <div class="modal fade" id="emailTicketModal" tabindex="-1" aria-labelledby="emailTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="emailTicketModalLabel">Enviar Ticket por Correo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Se enviará el ticket de la venta <strong id="emailSaleId">#0</strong> al siguiente correo electrónico.</p>
+          <form id="emailTicketForm">
+            <input type="hidden" id="hiddenSaleId">
+            <div class="mb-3">
+              <label for="recipientEmail" class="form-label">Correo del destinatario</label>
+              <input type="email" class="form-control" id="recipientEmail" required>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="submit" id="sendEmailSubmitBtn" class="btn btn-primary">
+                <i class="bi bi-send me-2"></i>Enviar Correo
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/utils.js"></script> <!-- Necesario para showToast -->
   <script src="js/ventas.js"></script>
   
   <!-- Footer con Copyright -->

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/toasts.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -247,6 +248,12 @@
                   <span class="fw-bold">Gestión de Cupones</span>
                 </a>
               </div>
+              <div class="col-md-4">
+                <a href="proveedores.html" class="quick-action-card admin-only">
+                  <div class="quick-action-icon"><i class="bi bi-truck"></i></div>
+                  <span class="fw-bold">Proveedores</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -280,8 +287,11 @@
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
-          <button type="button" class="btn btn-primary" onclick="printDailySummary()">
+          <button type="button" class="btn btn-secondary" onclick="printDailySummary()">
               <i class="bi bi-printer me-1"></i> Imprimir Resumen
+          </button>
+          <button type="button" id="sendEmailBtn" class="btn btn-primary" onclick="sendSummaryByEmail()">
+              <i class="bi bi-envelope me-1"></i> Enviar por Correo
           </button>
         </div>
       </div>
@@ -289,6 +299,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/utils.js"></script>
   <script src="js/dashboard.js"></script>
   
   <!-- Footer con Copyright -->

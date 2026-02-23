@@ -437,3 +437,46 @@ function printDailySummary() {
         printWindow.close();
     }, 500);
 }
+
+async function sendSummaryByEmail() {
+    const emailBtn = document.getElementById('sendEmailBtn');
+    const date = document.getElementById('summaryDate').value;
+
+    if (!date) {
+        alert('Por favor, seleccione una fecha.');
+        return;
+    }
+
+    // Disable button and show loading state
+    emailBtn.disabled = true;
+    emailBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
+
+    try {
+        const response = await fetch(`${API_URL}/api/daily-summary/email`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            body: JSON.stringify({ date: date })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || 'Error al enviar el correo.');
+        }
+
+        // Usamos alert para notificar, ya que no tenemos un sistema de "toasts" global
+        showToast(result.message);
+
+    } catch (error) {
+        console.error('Error sending summary email:', error);
+        showToast(error.message, true);
+
+    } finally {
+        // Re-enable button
+        emailBtn.disabled = false;
+        emailBtn.innerHTML = '<i class="bi bi-envelope me-1"></i> Enviar por Correo';
+    }
+}

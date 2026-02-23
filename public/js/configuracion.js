@@ -2,7 +2,7 @@ const API_URL = ''; // Ruta relativa para producción
 
 document.addEventListener('DOMContentLoaded', function() {
     loadSettings();
-    document.getElementById('configForm').addEventListener('submit', saveSettings);
+    document.getElementById('configForm')?.addEventListener('submit', saveSettings);
 
     // Previsualización inmediata del logo al seleccionar archivo
     const logoInput = document.getElementById('companyLogo');
@@ -15,6 +15,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 reader.readAsDataURL(file);
             }
         });
+    }
+
+    const backupBtn = document.getElementById('backupBtn');
+    if (backupBtn) {
+        backupBtn.addEventListener('click', downloadBackup);
     }
 });
 

@@ -290,14 +290,10 @@ window.generateReport = async function() {
   const endDate = document.getElementById('end-date').value;
   const reportType = document.getElementById('report-type').value;
 
-  if (!startDate || !endDate) {
-    alert('Por favor, selecciona las fechas de inicio y fin.');
+  // Solo validamos fechas para reportes que dependen del tiempo (ventas)
+  if (reportType === 'sales' && (!startDate || !endDate)) {
+    showToast('Por favor, selecciona las fechas de inicio y fin para el reporte de ventas.', true);
     return;
-  }
-  
-  if (reportType !== 'sales') {
-      alert('De momento, solo la descarga del Reporte de Ventas está implementada.');
-      return;
   }
 
   const btn = document.querySelector('button[onclick="generateReport()"]');
@@ -329,12 +325,10 @@ window.generateReport = async function() {
     a.click();
     window.URL.revokeObjectURL(downloadUrl);
     a.remove();
-    
-    alert('Reporte PDF generado y descargado con éxito.');
 
   } catch (error) {
     console.error('Error generating report:', error);
-    alert('Error al generar el reporte: ' + error.message);
+    showToast('Error al generar el reporte: ' + error.message, true);
   } finally {
     btn.disabled = false;
     btn.classList.remove('loading');

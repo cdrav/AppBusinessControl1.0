@@ -5,6 +5,11 @@ let allSales = [];
 document.addEventListener('DOMContentLoaded', function() {
   loadSales();
   loadClientsForFilter();
+
+  const emailForm = document.getElementById('emailTicketForm');
+  if(emailForm) {
+    emailForm.addEventListener('submit', handleSendEmail);
+  }
 });
 
 async function loadSales() {
@@ -60,21 +65,26 @@ function renderSalesTable(sales) {
             <div class="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px; font-size: 0.8rem;">
               ${sale.client_name ? sale.client_name.charAt(0).toUpperCase() : '?'}
             </div>
-            ${sale.client_name || 'Cliente Desconocido'}
+            ${sale.client_name || 'General'}
           </div>
         </td>
         <td>
-          <span class="badge bg-light text-dark border">Ver detalles</span>
+          <button class="btn btn-sm btn-outline-info" onclick="viewSaleDetails(${sale.id})">
+            <i class="bi bi-list-ul me-1"></i> Ver detalles
+          </button>
         </td>
         <td class="fw-bold text-success">$${parseFloat(sale.total_price).toFixed(2)}</td>
         <td class="text-muted small">${date}</td>
         <td><span class="badge bg-success bg-opacity-10 text-success rounded-pill">Completado</span></td>
         <td>
-          <button class="btn btn-sm btn-light text-danger me-1" onclick="processReturn(${sale.id})" title="Devolución">
+          <button class="btn btn-sm btn-light text-danger" onclick="processReturn(${sale.id})" title="Devolución">
             <i class="bi bi-arrow-counterclockwise"></i>
           </button>
-          <button class="btn btn-sm btn-light text-primary" onclick="printTicket(${sale.id})" title="Imprimir Ticket">
+          <button class="btn btn-sm btn-light text-primary" onclick="printTicket(${sale.id})" title="Imprimir">
             <i class="bi bi-printer"></i>
+          </button>
+          <button class="btn btn-sm btn-light text-info" onclick="openEmailModal(${sale.id}, '${sale.client_email || ''}')" title="Enviar por Correo">
+            <i class="bi bi-envelope"></i>
           </button>
         </td>
       </tr>
@@ -176,5 +186,115 @@ window.processReturn = async function(saleId) {
         }
     } catch (error) {
         alert(error.message);
+    }
+}
+
+window.viewSaleDetails = async function(saleId) {
+    const modal = new bootstrap.Modal(document.getElementById('saleDetailsModal'));
+    const modalBody = document.getElementById('detailsModalBody');
+    const modalTitle = document.getElementById('saleDetailsModalLabel');
+
+    modalTitle.textContent = `Detalles de la Venta #${saleId}`;
+    modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+
+    try {
+        const response = await fetch(`${API_URL}/sales/${saleId}/details`, {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+
+        if (!response.ok) throw new Error('No se pudieron cargar los detalles.');
+
+        const details = await response.json();
+
+        if (details.length === 0) {
+            modalBody.innerHTML = '<p class="text-muted text-center p-4">No hay productos detallados para esta venta.</p>';
+            return;
+        }
+
+        let tableHtml = `
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th class="text-center">Cantidad</th>
+                        <th class="text-end">Precio Unit.</th>
+                        <th class="text-end">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        let total = 0;
+        details.forEach(item => {
+            const unitPrice = parseFloat(item.unit_price) || 0;
+            const subtotal = parseFloat(item.subtotal) || 0;
+            total += subtotal;
+            tableHtml += `
+                <tr>
+                    <td>${item.product_name || 'Producto no encontrado'}</td>
+                    <td class="text-center">${item.quantity}</td>
+                    <td class="text-end">$${unitPrice.toFixed(2)}</td>
+                    <td class="text-end fw-bold">$${subtotal.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                </tbody>
+            </table>
+            <div class="text-end mt-3 fs-5 fw-bold text-dark">Total Verificado: <span class="text-success">$${total.toFixed(2)}</span></div>
+        `;
+
+        modalBody.innerHTML = tableHtml;
+
+    } catch (error) {
+        modalBody.innerHTML = `<p class="text-danger text-center p-4">${error.message}</p>`;
+    }
+}
+
+window.openEmailModal = function(saleId, clientEmail) {
+    const modal = new bootstrap.Modal(document.getElementById('emailTicketModal'));
+    document.getElementById('emailSaleId').textContent = `#${saleId}`;
+    document.getElementById('hiddenSaleId').value = saleId;
+    document.getElementById('recipientEmail').value = clientEmail;
+    modal.show();
+}
+
+async function handleSendEmail(event) {
+    event.preventDefault();
+    const saleId = document.getElementById('hiddenSaleId').value;
+    const email = document.getElementById('recipientEmail').value;
+    const submitBtn = document.getElementById('sendEmailSubmitBtn');
+
+    if (!email) {
+        showToast('Por favor, introduce una dirección de correo.', true);
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
+
+    try {
+        const response = await fetch(`${API_URL}/sales/${saleId}/ticket/email`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            body: JSON.stringify({ email: email })
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message);
+
+        showToast(result.message);
+        const modal = bootstrap.Modal.getInstance(document.getElementById('emailTicketModal'));
+        modal.hide();
+
+    } catch (error) {
+        showToast(error.message, true);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-send me-2"></i>Enviar Correo';
     }
 }

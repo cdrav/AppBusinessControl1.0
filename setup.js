@@ -138,6 +138,13 @@ async function setup() {
       console.log("✅ Columna 'ticket_format' agregada a la tabla settings.");
     }
 
+    // 5.7.2. Migración: Agregar columna 'cost' a inventory
+    const [costCols] = await connection.query("SHOW COLUMNS FROM inventory LIKE 'cost'");
+    if (costCols.length === 0) {
+      await connection.query("ALTER TABLE inventory ADD COLUMN cost DECIMAL(10, 2) DEFAULT 0 AFTER price");
+      console.log("✅ Columna 'cost' agregada a la tabla inventory.");
+    }
+
     // 5.8. Crear tabla de cupones
     await connection.query(`
       CREATE TABLE IF NOT EXISTS coupons (
@@ -159,6 +166,28 @@ async function setup() {
     // 5.10. Migración: Agregar columna 'notes' a ventas
     await connection.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS notes TEXT AFTER coupon_code");
     console.log("✅ Columna 'notes' agregada a la tabla sales.");
+
+    // 5.11. Crear tabla de proveedores
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        contact_name VARCHAR(255),
+        phone VARCHAR(50),
+        email VARCHAR(100),
+        address TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 5.12. Migración: Agregar columna 'supplier_id' a inventory
+    const [supplierCols] = await connection.query("SHOW COLUMNS FROM inventory LIKE 'supplier_id'");
+    if (supplierCols.length === 0) {
+      await connection.query("ALTER TABLE inventory ADD COLUMN supplier_id INT AFTER category");
+      // Opcional: Agregar Foreign Key si deseas integridad estricta, o dejarlo flexible
+      // await connection.query("ALTER TABLE inventory ADD CONSTRAINT fk_inventory_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL");
+      console.log("✅ Columna 'supplier_id' agregada a la tabla inventory.");
+    }
 
     // 6. Crear Usuario Admin (Si no existe)
     const adminEmail = 'admin@business.com';
