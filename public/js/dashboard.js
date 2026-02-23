@@ -108,6 +108,12 @@ async function loadDashboardStats() {
         // Actualizar lista de actividad reciente
         updateRecentActivity(stats.recentActivity);
 
+        // Actualizar lista de productos lentos
+        updateStaleProducts(stats.staleProducts);
+
+        // Actualizar lista de clientes inactivos
+        updateInactiveClients(stats.inactiveClients);
+
     } catch (error) {
         console.error('Error cargando estadísticas del dashboard:', error);
     }
@@ -319,6 +325,98 @@ function updateRecentActivity(activities) {
             </div>
         `;
         container.insertAdjacentHTML('beforeend', itemHtml);
+    });
+}
+
+function updateStaleProducts(products) {
+    const card = document.getElementById('staleProductsCard');
+    const list = document.getElementById('staleProductsList');
+    const topProductsCard = document.getElementById('topProductsCard');
+
+    if (!card || !list || !topProductsCard) return;
+
+    if (!products || products.length === 0) {
+        card.style.display = 'none';
+        topProductsCard.classList.remove('col-lg-7');
+        topProductsCard.classList.add('col-lg-12');
+        return;
+    }
+
+    // Si hay productos, mostrar la tarjeta y ajustar columnas
+    card.style.display = 'block';
+    topProductsCard.classList.remove('col-lg-12');
+    topProductsCard.classList.add('col-lg-7');
+    list.innerHTML = '';
+
+    products.forEach(product => {
+        let subtitle;
+        if (product.last_sale_date) {
+            const daysAgo = Math.floor((new Date() - new Date(product.last_sale_date)) / (1000 * 60 * 60 * 24));
+            subtitle = `Última venta hace ${daysAgo} días`;
+        } else {
+            subtitle = 'Nunca se ha vendido';
+        }
+
+        const itemHtml = `
+            <div class="d-flex align-items-center mb-3 pb-3 border-bottom border-light">
+                <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                    <i class="bi bi-box-seam fs-5 text-danger"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="mb-0 fw-bold">${product.product_name}</h6>
+                    <small class="text-muted">${subtitle}</small>
+                </div>
+                <a href="editInventory.html?id=${product.id}" class="btn btn-sm btn-light" title="Editar Producto">
+                    <i class="bi bi-pencil"></i>
+                </a>
+            </div>
+        `;
+        list.insertAdjacentHTML('beforeend', itemHtml);
+    });
+}
+
+function updateInactiveClients(clients) {
+    const card = document.getElementById('inactiveClientsCard');
+    const list = document.getElementById('inactiveClientsList');
+
+    if (!card || !list) return;
+
+    if (!clients || clients.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+
+    card.style.display = 'block';
+    list.innerHTML = '';
+
+    clients.forEach(client => {
+        const lastPurchase = new Date(client.last_purchase).toLocaleDateString();
+        const daysAgo = Math.floor((new Date() - new Date(client.last_purchase)) / (1000 * 60 * 60 * 24));
+        
+        const row = `
+            <tr>
+                <td>
+                    <div class="fw-bold">${client.name}</div>
+                </td>
+                <td>
+                    <div class="small"><i class="bi bi-envelope me-1"></i>${client.email || '-'}</div>
+                    <div class="small"><i class="bi bi-telephone me-1"></i>${client.phone || '-'}</div>
+                </td>
+                <td>
+                    <span class="badge bg-warning text-dark">${daysAgo} días</span>
+                    <div class="small text-muted">${lastPurchase}</div>
+                </td>
+                <td class="text-end">
+                    <a href="mailto:${client.email}" class="btn btn-sm btn-outline-primary" title="Enviar Correo">
+                        <i class="bi bi-envelope"></i>
+                    </a>
+                    <a href="https://wa.me/${client.phone ? client.phone.replace(/[^0-9]/g, '') : ''}" target="_blank" class="btn btn-sm btn-outline-success" title="Contactar por WhatsApp">
+                        <i class="bi bi-whatsapp"></i>
+                    </a>
+                </td>
+            </tr>
+        `;
+        list.insertAdjacentHTML('beforeend', row);
     });
 }
 

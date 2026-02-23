@@ -1,4 +1,6 @@
 const API_URL = ''; // Ruta relativa para producción
+let restoreFile = null;
+let restoreKey = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     loadSettings();
@@ -20,6 +22,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const backupBtn = document.getElementById('backupBtn');
     if (backupBtn) {
         backupBtn.addEventListener('click', downloadBackup);
+    }
+
+    const restoreForm = document.getElementById('restoreForm');
+    if (restoreForm) {
+        restoreForm.addEventListener('submit', handleRestore);
+    }
+
+    // Lógica para el modal de confirmación
+    const confirmInput = document.getElementById('confirmInput');
+    const btnConfirmAction = document.getElementById('btnConfirmRestoreAction');
+    
+    if (confirmInput && btnConfirmAction) {
+        confirmInput.addEventListener('input', function() {
+            btnConfirmAction.disabled = this.value !== 'CONFIRMAR';
+        });
+
+        btnConfirmAction.addEventListener('click', function() {
+            bootstrap.Modal.getInstance(document.getElementById('confirmRestoreModal')).hide();
+            executeRestore();
+        });
     }
 });
 
@@ -118,4 +140,104 @@ async function downloadBackup() {
     } catch (error) {
         alert('Error: ' + error.message);
     }
+}
+
+async function handleRestore(e) {
+    e.preventDefault();
+
+    const fileInput = document.getElementById('backupFile');
+    restoreFile = fileInput.files[0];
+    restoreKey = document.getElementById('supportKey').value;
+
+    if (!restoreFile) {
+        showToast('Por favor, selecciona un archivo .sql para restaurar.', true);
+        return;
+    }
+
+    if (!restoreKey) {
+        showToast('Debes ingresar la Clave de Soporte para continuar.', true);
+        return;
+    }
+
+    // Abrir modal de confirmación en lugar de prompt
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmRestoreModal'));
+    document.getElementById('confirmInput').value = '';
+    document.getElementById('btnConfirmRestoreAction').disabled = true;
+    confirmModal.show();
+}
+
+function executeRestore() {
+    const btn = document.getElementById('restoreBtn');
+    const progressContainer = document.getElementById('restoreProgressContainer');
+    const progressBar = document.getElementById('restoreProgressBar');
+    const statusText = document.getElementById('restoreStatusText');
+
+    const formData = new FormData();
+    formData.append('backupFile', restoreFile);
+    formData.append('supportKey', restoreKey);
+
+    // UI: Mostrar barra de progreso y bloquear botón
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
+    progressContainer.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0%';
+    progressBar.classList.remove('bg-success', 'bg-danger');
+    statusText.className = 'text-muted d-block mt-1 text-center';
+    statusText.textContent = 'Subiendo archivo de respaldo...';
+
+    // Usamos XMLHttpRequest para tener eventos de progreso de subida
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_URL}/api/restore`, true);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + localStorage.getItem('token'));
+
+    // Evento de progreso
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percentComplete + '%';
+            progressBar.textContent = percentComplete + '%';
+            
+            if (percentComplete === 100) {
+                statusText.textContent = 'Archivo subido. Restaurando base de datos (esto puede tardar)...';
+                progressBar.classList.add('progress-bar-animated'); // Animar mientras el servidor procesa
+            }
+        }
+    };
+
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            const result = JSON.parse(xhr.responseText);
+            progressBar.classList.remove('progress-bar-animated');
+            progressBar.classList.add('bg-success');
+            statusText.textContent = '¡Restauración completada con éxito!';
+            statusText.className = 'text-success fw-bold d-block mt-1 text-center';
+            
+            const successModal = new bootstrap.Modal(document.getElementById('restoreSuccessModal'));
+            successModal.show();
+        } else {
+            let message = 'Error desconocido';
+            try { message = JSON.parse(xhr.responseText).message; } catch(e) {}
+            
+            progressBar.classList.add('bg-danger');
+            statusText.textContent = 'Error: ' + message;
+            statusText.className = 'text-danger fw-bold d-block mt-1 text-center';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-upload me-2"></i> Restaurar Base de Datos';
+        }
+    };
+
+    xhr.onerror = function() {
+        progressBar.classList.add('bg-danger');
+        statusText.textContent = 'Error de conexión con el servidor.';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-upload me-2"></i> Restaurar Base de Datos';
+    };
+
+    xhr.send(formData);
+}
+
+window.finishRestore = function() {
+    localStorage.removeItem('token');
+    window.location.href = 'login.html';
 }

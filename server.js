@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
+const cron = require('node-cron');
 
 // Configuración de Multer para subir imágenes
 const storage = multer.diskStorage({
@@ -22,12 +23,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// Multer para in-memory storage (para backup restore)
+const memoryUpload = multer({ storage: multer.memoryStorage() });
+
 // Configuración de Nodemailer
 const transporter = nodemailer.createTransport({
-  service: 'hotmail', // Actualizado para coincidir con el correo @hotmail.com del .env
+  host: 'smtp.office365.com', // Servidor estándar de Microsoft (Outlook/Hotmail)
+  port: 587,
+  secure: false, // false para puerto 587 (STARTTLS)
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    ciphers: 'SSLv3' // Compatibilidad necesaria para algunos entornos
   }
 });
 
@@ -69,7 +78,8 @@ const db = mysql.createPool({
   port: process.env.DB_PORT,  
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  multipleStatements: true // Permitir ejecutar múltiples sentencias SQL a la vez
 });
 
 console.log('Pool de conexiones a la base de datos configurado.');
@@ -710,12 +720,29 @@ app.post('/sales/:id/ticket/email', authenticateToken, async (req, res) => {
 // Ruta para eliminar una venta y restaurar el stock
 app.delete('/sales/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   const { id } = req.params;
+  const { password } = req.body; // Recibimos la contraseña del body
+
+  // 1. Verificación de contraseña de administrador
+  if (!password) {
+      return res.status(400).json({ message: 'Se requiere contraseña para esta acción.' });
+  }
+
   let connection;
   try {
+    // Verificar la contraseña del usuario que hace la petición
+    const [userRows] = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
+    if (userRows.length === 0) {
+        return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+    const validPassword = await bcrypt.compare(password, userRows[0].password);
+    if (!validPassword) {
+        return res.status(403).json({ message: 'Contraseña incorrecta.' });
+    }
+
+    // Si la contraseña es correcta, proceder con la eliminación
     connection = await db.getConnection();
     await connection.beginTransaction();
 
-    // 1. Obtener los detalles de la venta para saber qué productos devolver al stock
     const [details] = await connection.query('SELECT product_id, quantity FROM sale_details WHERE sale_id = ?', [id]);
     
     if (details.length === 0) {
@@ -727,12 +754,10 @@ app.delete('/sales/:id', authenticateToken, authorizeRole(['admin']), async (req
         }
     }
 
-    // 2. Restaurar stock de cada producto
     for (const item of details) {
         await connection.query('UPDATE inventory SET stock = stock + ? WHERE id = ?', [item.quantity, item.product_id]);
     }
 
-    // 3. Eliminar la venta (la base de datos debería eliminar los detalles automáticamente si hay ON DELETE CASCADE, pero lo hacemos manual por seguridad)
     await connection.query('DELETE FROM sale_details WHERE sale_id = ?', [id]);
     await connection.query('DELETE FROM sales WHERE id = ?', [id]);
 
@@ -968,6 +993,37 @@ app.get('/api/dashboard-stats', authenticateToken, async (req, res) => {
             LIMIT 5
         `);
 
+        // 7. Productos Lentos (sin ventas en 30 días)
+        const [staleProducts] = await db.query(`
+            SELECT 
+                i.id, 
+                i.product_name,
+                MAX(s.sale_date) as last_sale_date
+            FROM inventory i
+            LEFT JOIN sale_details sd ON i.id = sd.product_id
+            LEFT JOIN sales s ON sd.sale_id = s.id
+            GROUP BY i.id
+            HAVING last_sale_date < DATE_SUB(CURDATE(), INTERVAL 30 DAY) OR last_sale_date IS NULL
+            ORDER BY last_sale_date ASC
+            LIMIT 5
+        `);
+
+        // 8. Clientes Inactivos (Riesgo de Fuga - sin compras en 90 días)
+        const [inactiveClients] = await db.query(`
+            SELECT 
+                c.id, 
+                c.name,
+                c.email,
+                c.phone,
+                MAX(s.sale_date) as last_purchase
+            FROM clients c
+            JOIN sales s ON c.id = s.client_id
+            GROUP BY c.id
+            HAVING last_purchase < DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+            ORDER BY last_purchase ASC
+            LIMIT 5
+        `);
+
         res.status(200).json({
             totalRevenue: salesStats[0].totalRevenue,
             totalSales: salesStats[0].totalSales,
@@ -976,7 +1032,9 @@ app.get('/api/dashboard-stats', authenticateToken, async (req, res) => {
             lowStockCount: productStats[0].lowStockCount || 0,
             salesTrend,
             topProducts,
-            recentActivity
+            recentActivity,
+            staleProducts,
+            inactiveClients
         });
 
     } catch (error) {
@@ -1127,11 +1185,9 @@ app.get('/api/daily-summary', authenticateToken, async (req, res) => {
 });
 
 // Enviar resumen diario por correo
-app.post('/api/daily-summary/email', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    const { date } = req.body;
-
+async function sendDailySummaryEmail(date) {
     if (!date || !process.env.EMAIL_USER) {
-        return res.status(400).json({ message: 'Fecha o email de destino no configurado.' });
+        throw new Error('Fecha o email de destino no configurado.');
     }
 
     const startDate = new Date(date);
@@ -1139,36 +1195,41 @@ app.post('/api/daily-summary/email', authenticateToken, authorizeRole(['admin'])
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
+    const [sales] = await db.query(
+        `SELECT COALESCE(SUM(total_price), 0) as totalRevenue, COUNT(id) as totalSales FROM sales WHERE sale_date BETWEEN ? AND ?`,
+        [startDate, endDate]
+    );
+
+    const summary = sales[0];
+    const formattedDate = new Date(date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: process.env.EMAIL_USER, // Enviar al admin
+        subject: `Cierre de Caja - ${formattedDate}`,
+        html: `
+            <h1>Resumen de Caja</h1>
+            <p><strong>Fecha:</strong> ${formattedDate}</p>
+            <hr>
+            <p><strong>Ingresos Totales:</strong> <h2>$${parseFloat(summary.totalRevenue).toFixed(2)}</h2></p>
+            <p><strong>Número de Transacciones:</strong> <h2>${summary.totalSales}</h2></p>
+            <hr>
+            <p><small>Este es un correo generado automáticamente por Business Control.</small></p>
+        `
+    };
+
+    await transporter.sendMail(mailOptions);
+    return `Correo con el resumen del ${formattedDate} enviado a ${process.env.EMAIL_USER}`;
+}
+
+// Enviar resumen diario por correo (ruta manual)
+app.post('/api/daily-summary/email', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     try {
-        const [sales] = await db.query(
-            `SELECT COALESCE(SUM(total_price), 0) as totalRevenue, COUNT(id) as totalSales FROM sales WHERE sale_date BETWEEN ? AND ?`,
-            [startDate, endDate]
-        );
-
-        const summary = sales[0];
-        const formattedDate = new Date(date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER, // Enviar al admin
-            subject: `Cierre de Caja - ${formattedDate}`,
-            html: `
-                <h1>Resumen de Caja</h1>
-                <p><strong>Fecha:</strong> ${formattedDate}</p>
-                <hr>
-                <p><strong>Ingresos Totales:</strong> <h2>$${parseFloat(summary.totalRevenue).toFixed(2)}</h2></p>
-                <p><strong>Número de Transacciones:</strong> <h2>${summary.totalSales}</h2></p>
-                <hr>
-                <p><small>Este es un correo generado automáticamente por Business Control.</small></p>
-            `
-        };
-
-        await transporter.sendMail(mailOptions);
-        res.json({ message: `Correo con el resumen del ${formattedDate} enviado a ${process.env.EMAIL_USER}` });
-
+        const message = await sendDailySummaryEmail(req.body.date);
+        res.json({ message });
     } catch (error) {
-        console.error('Error enviando correo de resumen:', error);
-        res.status(500).json({ message: 'Error al enviar el correo.' });
+        console.error('Error enviando correo de resumen manual:', error);
+        res.status(500).json({ message: error.message || 'Error al enviar el correo.' });
     }
 });
 
@@ -1568,6 +1629,35 @@ app.get('/api/backup', authenticateToken, authorizeRole(['admin']), async (req, 
     }
 });
 
+// Restaurar Backup desde archivo SQL
+app.post('/api/restore', authenticateToken, authorizeRole(['admin']), memoryUpload.single('backupFile'), async (req, res) => {
+    const { supportKey } = req.body;
+    
+    // La clave debe estar en tu archivo .env como SUPPORT_KEY=tu_clave_secreta
+    // Si no está configurada, usa una por defecto (¡Cámbiala en producción!)
+    const validKey = process.env.SUPPORT_KEY || 'soporte123';
+
+    if (!supportKey || supportKey !== validKey) {
+        return res.status(403).json({ message: '⛔ Clave de soporte incorrecta. Contacte al proveedor del sistema.' });
+    }
+
+    if (!req.file) {
+        return res.status(400).json({ message: 'No se ha subido ningún archivo.' });
+    }
+
+    const sqlScript = req.file.buffer.toString('utf8');
+
+    try {
+        // Ejecutar el script SQL completo.
+        // `multipleStatements: true` en la configuración del pool es requerido para esto.
+        await db.query(sqlScript);
+        res.json({ message: 'Restauración completada con éxito. Se recomienda reiniciar la sesión.' });
+    } catch (error) {
+        console.error('Error al restaurar la base de datos:', error);
+        res.status(500).json({ message: `Error al ejecutar el script de restauración: ${error.message}` });
+    }
+});
+
 // Cambiar contraseña del usuario actual
 app.put('/profile/change-password', authenticateToken, async (req, res) => {
   const userId = req.user.id;
@@ -1627,10 +1717,30 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// ==================================================================
+// TAREAS PROGRAMADAS (CRON JOBS)
+// ==================================================================
+// Envía el resumen de caja todos los días a las 8:00 PM (20:00)
+// Formato: minuto hora día-del-mes mes día-de-la-semana
+cron.schedule('0 20 * * *', async () => {
+    console.log('🕒 Ejecutando tarea programada: Envío de resumen de caja diario...');
+    try {
+        const today = new Date();
+        const message = await sendDailySummaryEmail(today);
+        console.log(`✅ Tarea programada completada: ${message}`);
+    } catch (error) {
+        console.error('❌ Error en la tarea programada de resumen diario:', error);
+    }
+}, {
+    scheduled: true,
+    timezone: "America/Bogota" // IMPORTANTE: Cambia esto a tu zona horaria.
+});
+
 // Puerto del servidor Express
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Servidor iniciado en el puerto ${PORT}`);
+  console.log('⏰ Tarea programada para envío de resumen de caja activada (diario a las 8:00 PM).');
 });
 // --- FIN DEL ARCHIVO (Borra todo lo que esté debajo de esta línea) ---

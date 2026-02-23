@@ -10,6 +10,11 @@ document.addEventListener('DOMContentLoaded', function() {
   if(emailForm) {
     emailForm.addEventListener('submit', handleSendEmail);
   }
+
+  const passwordConfirmForm = document.getElementById('passwordConfirmForm');
+  if (passwordConfirmForm) {
+    passwordConfirmForm.addEventListener('submit', handleConfirmDelete);
+  }
 });
 
 async function loadSales() {
@@ -167,25 +172,52 @@ window.printTicket = function(id) {
   });
 }
 
-window.processReturn = async function(saleId) {
-    if (!confirm('¿Desea procesar una devolución completa para esta venta? Esto restaurará el stock de todos los productos.')) return;
+window.processReturn = function(saleId) {
+    const modal = new bootstrap.Modal(document.getElementById('passwordConfirmModal'));
+    document.getElementById('saleIdToDelete').value = saleId;
+    document.getElementById('passwordConfirmModalLabel').textContent = `Confirmar Devolución Venta #${saleId}`;
+    modal.show();
+}
 
-    // Para esta versión simplificada, usamos la ruta de eliminación que ya restaura el stock
-    // En una versión avanzada, usaríamos la ruta /return para devoluciones parciales
+async function handleConfirmDelete(event) {
+    event.preventDefault();
+    
+    const saleId = document.getElementById('saleIdToDelete').value;
+    const password = document.getElementById('adminPassword').value;
+    const submitBtn = document.getElementById('confirmDeleteBtn');
+
+    if (!password) {
+        showToast('Debes ingresar tu contraseña.', true);
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verificando...';
+
     try {
         const response = await fetch(`${API_URL}/sales/${saleId}`, {
             method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token') 
+            },
+            body: JSON.stringify({ password: password }) // Enviando contraseña en el body
         });
 
-        if (response.ok) {
-            alert('Devolución procesada correctamente. El stock ha sido restaurado.');
-            loadSales();
-        } else {
-            throw new Error('No se pudo procesar la devolución');
-        }
+        const result = await response.json();
+
+        if (!response.ok) throw new Error(result.message);
+
+        showToast(result.message);
+        bootstrap.Modal.getInstance(document.getElementById('passwordConfirmModal')).hide();
+        document.getElementById('passwordConfirmForm').reset();
+        loadSales(); // Recargar la lista de ventas
+
     } catch (error) {
-        alert(error.message);
+        showToast(error.message, true);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Confirmar Devolución';
     }
 }
 
