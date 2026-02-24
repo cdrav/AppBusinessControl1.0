@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
   setupUserSession();
   loadInventory();
   setupEventListeners();
+  injectStockModal(); // Crear el modal dinámicamente
 });
 
 function setupUserSession() {
@@ -98,8 +99,13 @@ function renderInventory(products) {
       
       // Generar botones solo si es admin
       let actionButtons = '';
+      // Escapar comillas dobles y simples para evitar errores en el HTML
+      const safeName = product.product_name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
       if (userRole === 'admin') {
         actionButtons = `
+          <button class="btn btn-outline-primary w-100 mb-2 btn-sm" onclick="manageStock(${product.id}, '${safeName}')">
+            <i class="bi bi-shop me-1"></i> Gestionar Stock por Sede
+          </button>
           <div class="d-flex gap-2 pt-3 border-top">
             <button class="btn btn-light flex-fill text-primary btn-sm" onclick="editProduct(${product.id})">
               <i class="bi bi-pencil me-1"></i> Editar
@@ -217,4 +223,239 @@ async function exportInventory() {
   } catch (error) {
     alert('No se pudo descargar el archivo: ' + error.message);
   }
+}
+
+// ==========================================
+// GESTIÓN DE STOCK POR SEDE
+// ==========================================
+
+function injectStockModal() {
+    if (document.getElementById('stockModal')) return;
+
+    const modalHtml = `
+    <div class="modal fade" id="stockModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+          <div class="modal-header bg-light">
+            <h5 class="modal-title fw-bold" id="stockModalLabel">Gestión de Stock</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-3 text-muted">Producto: <strong id="stockModalProductName" class="text-dark"></strong></p>
+            <h6 class="fw-bold text-primary mb-3"><i class="bi bi-arrow-left-right me-2"></i>Transferir Mercancía</h6>
+            <p class="small text-muted mb-3">Mueve unidades de una sede a otra manteniendo el inventario global constante.</p>
+            <div class="p-3 bg-light rounded mb-4 border">
+                <form id="transferForm">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-4">
+                            <label class="small text-muted">Origen</label>
+                            <select id="transferFrom" class="form-select form-select-sm"></select>
+                        </div>
+                        <div class="col-4">
+                            <label class="small text-muted">Destino</label>
+                            <select id="transferTo" class="form-select form-select-sm"></select>
+                        </div>
+                        <div class="col-4">
+                            <label class="small text-muted">Cantidad</label>
+                            <input type="number" id="transferQty" class="form-control form-select-sm" min="1" placeholder="0">
+                        </div>
+                        <div class="col-12 mt-2">
+                            <button type="submit" class="btn btn-primary btn-sm w-100">Confirmar Transferencia</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <h6 class="fw-bold text-dark mb-2">Stock Actual por Sede</h6>
+            <p class="small text-muted mb-2">Usa el lápiz <strong>solo</strong> para correcciones de conteo (pérdidas, robos o sobrantes).</p>
+            <div id="stockModalBody" class="d-flex flex-column gap-2">
+                <div class="text-center py-3"><div class="spinner-border text-primary"></div></div>
+            </div>
+
+            <h6 class="fw-bold text-dark mt-4 mb-2">Historial de Transferencias</h6>
+            <div class="table-responsive" style="max-height: 150px; overflow-y: auto;">
+                <table class="table table-sm table-bordered mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Detalle</th>
+                            <th>Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transferHistoryBody"></tbody>
+                </table>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+window.manageStock = async function(productId, productName) {
+    const modalEl = document.getElementById('stockModal');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    document.getElementById('stockModalProductName').textContent = productName;
+    const body = document.getElementById('stockModalBody');
+    const selectFrom = document.getElementById('transferFrom');
+    const selectTo = document.getElementById('transferTo');
+    const historyBody = document.getElementById('transferHistoryBody');
+    
+    // Guardar ID de producto actual para el formulario
+    document.getElementById('transferForm').dataset.productId = productId;
+    
+    body.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+
+    try {
+        // Cargar Stocks y Historial en paralelo
+        const [stockRes, historyRes] = await Promise.all([
+            fetch(`${API_URL}/inventory/${productId}/stocks`, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } }),
+            fetch(`${API_URL}/inventory/${productId}/transfers`, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } })
+        ]);
+
+        const stocks = await stockRes.json();
+        const history = await historyRes.json();
+
+        // Llenar selects y tabla
+        body.innerHTML = '';
+        selectFrom.innerHTML = '';
+        selectTo.innerHTML = '';
+
+        stocks.forEach(branch => {
+            // Llenar selects de transferencia
+            const option = `<option value="${branch.branch_id}">${branch.branch_name} (${branch.stock})</option>`;
+            selectFrom.innerHTML += option;
+            selectTo.innerHTML += option;
+
+            // Llenar lista visual
+            const row = `
+                <div class="d-flex align-items-center justify-content-between p-3 border rounded bg-white">
+                    <div>
+                        <div class="fw-bold">${branch.branch_name}</div>
+                        <small class="text-muted">Disponible: <strong class="text-dark">${branch.stock}</strong></small>
+                    </div>
+                    <div>
+                         <!-- Botón discreto para ajuste manual (solo si es necesario) -->
+                         <button class="btn btn-sm btn-outline-secondary" onclick="toggleEdit(${branch.branch_id})" title="Ajuste Manual (Pérdidas/Inventario)">
+                            <i class="bi bi-pencil"></i>
+                         </button>
+                         <div id="edit-box-${branch.branch_id}" style="display:none;" class="mt-2 d-flex gap-1">
+                            <input type="number" class="form-control form-control-sm" value="${branch.stock}" id="stock-input-${branch.branch_id}" style="width: 70px;">
+                            <button class="btn btn-sm btn-success" onclick="updateBranchStock(${productId}, ${branch.branch_id})"><i class="bi bi-check"></i></button>
+                         </div>
+                    </div>
+                </div>
+            `;
+            body.insertAdjacentHTML('beforeend', row);
+        });
+        
+        // Seleccionar Sede Principal como origen por defecto si existe
+        if (selectFrom.options.length > 0) selectFrom.selectedIndex = 0;
+        // Seleccionar la segunda sede como destino por defecto
+        if (selectTo.options.length > 1) selectTo.selectedIndex = 1;
+
+        // Llenar Historial
+        historyBody.innerHTML = '';
+        if (history.length === 0) {
+            historyBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sin movimientos recientes</td></tr>';
+        } else {
+            history.forEach(h => {
+                const date = new Date(h.created_at).toLocaleDateString() + ' ' + new Date(h.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const row = `
+                    <tr>
+                        <td>${date}</td>
+                        <td><span class="fw-bold text-primary">${h.quantity} un.</span> de ${h.from_branch} a ${h.to_branch}</td>
+                        <td>${h.user_name}</td>
+                    </tr>
+                `;
+                historyBody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+
+        // Manejar evento de transferencia
+        document.getElementById('transferForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const fromId = selectFrom.value;
+            const toId = selectTo.value;
+            const qty = document.getElementById('transferQty').value;
+            
+            if(fromId === toId) {
+                showToast('El origen y destino no pueden ser iguales.', true);
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/inventory/transfer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    },
+                    body: JSON.stringify({ productId, fromBranchId: fromId, toBranchId: toId, quantity: qty })
+                });
+                
+                const data = await res.json();
+                if(res.ok) {
+                    showToast('Transferencia realizada con éxito');
+                    document.getElementById('transferQty').value = ''; // Limpiar campo cantidad
+                    manageStock(productId, productName); // Recargar modal
+                    loadInventory(); // Actualizar fondo
+                } else {
+                    showToast(data.message, true);
+                }
+            } catch(err) { showToast('Error de conexión', true); }
+        };
+
+    } catch (error) {
+        body.innerHTML = '<p class="text-danger text-center">Error al cargar información de stock.</p>';
+    }
+}
+
+window.toggleEdit = function(branchId) {
+    const box = document.getElementById(`edit-box-${branchId}`);
+    box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+}
+
+window.updateBranchStock = async function(productId, branchId) {
+    const input = document.getElementById(`stock-input-${branchId}`);
+    const newStock = parseInt(input.value);
+
+    if (isNaN(newStock) || newStock < 0) {
+        showToast('Por favor ingresa una cantidad válida.', true);
+        return;
+    }
+
+    // Confirmación de seguridad para evitar errores conceptuales
+    const confirmMsg = "⚠️ ¿Estás seguro de realizar un AJUSTE MANUAL?\n\n" +
+                       "Esta acción modificará el Inventario Global (creará o eliminará unidades del sistema).\n" +
+                       "Si lo que deseas es mover mercancía entre sedes, usa la opción de 'Transferir' arriba.\n\n" +
+                       "¿Continuar con el ajuste?";
+    
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const response = await fetch(`${API_URL}/inventory/stock`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            body: JSON.stringify({ productId, branchId, newStock })
+        });
+
+        if (response.ok) {
+            // Mostrar feedback visual temporal
+            showToast('Stock ajustado correctamente');
+            manageStock(productId, document.getElementById('stockModalProductName').textContent);
+            loadInventory();
+        } else {
+            showToast('Error al actualizar stock.', true);
+        }
+    } catch (error) {
+        showToast('Error de conexión.', true);
+    }
 }

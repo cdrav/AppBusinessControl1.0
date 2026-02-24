@@ -29,6 +29,7 @@ async function loadUsers() {
             const roleBadge = user.role === 'admin' 
                 ? '<span class="badge bg-primary">Administrador</span>' 
                 : '<span class="badge bg-secondary">Cajero</span>';
+            const branchName = user.branch_name || 'Sin asignar';
             
             const row = `
                 <tr>
@@ -44,6 +45,7 @@ async function loadUsers() {
                         </div>
                     </td>
                     <td>${roleBadge}</td>
+                    <td><small class="text-muted"><i class="bi bi-shop me-1"></i>${branchName}</small></td>
                     <td>${date}</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})" title="Eliminar usuario">

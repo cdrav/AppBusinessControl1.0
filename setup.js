@@ -189,6 +189,75 @@ async function setup() {
       console.log("✅ Columna 'supplier_id' agregada a la tabla inventory.");
     }
 
+    // ==================================================================
+    // 5.13. SOPORTE MULTI-SUCURSAL (NUEVO)
+    // ==================================================================
+    
+    // A. Crear tabla de Sucursales
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS branches (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        address VARCHAR(255),
+        phone VARCHAR(50),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // B. Crear Sede Principal por defecto si no existe ninguna
+    const [branches] = await connection.query('SELECT * FROM branches');
+    let defaultBranchId = 1;
+    if (branches.length === 0) {
+        const [res] = await connection.query("INSERT INTO branches (name, address) VALUES ('Sede Principal', 'Oficina Central')");
+        defaultBranchId = res.insertId;
+        console.log("✅ Sede Principal creada automáticamente.");
+    } else {
+        defaultBranchId = branches[0].id;
+    }
+
+    // C. Crear tabla de Stock por Sucursal (Relación Muchos a Muchos)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS branch_stocks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        branch_id INT NOT NULL,
+        product_id INT NOT NULL,
+        stock INT NOT NULL DEFAULT 0,
+        FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES inventory(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_stock (branch_id, product_id)
+      )
+    `);
+
+    // D. Migración: Mover stock existente a la Sede Principal
+    // Si la tabla branch_stocks está vacía, copiamos el stock actual de la tabla inventory
+    const [stockCount] = await connection.query('SELECT COUNT(*) as count FROM branch_stocks');
+    if (stockCount[0].count === 0) {
+        console.log("🔄 Migrando inventario actual a la Sede Principal...");
+        // Insertamos en la nueva tabla tomando los datos de la vieja
+        await connection.query(`
+            INSERT INTO branch_stocks (branch_id, product_id, stock)
+            SELECT ?, id, stock FROM inventory WHERE stock > 0
+        `, [defaultBranchId]);
+        console.log("✅ Inventario migrado exitosamente.");
+    }
+
+    // E. Actualizar Usuarios para pertenecer a una sede
+    const [userCols] = await connection.query("SHOW COLUMNS FROM users LIKE 'branch_id'");
+    if (userCols.length === 0) {
+        await connection.query("ALTER TABLE users ADD COLUMN branch_id INT DEFAULT ? AFTER role", [defaultBranchId]);
+        await connection.query("ALTER TABLE users ADD CONSTRAINT fk_user_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL");
+        console.log("✅ Usuarios vinculados a la Sede Principal.");
+    }
+
+    // F. Actualizar Ventas para saber dónde se hicieron
+    const [saleCols] = await connection.query("SHOW COLUMNS FROM sales LIKE 'branch_id'");
+    if (saleCols.length === 0) {
+        await connection.query("ALTER TABLE sales ADD COLUMN branch_id INT DEFAULT ? AFTER client_id", [defaultBranchId]);
+        await connection.query("ALTER TABLE sales ADD CONSTRAINT fk_sale_branch FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL");
+        console.log("✅ Historial de ventas vinculado a la Sede Principal.");
+    }
+
     // 6. Crear Usuario Admin (Si no existe)
     const adminEmail = 'admin@business.com';
     const [users] = await connection.query('SELECT * FROM users WHERE email = ?', [adminEmail]);

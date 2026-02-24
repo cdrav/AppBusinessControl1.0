@@ -12,12 +12,20 @@
   <div class="page-wrapper">
     <div class="content-container">
       <div class="container">
-        <div class="form-container fade-in">
-          <div class="form-header">
-            <i class="bi bi-gear-fill form-icon"></i>
-            <h1 class="form-title">Configuración de la Empresa</h1>
+        
+        <!-- Header Unificado -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 fade-in">
+          <div>
+            <h2 class="fw-bold text-dark mb-1"><i class="bi bi-gear-fill text-primary me-2"></i>Configuración</h2>
+            <p class="text-muted mb-0">Administra los datos de tu empresa y sistema.</p>
           </div>
-          
+          <a href="dashboard.html" class="btn btn-outline-secondary mt-3 mt-md-0 rounded-pill px-4">
+            <i class="bi bi-arrow-left me-1"></i> Volver al Dashboard
+          </a>
+        </div>
+
+        <div class="card border-0 shadow-sm p-4 mb-4 fade-in" style="border-radius: 1rem;">
+          <h5 class="fw-bold mb-4 text-dark border-bottom pb-2">Datos de la Empresa</h5>
           <div id="message" class="mb-3"></div>
 
           <form id="configForm">
@@ -64,16 +72,50 @@
               <button type="submit" class="btn btn-primary flex-fill btn-submit">
                 <i class="bi bi-save me-2"></i> Guardar Cambios
               </button>
-              <a href="dashboard.html" class="btn btn-outline-secondary">Volver</a>
             </div>
           </form>
         </div>
 
-        <div class="form-container fade-in mt-4">
-            <div class="form-header">
-                <i class="bi bi-database-down form-icon text-warning"></i>
-                <h2 class="form-title">Zona de Mantenimiento</h2>
+        <!-- Gestión de Sucursales -->
+        <div class="card border-0 shadow-sm p-4 mb-4 fade-in" style="border-radius: 1rem;">
+            <h5 class="fw-bold mb-4 text-dark border-bottom pb-2">Gestión de Sucursales</h5>
+            
+            <form id="addBranchForm" class="mb-4">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="branchName" placeholder="Nombre Sede (Ej. Norte)" required>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="branchAddress" placeholder="Dirección">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" class="form-control" id="branchPhone" placeholder="Teléfono">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-plus-lg"></i> Agregar
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Dirección</th>
+                            <th>Teléfono</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="branchesTableBody"></tbody>
+                </table>
             </div>
+        </div>
+
+        <div class="card border-0 shadow-sm p-4 mb-4 fade-in border-start border-4 border-warning" style="border-radius: 1rem;">
+            <h5 class="fw-bold mb-4 text-dark border-bottom pb-2">Zona de Mantenimiento</h5>
             <div class="alert alert-warning">
                 <strong>Atención:</strong> Las siguientes acciones deben usarse con precaución.
             </div>

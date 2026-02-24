@@ -4,7 +4,9 @@ let restoreKey = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     loadSettings();
+    loadBranches();
     document.getElementById('configForm')?.addEventListener('submit', saveSettings);
+    document.getElementById('addBranchForm')?.addEventListener('submit', handleAddBranch);
 
     // Previsualización inmediata del logo al seleccionar archivo
     const logoInput = document.getElementById('companyLogo');
@@ -118,6 +120,81 @@ async function saveSettings(e) {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-save me-2"></i> Guardar Cambios';
+    }
+}
+
+async function loadBranches() {
+    const tbody = document.getElementById('branchesTableBody');
+    if (!tbody) return;
+
+    try {
+        const response = await fetch(`${API_URL}/branches`, {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        const branches = await response.json();
+        
+        tbody.innerHTML = branches.map(b => `
+            <tr>
+                <td class="fw-bold">${b.name} ${b.id === 1 ? '<span class="badge bg-info text-dark ms-1">Principal</span>' : ''}</td>
+                <td>${b.address || '-'}</td>
+                <td>${b.phone || '-'}</td>
+                <td class="text-end">
+                    ${b.id !== 1 ? `
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBranch(${b.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>` : ''}
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargando sucursales:', error);
+    }
+}
+
+async function handleAddBranch(e) {
+    e.preventDefault();
+    const name = document.getElementById('branchName').value;
+    const address = document.getElementById('branchAddress').value;
+    const phone = document.getElementById('branchPhone').value;
+
+    try {
+        const response = await fetch(`${API_URL}/branches`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            body: JSON.stringify({ name, address, phone })
+        });
+
+        if (response.ok) {
+            showToast('Sucursal creada correctamente');
+            document.getElementById('addBranchForm').reset();
+            loadBranches();
+        } else {
+            showToast('Error al crear sucursal', true);
+        }
+    } catch (error) {
+        showToast('Error de conexión', true);
+    }
+}
+
+window.deleteBranch = async function(id) {
+    if (!confirm('¿Eliminar esta sucursal?')) return;
+    try {
+        const response = await fetch(`${API_URL}/branches/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        if (response.ok) {
+            showToast('Sucursal eliminada');
+            loadBranches();
+        } else {
+            const data = await response.json();
+            showToast(data.message || 'Error al eliminar', true);
+        }
+    } catch (error) {
+        showToast('Error de conexión', true);
     }
 }
 

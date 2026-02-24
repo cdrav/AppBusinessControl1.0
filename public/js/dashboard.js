@@ -38,6 +38,10 @@ function setupUserSession() {
         document.getElementById('usernameDisplay').textContent = payload.username;
         document.getElementById('userRoleDisplay').textContent = payload.role.charAt(0).toUpperCase() + payload.role.slice(1);
         document.getElementById('userInitialDisplay').textContent = payload.username.charAt(0).toUpperCase();
+        
+        // Mostrar elementos con transición suave para evitar parpadeo
+        document.getElementById('userInfoContainer').style.opacity = '1';
+        document.getElementById('userInitialDisplay').style.opacity = '1';
 
         // Ocultar elementos de administrador si no es admin
         if (payload.role !== 'admin') {
@@ -70,6 +74,7 @@ function updateDate() {
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         const today = new Date();
         dateElement.textContent = today.toLocaleDateString('es-ES', options);
+        dateElement.style.opacity = '1';
     }
 }
 
@@ -94,9 +99,18 @@ async function loadDashboardStats() {
         document.getElementById('totalClients').textContent = stats.totalClients;
         document.getElementById('totalProducts').textContent = stats.totalProducts;
 
-        // Alerta de stock bajo (si existe la función showToast en utils.js)
-        if (parseInt(stats.lowStockCount) > 0 && typeof showToast === 'function') {
-            showToast(`⚠️ Atención: Tienes ${stats.lowStockCount} productos con stock bajo.`, true);
+        // Actualizar la alerta de stock bajo dedicada
+        const lowStockAlert = document.getElementById('lowStockAlert');
+        const lowStockCountSpan = document.getElementById('lowStockCount');
+        if (lowStockAlert && lowStockCountSpan) {
+            const count = parseInt(stats.lowStockCount);
+            if (count > 0) {
+                lowStockCountSpan.textContent = count;
+                // Usamos 'flex' porque en el HTML usamos d-flex para alinear ícono y texto
+                lowStockAlert.style.display = 'flex'; 
+            } else {
+                lowStockAlert.style.display = 'none';
+            }
         }
 
         // Actualizar gráfico con datos reales

@@ -150,7 +150,7 @@ app.post('/login', async (req, res) => {
 
     if (!validPassword) return res.status(401).json({ message: 'Credenciales inválidas.' });
 
-    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role, branch_id: user.branch_id }, process.env.JWT_SECRET, { expiresIn: '8h' });
 
     res.json({ message: 'Bienvenido de nuevo', token });
   } catch (err) {
@@ -340,6 +340,11 @@ app.get('/inventory/:id', authenticateToken, async (req, res) => {
       // Incluimos barcode en la inserción
       const query = 'INSERT INTO inventory (product_name, stock, price, cost, category, supplier_id, description, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
       const [result] = await db.query(query, [name, quantity, price, cost || 0, category || null, supplier_id || null, description || null, barcode || null]);
+      
+      // NUEVO: Asignar el stock inicial a la sucursal del usuario (o Sede Principal por defecto)
+      const branchId = req.user.branch_id || 1; 
+      await db.query('INSERT INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, ?)', [branchId, result.insertId, quantity]);
+
       res.status(201).json({ message: 'Producto agregado con éxito', productId: result.insertId });
     } catch (error) {
       console.error('Error al agregar producto:', error);
@@ -351,21 +356,50 @@ app.get('/inventory/:id', authenticateToken, async (req, res) => {
   app.put('/inventory/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     const { id } = req.params;
     const { name, quantity, price, cost, category, supplier_id, description, barcode } = req.body;
+    const branchId = req.user.branch_id || 1; // Usar la sucursal del admin o la principal
   
-    if (!name || !quantity || !price) {
+    // Validamos quantity explícitamente porque !0 es true en JS
+    if (!name || quantity === undefined || quantity === null || !price) {
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
     }
   
+    let connection;
     try {
-      const query = 'UPDATE inventory SET product_name = ?, stock = ?, price = ?, cost = ?, category = ?, supplier_id = ?, description = ?, barcode = ? WHERE id = ?';
-      const [result] = await db.query(query, [name, quantity, price, cost || 0, category, supplier_id || null, description, barcode || null, id]);
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      // 1. Actualizar datos básicos del producto (SIN el stock aún)
+      const query = 'UPDATE inventory SET product_name = ?, price = ?, cost = ?, category = ?, supplier_id = ?, description = ?, barcode = ? WHERE id = ?';
+      const [result] = await connection.query(query, [name, price, cost || 0, category, supplier_id || null, description, barcode || null, id]);
+      
       if (result.affectedRows === 0) {
+        await connection.rollback();
         return res.status(404).json({ message: 'Producto no encontrado' });
       }
+
+      // 2. Sincronización de Stock: Calcular la diferencia y aplicarla a la sucursal actual
+      // Obtenemos el stock total real actual (suma de sucursales)
+      const [rows] = await connection.query('SELECT COALESCE(SUM(stock), 0) as total FROM branch_stocks WHERE product_id = ?', [id]);
+      const currentTotal = parseInt(rows[0].total);
+      const newTotal = parseInt(quantity);
+      const difference = newTotal - currentTotal;
+
+      if (difference !== 0) {
+          // Aplicamos la diferencia a la sucursal del usuario (sumando o restando)
+          await connection.query('INSERT INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE stock = stock + ?', [branchId, id, difference, difference]);
+      }
+
+      // 3. Actualizar el stock global en la tabla inventory para que coincida con la suma
+      await connection.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(stock), 0) FROM branch_stocks WHERE product_id = ?) WHERE id = ?', [id, id]);
+
+      await connection.commit();
       res.status(200).json({ message: 'Producto actualizado con éxito' });
     } catch (error) {
+      if (connection) await connection.rollback();
       console.error('Error al actualizar producto:', error);
       res.status(500).json({ message: 'Error del servidor al actualizar producto' });
+    } finally {
+      if (connection) connection.release();
     }
   });
   
@@ -384,7 +418,142 @@ app.get('/inventory/:id', authenticateToken, async (req, res) => {
       res.status(500).json({ message: 'Error del servidor al eliminar producto' });
     }
   });
+
+  // ==================================================================
+  // GESTIÓN DE STOCK POR SUCURSAL (NUEVO)
+  // ==================================================================
   
+  // Obtener stock detallado por sucursal para un producto
+  app.get('/inventory/:id/stocks', authenticateToken, async (req, res) => {
+      const { id } = req.params;
+      try {
+          // Obtener todas las sucursales y su stock para este producto (0 si no existe)
+          const [stocks] = await db.query(`
+              SELECT b.id as branch_id, b.name as branch_name, COALESCE(bs.stock, 0) as stock
+              FROM branches b
+              LEFT JOIN branch_stocks bs ON b.id = bs.branch_id AND bs.product_id = ?
+              ORDER BY b.id ASC
+          `, [id]);
+          res.json(stocks);
+      } catch (error) {
+          res.status(500).json({ message: 'Error al obtener stock por sucursal' });
+      }
+  });
+
+  // Actualizar stock de una sucursal específica
+  app.post('/inventory/stock', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+      const { productId, branchId, newStock } = req.body;
+      
+      try {
+          // 1. Actualizar o Insertar en branch_stocks
+          await db.query(`
+              INSERT INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, ?)
+              ON DUPLICATE KEY UPDATE stock = ?
+          `, [branchId, productId, newStock, newStock]);
+
+          // 2. Actualizar el stock global (suma total) para mantener coherencia
+          await db.query(`UPDATE inventory i SET stock = (SELECT SUM(stock) FROM branch_stocks WHERE product_id = i.id) WHERE i.id = ?`, [productId]);
+
+          res.json({ message: 'Stock actualizado correctamente' });
+      } catch (error) {
+          res.status(500).json({ message: 'Error al actualizar stock' });
+      }
+  });
+  
+  // Transferir stock entre sucursales (NUEVO)
+  app.post('/inventory/transfer', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+      const { productId, fromBranchId, toBranchId, quantity } = req.body;
+      const qty = parseInt(quantity);
+
+      if (!productId || !fromBranchId || !toBranchId || !qty || qty <= 0) {
+          return res.status(400).json({ message: 'Datos de transferencia inválidos.' });
+      }
+
+      if (fromBranchId == toBranchId) {
+          return res.status(400).json({ message: 'La sede de origen y destino deben ser diferentes.' });
+      }
+
+      let connection;
+      try {
+          connection = await db.getConnection();
+          await connection.beginTransaction();
+
+          // 1. Verificar stock en origen
+          const [sourceStock] = await connection.query(
+              'SELECT stock FROM branch_stocks WHERE product_id = ? AND branch_id = ? FOR UPDATE',
+              [productId, fromBranchId]
+          );
+
+          if (sourceStock.length === 0 || sourceStock[0].stock < qty) {
+              await connection.rollback();
+              return res.status(400).json({ message: 'Stock insuficiente en la sede de origen.' });
+          }
+
+          // 2. Descontar de origen
+          await connection.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id = ? AND branch_id = ?', [qty, productId, fromBranchId]);
+
+          // 3. Agregar a destino
+          await connection.query('INSERT INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE stock = stock + ?', [toBranchId, productId, qty, qty]);
+
+          // 4. Registrar Historial (Auto-crear tabla si no existe para facilitar pruebas)
+          await connection.query(`
+              CREATE TABLE IF NOT EXISTS inventory_transfers (
+                  id INT AUTO_INCREMENT PRIMARY KEY,
+                  product_id INT,
+                  from_branch_id INT,
+                  to_branch_id INT,
+                  quantity INT,
+                  user_id INT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              )
+          `);
+          
+          await connection.query(
+              'INSERT INTO inventory_transfers (product_id, from_branch_id, to_branch_id, quantity, user_id) VALUES (?, ?, ?, ?, ?)',
+              [productId, fromBranchId, toBranchId, qty, req.user.id]
+          );
+
+          await connection.commit();
+          res.json({ message: 'Transferencia realizada con éxito.' });
+      } catch (error) {
+          if (connection) await connection.rollback();
+          console.error(error);
+          res.status(500).json({ message: 'Error al transferir stock.' });
+      } finally {
+          if (connection) connection.release();
+      }
+  });
+
+  // Obtener historial de transferencias de un producto
+  app.get('/inventory/:id/transfers', authenticateToken, async (req, res) => {
+      const { id } = req.params;
+      try {
+          // Verificar si la tabla existe primero para evitar errores en instalaciones nuevas
+          const [tableExists] = await db.query("SHOW TABLES LIKE 'inventory_transfers'");
+          if (tableExists.length === 0) {
+              return res.json([]); // Retornar array vacío si no hay tabla aún
+          }
+
+          const [transfers] = await db.query(`
+              SELECT t.*, 
+                     b_from.name as from_branch, 
+                     b_to.name as to_branch,
+                     u.username as user_name
+              FROM inventory_transfers t
+              LEFT JOIN branches b_from ON t.from_branch_id = b_from.id
+              LEFT JOIN branches b_to ON t.to_branch_id = b_to.id
+              LEFT JOIN users u ON t.user_id = u.id
+              WHERE t.product_id = ?
+              ORDER BY t.created_at DESC
+              LIMIT 10
+          `, [id]);
+          res.json(transfers);
+      } catch (error) {
+          console.error(error);
+          res.status(500).json({ message: 'Error al obtener historial' });
+      }
+  });
+
 // ==================================================================
 // RUTAS DE PROVEEDORES
 // ==================================================================
@@ -431,10 +600,51 @@ app.delete('/suppliers/:id', authenticateToken, authorizeRole(['admin']), async 
 });
 
 // ==================================================================
+// RUTAS DE SUCURSALES (BRANCHES)
+// ==================================================================
+
+// Obtener todas las sucursales
+app.get('/branches', authenticateToken, async (req, res) => {
+    try {
+        const [branches] = await db.query('SELECT * FROM branches ORDER BY id ASC');
+        res.json(branches);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener sucursales' });
+    }
+});
+
+// Crear sucursal
+app.post('/branches', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { name, address, phone } = req.body;
+    if (!name) return res.status(400).json({ message: 'El nombre de la sucursal es obligatorio' });
+
+    try {
+        await db.query('INSERT INTO branches (name, address, phone) VALUES (?, ?, ?)', [name, address, phone]);
+        res.status(201).json({ message: 'Sucursal creada exitosamente' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al crear sucursal' });
+    }
+});
+
+// Eliminar sucursal
+app.delete('/branches/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { id } = req.params;
+    if (id == 1) return res.status(400).json({ message: 'No se puede eliminar la Sede Principal.' });
+
+    try {
+        await db.query('DELETE FROM branches WHERE id = ?', [id]);
+        res.json({ message: 'Sucursal eliminada' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al eliminar sucursal. Verifique que no tenga usuarios o inventario asignado.' });
+    }
+});
+
+// ==================================================================
 // RUTA DE VENTAS REFACTORIZADA CON TRANSACCIONES
 // ==================================================================
 app.post('/sales', authenticateToken, async (req, res) => {
   const { clientId, products, saleDate, couponCode, notes } = req.body;
+  const branchId = req.user.branch_id; // Obtener la sucursal del usuario logueado
 
   if (!clientId || !products || !Array.isArray(products) || products.length === 0 || !saleDate) {
     return res.status(400).json({ message: 'Datos de venta inválidos. Se requiere cliente, fecha y un arreglo de productos.' });
@@ -457,7 +667,12 @@ app.post('/sales', authenticateToken, async (req, res) => {
         throw new Error('Cada producto debe tener un ID y una cantidad válida.');
       }
 
-      const [rows] = await connection.query('SELECT product_name, stock, price FROM inventory WHERE id = ? FOR UPDATE', [productId]);
+      // Ahora consultamos el stock de la sucursal específica
+      const [rows] = await connection.query(`
+        SELECT i.product_name, i.price, COALESCE(bs.stock, 0) as stock 
+        FROM inventory i 
+        LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ?
+        WHERE i.id = ? FOR UPDATE`, [branchId, productId]);
       if (rows.length === 0) {
         throw new Error(`Producto con ID ${productId} no encontrado.`);
       }
@@ -492,8 +707,8 @@ app.post('/sales', authenticateToken, async (req, res) => {
 
     // 2. Insertar la venta principal
     const [saleResult] = await connection.query(
-      'INSERT INTO sales (client_id, total_price, discount, coupon_code, sale_date, notes) VALUES (?, ?, ?, ?, ?, ?)',
-      [clientId, finalTotal, discountAmount, couponCode || null, saleDate, notes || null]
+      'INSERT INTO sales (client_id, branch_id, total_price, discount, coupon_code, sale_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [clientId, branchId, finalTotal, discountAmount, couponCode || null, saleDate, notes || null]
     );
     const saleId = saleResult.insertId;
 
@@ -507,13 +722,18 @@ app.post('/sales', authenticateToken, async (req, res) => {
 
       // Actualizar stock
       await connection.query(
-        'UPDATE inventory SET stock = stock - ? WHERE id = ?',
-        [detail.quantity, detail.productId]
+        'UPDATE branch_stocks SET stock = stock - ? WHERE product_id = ? AND branch_id = ?',
+        [detail.quantity, detail.productId, branchId]
       );
 
       // Verificar si el stock bajó del umbral (ej. 10 unidades)
-      const [stockRows] = await connection.query('SELECT product_name, stock FROM inventory WHERE id = ?', [detail.productId]);
-      if (stockRows.length > 0 && stockRows[0].stock <= 10) {
+      const [stockRows] = await connection.query(`
+        SELECT i.product_name, bs.stock 
+        FROM branch_stocks bs
+        JOIN inventory i ON bs.product_id = i.id
+        WHERE bs.product_id = ? AND bs.branch_id = ?
+      `, [detail.productId, branchId]);
+      if (stockRows.length > 0 && stockRows[0].stock <= 10 && stockRows[0].stock >= 0) {
           lowStockItems.push({ name: stockRows[0].product_name, stock: stockRows[0].stock });
       }
     }
@@ -1532,7 +1752,11 @@ app.put('/settings', authenticateToken, authorizeRole(['admin']), upload.single(
 // Obtener todos los usuarios
 app.get('/users', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
-    const [users] = await db.query('SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC');
+    const [users] = await db.query(`
+        SELECT u.id, u.username, u.email, u.role, u.created_at, b.name as branch_name 
+        FROM users u 
+        LEFT JOIN branches b ON u.branch_id = b.id 
+        ORDER BY u.created_at DESC`);
     res.json(users);
   } catch (error) {
     console.error(error);

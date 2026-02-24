@@ -26,17 +26,18 @@
             </div>
           </div>
           <div class="d-flex align-items-center gap-3">
-            <div class="text-end d-none d-md-block">
-              <span id="usernameDisplay" class="d-block fw-bold text-dark">Cargando...</span>
-              <small id="userRoleDisplay" class="text-muted">Usuario</small>
+            <div class="text-end d-none d-md-block" id="userInfoContainer" style="opacity: 0; transition: opacity 0.3s;">
+              <span id="usernameDisplay" class="d-block fw-bold text-dark"></span>
+              <small id="userRoleDisplay" class="text-muted"></small>
             </div>
             <a href="perfil.html" class="text-decoration-none">
-                <div id="userInitialDisplay" class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px; font-size: 1.2rem;" title="Ir a mi perfil">
-                  ?
+                <div id="userInitialDisplay" class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px; font-size: 1.2rem; opacity: 0; transition: opacity 0.3s;">
+                  
                 </div>
             </a>
-            <button id="logoutButton" class="btn btn-light btn-sm ms-2" title="Cerrar Sesión">
+            <button id="logoutButton" type="button" class="btn btn-danger btn-sm ms-2 text-white d-flex align-items-center gap-2 px-3">
               <i class="bi bi-box-arrow-right"></i>
+              <span>Cerrar Sesión</span>
             </button>
           </div>
         </div>
@@ -55,7 +56,7 @@
                   <p class="mb-0 fs-5 fw-medium" style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">Aquí tienes el resumen de la actividad de tu negocio hoy.</p>
                 </div>
                 <div class="text-center text-md-end">
-                  <div class="d-inline-block bg-white bg-opacity-20 rounded-pill px-4 py-2 mb-2" style="backdrop-filter: blur(5px);">
+                  <div class="d-inline-block rounded-pill px-4 py-2 mb-2" style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(5px); border: 1px solid rgba(255, 255, 255, 0.2);">
                     <i class="bi bi-calendar-date me-2"></i>
                     <span id="currentDate" class="fw-bold">Cargando fecha...</span>
                   </div>
@@ -66,6 +67,15 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Low Stock Alert -->
+        <div class="alert alert-warning d-flex align-items-center fade-in" role="alert" id="lowStockAlert" style="display: none; animation-delay: 0.05s;">
+            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+            <div>
+                <strong class="fw-bold">Atención:</strong> Tienes <span id="lowStockCount" class="fw-bold">0</span> productos con stock bajo.
+                <a href="inventarios.html" class="alert-link ms-2">Revisar inventario</a> para reabastecer.
+            </div>
         </div>
 
         <!-- Stats Row -->
