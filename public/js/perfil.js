@@ -2,7 +2,21 @@ const API_URL = ''; // Ruta relativa para producción
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('changePasswordForm').addEventListener('submit', handleChangePassword);
+    loadUserProfile(); // Cargar datos del usuario al cargar la página
 });
+
+function loadUserProfile() {
+    const token = localStorage.getItem('token');
+    if (token) {
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            document.getElementById('profileUsername').textContent = payload.username;
+            document.getElementById('profileRole').textContent = payload.role.charAt(0).toUpperCase() + payload.role.slice(1);
+        } catch (e) {
+            console.error('Error decodificando el token para perfil:', e);
+        }
+    }
+}
 
 async function handleChangePassword(e) {
     e.preventDefault();

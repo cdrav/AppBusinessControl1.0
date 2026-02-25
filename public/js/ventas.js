@@ -56,6 +56,7 @@ async function loadSales() {
 function renderSalesTable(sales) {
   const tbody = document.getElementById('salesTableBody');
   tbody.innerHTML = '';
+  const formatCOP = (amount) => amount.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
   
   sales.forEach(sale => {
     const date = new Date(sale.sale_date).toLocaleDateString('es-ES', {
@@ -78,7 +79,7 @@ function renderSalesTable(sales) {
             <i class="bi bi-list-ul me-1"></i> Ver detalles
           </button>
         </td>
-        <td class="fw-bold text-success">$${parseFloat(sale.total_price).toFixed(2)}</td>
+        <td class="fw-bold text-success">${formatCOP(parseFloat(sale.total_price))}</td>
         <td class="text-muted small">${date}</td>
         <td><span class="badge bg-success bg-opacity-10 text-success rounded-pill">Completado</span></td>
         <td>
@@ -109,10 +110,12 @@ function updateStats(sales) {
     .filter(s => new Date(s.sale_date).toDateString() === today)
     .reduce((sum, s) => sum + parseFloat(s.total_price), 0);
 
-  document.getElementById('totalSales').textContent = `$${totalSales.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+  const formatCOP = (amount) => amount.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+  document.getElementById('totalSales').textContent = formatCOP(totalSales);
   document.getElementById('totalOrders').textContent = totalOrders;
-  document.getElementById('avgSale').textContent = `$${avgSale.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-  document.getElementById('todaySales').textContent = `$${todaySalesTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+  document.getElementById('avgSale').textContent = formatCOP(avgSale);
+  document.getElementById('todaySales').textContent = formatCOP(todaySalesTotal);
 }
 
 async function loadClientsForFilter() {
@@ -239,6 +242,7 @@ window.viewSaleDetails = async function(saleId) {
 
         const details = await response.json();
 
+        const formatCOP = (amount) => amount.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
         if (details.length === 0) {
             modalBody.innerHTML = '<p class="text-muted text-center p-4">No hay productos detallados para esta venta.</p>';
             return;
@@ -265,8 +269,8 @@ window.viewSaleDetails = async function(saleId) {
                 <tr>
                     <td>${item.product_name || 'Producto no encontrado'}</td>
                     <td class="text-center">${item.quantity}</td>
-                    <td class="text-end">$${unitPrice.toFixed(2)}</td>
-                    <td class="text-end fw-bold">$${subtotal.toFixed(2)}</td>
+                    <td class="text-end">${formatCOP(unitPrice)}</td>
+                    <td class="text-end fw-bold">${formatCOP(subtotal)}</td>
                 </tr>
             `;
         });
@@ -274,7 +278,7 @@ window.viewSaleDetails = async function(saleId) {
         tableHtml += `
                 </tbody>
             </table>
-            <div class="text-end mt-3 fs-5 fw-bold text-dark">Total Verificado: <span class="text-success">$${total.toFixed(2)}</span></div>
+            <div class="text-end mt-3 fs-5 fw-bold text-dark">Total Verificado: <span class="text-success">${formatCOP(total)}</span></div>
         `;
 
         modalBody.innerHTML = tableHtml;

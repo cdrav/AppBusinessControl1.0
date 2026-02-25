@@ -6,8 +6,8 @@
   <title>Dashboard - Business Control</title>
   <meta name="author" content="Cristian David Ruiz">
   <meta name="description" content="Panel principal de control - Business Control por Cristian David Ruiz">
-  <link rel="stylesheet" href="css/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="css/toasts.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -31,7 +31,7 @@
               <small id="userRoleDisplay" class="text-muted"></small>
             </div>
             <a href="perfil.html" class="text-decoration-none">
-                <div id="userInitialDisplay" class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px; font-size: 1.2rem; opacity: 0; transition: opacity 0.3s;">
+                <div id="userInitialDisplay" class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm user-avatar-nav user-avatar-nav-size">
                   
                 </div>
             </a>
@@ -44,11 +44,11 @@
 
         <!-- Welcome Banner -->
         <div class="fade-in-up mb-4">
-          <div class="card border-0 shadow text-white overflow-hidden" style="background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%); border-radius: 1rem;">
+          <div class="card border-0 shadow text-white overflow-hidden welcome-card rounded-xl">
             <div class="card-body p-4 p-lg-5 position-relative">
               <!-- Elementos decorativos de fondo -->
-              <div class="position-absolute top-0 end-0 rounded-circle bg-white bg-opacity-10" style="width: 200px; height: 200px; transform: translate(30%, -30%);"></div>
-              <div class="position-absolute bottom-0 start-0 rounded-circle bg-white bg-opacity-10" style="width: 150px; height: 150px; transform: translate(-30%, 30%);"></div>
+              <div class="position-absolute top-0 end-0 rounded-circle bg-white bg-opacity-10 welcome-deco-1 welcome-deco-1-size"></div>
+              <div class="position-absolute bottom-0 start-0 rounded-circle bg-white bg-opacity-10 welcome-deco-2 welcome-deco-2-size"></div>
               
               <div class="d-flex flex-column flex-md-row justify-content-between align-items-center position-relative z-1">
                 <div class="text-center text-md-start mb-3 mb-md-0">
@@ -57,7 +57,7 @@
                 </div>
                 <div class="text-center text-md-end">
                   <div class="d-inline-block rounded-pill px-4 py-2 mb-2" style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(5px); border: 1px solid rgba(255, 255, 255, 0.2);">
-                    <i class="bi bi-calendar-date me-2"></i>
+                    <i class="bi bi-calendar-date me-2 text-shadow-sm"></i>
                     <span id="currentDate" class="fw-bold">Cargando fecha...</span>
                   </div>
                   <div class="small">
@@ -70,7 +70,7 @@
         </div>
 
         <!-- Low Stock Alert -->
-        <div class="alert alert-warning d-flex align-items-center fade-in" role="alert" id="lowStockAlert" style="display: none; animation-delay: 0.05s;">
+        <div class="alert alert-warning d-flex align-items-center fade-in rounded-xl" role="alert" id="lowStockAlert" style="display: none;">
             <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
             <div>
                 <strong class="fw-bold">Atención:</strong> Tienes <span id="lowStockCount" class="fw-bold">0</span> productos con stock bajo.
@@ -79,7 +79,7 @@
         </div>
 
         <!-- Stats Row -->
-        <div class="row g-4 mb-4 fade-in" style="animation-delay: 0.1s">
+        <div class="row g-4 mb-4 fade-in delay-1 rounded-xl">
               <div class="col-md-3">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-primary">
                   <div class="d-flex justify-content-between align-items-start">
@@ -148,7 +148,7 @@
             <div class="card h-100 p-4 border-0 shadow-sm">
               <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="mb-0 fw-bold text-dark">Resumen de Ingresos</h5>
-                <select class="form-select form-select-sm w-auto border-0 bg-light">
+                <select class="form-select form-select-sm w-auto border-0 bg-light rounded-pill">
                   <option>Últimos 7 días</option>
                   <option>Este mes</option>
                 </select>
@@ -162,7 +162,7 @@
           <!-- Recent Activity Column -->
           <div class="col-lg-4 fade-in" style="animation-delay: 0.3s">
             <div class="card h-100 p-4 border-0 shadow-sm">
-              <div class="d-flex justify-content-between align-items-center mb-4">
+              <div class="d-flex justify-content-between align-items-center mb-4 rounded-xl">
                 <h5 class="mb-0 fw-bold text-dark">Actividad Reciente</h5>
               </div>
               <div class="activity-list" id="recentActivityList">
@@ -173,7 +173,7 @@
 
           <!-- Stale & Top Products Row -->
           <div class="row g-4 mb-4">
-            <div class="col-lg-5 fade-in" style="animation-delay: 0.35s; display: none;" id="staleProductsCard">
+            <div class="col-lg-5 fade-in rounded-xl" style="display: none;" id="staleProductsCard">
               <div class="card h-100 p-4 border-0 shadow-sm">
                   <h5 class="mb-3 fw-bold text-dark">
                       <i class="bi bi-hourglass-split text-danger me-2"></i>
@@ -185,7 +185,7 @@
                   </div>
               </div>
             </div>
-            <div class="col-lg-7 fade-in" style="animation-delay: 0.4s;" id="topProductsCard">
+            <div class="col-lg-7 fade-in delay-4 rounded-xl" id="topProductsCard">
               <div class="card h-100 p-4 border-0 shadow-sm">
                   <h5 class="mb-3 fw-bold text-dark">
                       <i class="bi bi-trophy-fill text-warning me-2"></i>
@@ -199,7 +199,7 @@
           </div>
 
           <!-- Inactive Clients Row -->
-          <div class="col-12 fade-in" style="animation-delay: 0.45s; display: none;" id="inactiveClientsCard">
+          <div class="col-12 fade-in rounded-xl" style="display: none;" id="inactiveClientsCard">
             <div class="card h-100 p-4 border-0 shadow-sm border-start border-4 border-warning">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
@@ -229,7 +229,7 @@
           </div>
 
           <!-- Quick Actions Row -->
-          <div class="col-12 fade-in" style="animation-delay: 0.4s">
+          <div class="col-12 fade-in delay-4 rounded-xl">
             <h5 class="mb-3 fw-bold text-dark">Accesos Rápidos</h5>
             <div class="row g-3">
               <div class="col-6 col-md-3">
@@ -276,7 +276,7 @@
           </div>
 
           <!-- Management Modules Row -->
-          <div class="col-12 fade-in mt-4" style="animation-delay: 0.5s">
+          <div class="col-12 fade-in mt-4 delay-5 rounded-xl">
             <h5 class="mb-3 fw-bold text-dark">Módulos de Gestión</h5>
             <div class="row g-3">
               <div class="col-md-4">

@@ -32,7 +32,7 @@ async function loadCoupons() {
 
         coupons.forEach(coupon => {
             const isPercent = coupon.discount_type === 'percent';
-            const valueDisplay = isPercent ? `${coupon.value}%` : `$${parseFloat(coupon.value).toFixed(2)}`;
+            const valueDisplay = isPercent ? `${coupon.value}%` : parseFloat(coupon.value).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
             
             let expirationDisplay = 'Nunca';
             let statusBadge = '<span class="badge bg-success">Activo</span>';

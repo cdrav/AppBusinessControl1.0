@@ -45,8 +45,8 @@ async function loadProductData() {
         document.getElementById('productBarcode').value = product.barcode || '';
         document.getElementById('productName').value = product.product_name;
         document.getElementById('productQuantity').value = product.stock;
-        document.getElementById('productPrice').value = product.price;
-        document.getElementById('productCost').value = product.cost || 0;
+        document.getElementById('productPrice').value = parseFloat(product.price);
+        document.getElementById('productCost').value = parseFloat(product.cost || 0);
         document.getElementById('productCategory').value = product.category || '';
         document.getElementById('productSupplier').value = product.supplier_id || '';
         document.getElementById('productDescription').value = product.description || '';

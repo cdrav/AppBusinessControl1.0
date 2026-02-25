@@ -17,7 +17,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Establecer fecha actual
 function setTodayDate() {
-  const today = new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
   document.getElementById('saleDate').value = today;
 }
 
@@ -85,7 +89,7 @@ async function loadClients() {
 // Cargar productos
 async function loadProducts() {
   try {
-    const response = await fetch(`${API_URL}/inventory`, {
+    const response = await fetch(`${API_URL}/inventory/for-sale`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
     if (response.ok) {
@@ -137,8 +141,8 @@ function addProductField() {
       </select>
     </div>
     <div class="d-flex align-items-center gap-3">
-      <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 100px;">
-      <span class="product-price">$0.00</span>
+      <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 130px;">
+      <span class="product-price">$0</span>
       <button type="button" class="btn btn-danger btn-sm remove-product">
         <i class="bi bi-trash"></i>
       </button>
@@ -260,6 +264,7 @@ window.applyCoupon = async function() {
 // Actualizar resumen
 function updateSummary() {
   let subtotal = 0;
+  const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
   
   document.querySelectorAll('.product-item').forEach(item => {
     const select = item.querySelector('.product-select');
@@ -267,7 +272,7 @@ function updateSummary() {
     const price = parseFloat(select.options[select.selectedIndex]?.dataset.price) || 0;
     const total = price * quantity;
     
-    item.querySelector('.product-price').textContent = `$${total.toFixed(2)}`;
+    item.querySelector('.product-price').textContent = formatCurrency(total);
     subtotal += total;
   });
   
@@ -281,29 +286,30 @@ function updateSummary() {
       }
       // Mostrar fila de descuento
       document.getElementById('discountRow').style.display = 'flex';
-      document.getElementById('discountValue').textContent = `-$${discount.toFixed(2)}`;
+      document.getElementById('discountValue').textContent = `-${formatCurrency(discount)}`;
   } else {
       document.getElementById('discountRow').style.display = 'none';
   }
 
-  const tax = (subtotal - discount) * 0.16;
+  const tax = 0; // Impuesto eliminado (0%)
   const total = Math.max(0, (subtotal - discount) + tax);
   
-  document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
-  document.getElementById('tax').textContent = `$${tax.toFixed(2)}`;
-  document.getElementById('total').textContent = `$${total.toFixed(2)}`;
+  document.getElementById('subtotal').textContent = formatCurrency(subtotal);
+  document.getElementById('tax').textContent = formatCurrency(tax);
+  const totalEl = document.getElementById('total');
+  totalEl.textContent = formatCurrency(total);
+  totalEl.dataset.value = total; // Guardamos el valor crudo para cálculos
   
   // Recalcular cambio si cambia el total
   calculateChange();
 }
 
 function calculateChange() {
-    const totalText = document.getElementById('total').textContent.replace('$', '').replace(',', '');
-    const total = parseFloat(totalText) || 0;
+    const total = parseFloat(document.getElementById('total').dataset.value) || 0;
     const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
     
     const change = Math.max(0, paid - total);
-    document.getElementById('changeAmount').textContent = `$${change.toFixed(2)}`;
+    document.getElementById('changeAmount').textContent = change.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 // Event listeners para el primer producto
@@ -391,8 +397,8 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
             </select>
           </div>
           <div class="d-flex align-items-center gap-3">
-            <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 100px;">
-            <span class="product-price">$0.00</span>
+            <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 130px;">
+            <span class="product-price">$0</span>
             <button type="button" class="btn btn-danger btn-sm remove-product">
               <i class="bi bi-trash"></i>
             </button>

@@ -1,0 +1,60 @@
+/* =========================================
+   BUSINESS CONTROL - DEMO USAGE EXAMPLES
+   Ejemplos de cómo usar las nuevas clases de accesibilidad
+   ========================================= */
+
+/* EJEMPLOS DE USO:
+
+1. DARK MODE:
+   - El tema se guarda en localStorage
+   - Toggle automático con botón flotante
+   - Todas las variables CSS se ajustan automáticamente
+
+2. LOADING STATES:
+   <div class="loading">
+     <p>Contenido cargando...</p>
+   </div>
+
+3. SKELETON LOADING:
+   <div class="skeleton" style="height: 20px; width: 100%;"></div>
+
+4. FOCUS STATES:
+   <button class="focus-ring">Botón accesible</button>
+
+5. ACCESSIBILITY:
+   <a href="#main-content" class="skip-link">Saltar al contenido principal</a>
+   <span class="sr-only">Texto solo para lectores de pantalla</span>
+
+6. FEEDBACK:
+   <div class="success-feedback">✅ Operación exitosa</div>
+   <div class="error-feedback">❌ Error en la operación</div>
+   <div class="warning-feedback">⚠️ Advertencia importante</div>
+
+7. INTERACTIVE ELEMENTS:
+   <div class="card card-interactive interactive">
+     <h3>Tarjeta interactiva</h3>
+   </div>
+
+8. FORM ENHANCEMENTS:
+   <form class="form-enhanced">
+     <input type="text" placeholder="Campo mejorado" required>
+   </form>
+
+9. RESPONSIVE TYPOGRAPHY:
+   <h1 class="heading-responsive">Título responsive</h1>
+   <p class="text-responsive">Texto responsive</p>
+
+10. ANIMATION DELAYS:
+    <div class="fade-in animation-delay-1">Elemento 1</div>
+    <div class="fade-in animation-delay-2">Elemento 2</div>
+
+11. PRINT STYLES:
+    <div class="no-print">No se imprime</div>
+    <div class="print-only">Solo en impresión</div>
+
+12. LOADING OVERLAY:
+    <div class="loading-overlay">
+      <div class="spinner"></div>
+    </div>
+
+========================================= */

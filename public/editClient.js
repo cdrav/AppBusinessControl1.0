@@ -1,7 +1,7 @@
 // Leer el ID del cliente desde la URL
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get('id');
-const API_URL = 'http://localhost:3000';
+const API_URL = ''; // Ruta relativa
 
 // Función para cargar los datos del cliente
 function loadClientData() {

@@ -26,8 +26,16 @@ function setDefaultDates() {
   const startDate = new Date();
   startDate.setDate(endDate.getDate() - 29); // Last 30 days
   
-  document.getElementById('start-date').value = startDate.toISOString().split('T')[0];
-  document.getElementById('end-date').value = endDate.toISOString().split('T')[0];
+  // Usar fecha local para evitar problemas de zona horaria
+  const formatDate = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+  };
+  
+  document.getElementById('start-date').value = formatDate(startDate);
+  document.getElementById('end-date').value = formatDate(endDate);
 }
 
 // Initialize charts with empty data but with full options
@@ -62,7 +70,7 @@ function initializeCharts() {
             padding: 12,
             callbacks: {
               label: function(context) {
-                return 'Ventas: $' + (context.parsed.y || 0).toLocaleString();
+                return 'Ventas: ' + (context.parsed.y || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
               }
             }
           }
@@ -74,8 +82,7 @@ function initializeCharts() {
             grid: { color: 'rgba(0, 0, 0, 0.05)' },
             ticks: {
               callback: function(value) {
-                if (value >= 1000) return '$' + (value / 1000) + 'k';
-                return '$' + value;
+                return value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
               }
             }
           }
@@ -109,7 +116,7 @@ function initializeCharts() {
                 const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
                 const value = context.parsed || 0;
                 const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                return `${context.label}: $${value.toLocaleString()} (${percentage}%)`;
+                return `${context.label}: ${value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })} (${percentage}%)`;
               }
             }
           }
@@ -143,7 +150,7 @@ function initializeCharts() {
           tooltip: {
             callbacks: {
               label: function(context) {
-                return 'Total: $' + (context.parsed.x || 0).toLocaleString();
+                return 'Total: ' + (context.parsed.x || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
               }
             }
           }
@@ -153,7 +160,7 @@ function initializeCharts() {
             beginAtZero: true,
             grid: { color: 'rgba(0, 0, 0, 0.05)' },
             ticks: {
-              callback: function(value) { return '$' + value; }
+              callback: function(value) { return value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
             }
           },
           y: { grid: { display: false } }
@@ -273,12 +280,23 @@ function animateValue(id, start, end, duration, prefix = '') {
     if (!startTimestamp) startTimestamp = timestamp;
     const progress = Math.min((timestamp - startTimestamp) / duration, 1);
     const currentValue = Math.floor(progress * (end - start) + start);
-    element.textContent = prefix + currentValue.toLocaleString('en-US');
+    
+    // Si el prefijo es $, usamos formato moneda COP, si no, formato número estándar
+    if (prefix === '$') {
+        element.textContent = currentValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    } else {
+        element.textContent = currentValue.toLocaleString('es-CO');
+    }
+
     if (progress < 1) {
       window.requestAnimationFrame(step);
     } else {
       // Ensure final value is exact, especially for currency
-      element.textContent = prefix + parseFloat(end).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      if (prefix === '$') {
+          element.textContent = parseFloat(end).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      } else {
+          element.textContent = parseFloat(end).toLocaleString('es-CO');
+      }
     }
   };
   window.requestAnimationFrame(step);

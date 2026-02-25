@@ -91,6 +91,7 @@ function renderInventory(products) {
     let totalStock = 0;
     let lowStockCount = 0;
     let totalValue = 0;
+    const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
     products.forEach((product, index) => {
       const stockLevel = product.stock < 10 ? 'low' : product.stock < 50 ? 'medium' : 'high';
@@ -141,11 +142,11 @@ function renderInventory(products) {
               <div class="row g-2 mb-4">
                 <div class="col-4">
                   <small class="text-muted d-block">Precio</small>
-                  <span class="fw-bold">$${parseFloat(product.price).toFixed(2)}</span>
+                  <span class="fw-bold">${formatCurrency(product.price || 0)}</span>
                 </div>
                 <div class="col-4">
                   <small class="text-muted d-block">Costo</small>
-                  <span class="fw-bold text-secondary">$${parseFloat(product.cost || 0).toFixed(2)}</span>
+                  <span class="fw-bold text-secondary">${formatCurrency(product.cost || 0)}</span>
                 </div>
                 <div class="col-4">
                   <small class="text-muted d-block">Stock</small>
@@ -168,7 +169,7 @@ function renderInventory(products) {
     document.getElementById('totalProducts').textContent = totalProducts;
     document.getElementById('totalStock').textContent = totalStock;
     document.getElementById('lowStock').textContent = lowStockCount;
-    document.getElementById('totalValue').textContent = `$${totalValue.toFixed(2)}`;
+    document.getElementById('totalValue').textContent = formatCurrency(totalValue || 0);
   }
 }
 
@@ -356,7 +357,7 @@ window.manageStock = async function(productId, productName) {
                 <div class="d-flex align-items-center justify-content-between p-3 border rounded bg-white">
                     <div>
                         <div class="fw-bold">${branch.branch_name}</div>
-                        <small class="text-muted">Disponible: <strong class="text-dark">${branch.stock}</strong></small>
+                        <small class="text-muted">Disponible: <strong class="text-dark">${parseFloat(branch.stock)}</strong></small>
                     </div>
                     <div>
                          <!-- Botón discreto para ajuste manual (solo si es necesario) -->

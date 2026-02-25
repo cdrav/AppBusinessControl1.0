@@ -1,7 +1,10 @@
 // Add Inventory Page JavaScript
-const API_URL = (typeof CONFIG !== 'undefined' && CONFIG.API_URL) ? CONFIG.API_URL : 'http://localhost:3000';
+const API_URL = ''; // Ruta relativa para producción
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Cargar proveedores
+    loadSuppliers();
+
     // Efecto de entrada para los inputs
     document.querySelectorAll('.form-control').forEach((input, index) => {
       input.style.animationDelay = `${index * 0.1}s`;
@@ -16,6 +19,21 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('addProductForm').addEventListener('submit', handleAddProduct);
 });
 
+async function loadSuppliers() {
+    try {
+        const response = await fetch(`${API_URL}/suppliers`, {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        const suppliers = await response.json();
+        const select = document.getElementById('productSupplier');
+        if (select) {
+            suppliers.forEach(s => {
+                select.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+            });
+        }
+    } catch (e) { console.error('Error cargando proveedores', e); }
+}
+
 function calculateTotal() {
     const quantity = parseFloat(document.getElementById('productQuantity').value) || 0;
     const price = parseFloat(document.getElementById('productPrice').value) || 0;
@@ -29,11 +47,16 @@ async function handleAddProduct(event) {
     const submitBtn = document.querySelector('.btn-submit');
     const messageDiv = document.getElementById('message');
     
-    const barcode = document.getElementById('productBarcode').value.trim();
+    // Uso seguro de elementos (evita el error null)
+    const barcodeInput = document.getElementById('productBarcode');
+    const barcode = barcodeInput ? barcodeInput.value.trim() : '';
+    
     const name = document.getElementById('productName').value;
     const quantity = document.getElementById('productQuantity').value;
     const price = document.getElementById('productPrice').value;
+    const cost = document.getElementById('productCost') ? document.getElementById('productCost').value : 0; // Nuevo campo
     const category = document.getElementById('productCategory').value;
+    const supplierId = document.getElementById('productSupplier').value;
     const description = document.getElementById('productDescription').value;
 
     // Validación básica
@@ -54,7 +77,16 @@ async function handleAddProduct(event) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({ name, quantity, price, category, description, barcode }),
+        body: JSON.stringify({ 
+            name, 
+            quantity, 
+            price, 
+            cost, 
+            category, 
+            supplier_id: supplierId, 
+            description, 
+            barcode 
+        }),
       });
 
       if (!response.ok) {

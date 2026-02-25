@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Configuración - Business Control</title>
-  <link rel="stylesheet" href="css/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/toasts.css">
 </head>
 <body>
   <div class="page-wrapper">
@@ -24,7 +25,7 @@
           </a>
         </div>
 
-        <div class="card border-0 shadow-sm p-4 mb-4 fade-in" style="border-radius: 1rem;">
+        <div class="card border-0 shadow-sm p-4 mb-4 fade-in rounded-xl">
           <h5 class="fw-bold mb-4 text-dark border-bottom pb-2">Datos de la Empresa</h5>
           <div id="message" class="mb-3"></div>
 
@@ -51,7 +52,7 @@
             <div class="mb-4">
               <label class="form-label fw-bold">Logo de la Empresa</label>
               <div class="d-flex align-items-center gap-4">
-                <img id="logoPreview" src="https://placehold.co/80x80?text=Logo" alt="Logo Preview" class="rounded border p-1" style="width: 80px; height: 80px; object-fit: contain;">
+                <img id="logoPreview" src="https://placehold.co/100x100?text=Logo" alt="Logo Preview" class="rounded border p-1 bg-light" style="width: 100px; height: 100px; object-fit: contain;">
                 <div>
                   <input class="form-control" type="file" id="companyLogo" accept="image/png, image/jpeg">
                   <div class="form-text mt-2">Sube una imagen PNG o JPG (max 2MB).</div>
@@ -77,7 +78,7 @@
         </div>
 
         <!-- Gestión de Sucursales -->
-        <div class="card border-0 shadow-sm p-4 mb-4 fade-in" style="border-radius: 1rem;">
+        <div class="card border-0 shadow-sm p-4 mb-4 fade-in rounded-xl">
             <h5 class="fw-bold mb-4 text-dark border-bottom pb-2">Gestión de Sucursales</h5>
             
             <form id="addBranchForm" class="mb-4">
@@ -114,7 +115,7 @@
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm p-4 mb-4 fade-in border-start border-4 border-warning" style="border-radius: 1rem;">
+        <div class="card border-0 shadow-sm p-4 mb-4 fade-in border-start border-4 border-warning rounded-xl">
             <h5 class="fw-bold mb-4 text-dark border-bottom pb-2">Zona de Mantenimiento</h5>
             <div class="alert alert-warning">
                 <strong>Atención:</strong> Las siguientes acciones deben usarse con precaución.
@@ -122,6 +123,11 @@
             <button id="backupBtn" class="btn btn-outline-secondary w-100">
                 <i class="bi bi-download me-2"></i>
                 Descargar Copia de Seguridad (SQL)
+            </button>
+            
+            <button type="button" class="btn btn-outline-danger w-100 mt-3" data-bs-toggle="modal" data-bs-target="#purgeModal">
+                <i class="bi bi-trash3 me-2"></i>
+                Purgar Historial de Ventas
             </button>
             <div class="form-text mt-2">Genera un archivo .sql con todos los datos de tu negocio. Guárdalo en un lugar seguro.</div>
         
@@ -148,7 +154,7 @@
                 <!-- Barra de Progreso (Oculta por defecto) -->
                 <div id="restoreProgressContainer" class="mt-3" style="display: none;">
                     <label class="form-label small text-muted">Progreso de la operación:</label>
-                    <div class="progress" style="height: 20px;">
+                    <div class="progress restore-progress-bar-height">
                         <div id="restoreProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
                     </div>
                     <small id="restoreStatusText" class="text-muted d-block mt-1 text-center">Iniciando...</small>
@@ -161,8 +167,8 @@
 
   <!-- Modal de Éxito Restauración -->
   <div class="modal fade" id="restoreSuccessModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
+    <div class="modal-dialog modal-dialog-centered restore-modal-radius">
+      <div class="modal-content border-0 shadow-lg">
         <div class="modal-body text-center p-5">
           <div class="mb-4">
             <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
@@ -208,8 +214,70 @@
     </div>
   </div>
 
+  <!-- Modal de Purga de Datos -->
+  <div class="modal fade" id="purgeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-danger text-white border-0">
+          <h5 class="modal-title"><i class="bi bi-exclamation-octagon me-2"></i>Limpiar Base de Datos</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <p class="fw-bold">¿Estás seguro de eliminar todo el historial de ventas?</p>
+          <p class="text-muted small">Esta acción eliminará permanentemente:</p>
+          <ul class="text-muted small">
+              <li>Todas las ventas registradas.</li>
+              <li>Detalles de productos vendidos.</li>
+              <li>Historial de transferencias entre sedes.</li>
+          </ul>
+          <p class="text-muted small"><em>Tus productos, clientes y usuarios NO se borrarán.</em></p>
+          
+          <div class="mb-3 mt-4">
+            <label class="form-label fw-bold">Contraseña de Administrador</label>
+            <input type="password" class="form-control" id="purgePassword" placeholder="Ingresa tu contraseña para confirmar">
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" onclick="purgeSalesData()">Confirmar y Borrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/configuracion.js"></script>
+  <script>
+    // Script inyectado para la funcionalidad de purga
+    async function purgeSalesData() {
+        const password = document.getElementById('purgePassword').value;
+        if (!password) {
+            showToast('Ingresa tu contraseña', true);
+            return;
+        }
+
+        if (!confirm('Última advertencia: ¿Borrar historial de ventas?')) return;
+
+        try {
+            const response = await fetch('/purge-data', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + localStorage.getItem('token') 
+                },
+                body: JSON.stringify({ password, type: 'sales' })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showToast(data.message);
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showToast(data.message, true);
+            }
+        } catch (e) { showToast('Error de conexión', true); }
+    }
+  </script>
+  <footer class="main-footer"><p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p></footer>
 </body>
 </html>

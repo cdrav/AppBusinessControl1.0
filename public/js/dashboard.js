@@ -14,7 +14,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const cashSummaryModal = document.getElementById('cashSummaryModal');
     if (cashSummaryModal) {
         cashSummaryModal.addEventListener('show.bs.modal', function () {
-            const today = new Date().toISOString().split('T')[0];
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const today = `${year}-${month}-${day}`;
             document.getElementById('summaryDate').value = today;
             fetchDailySummary(today);
         });
@@ -94,7 +98,7 @@ async function loadDashboardStats() {
         
         const stats = await response.json();
         
-        document.getElementById('totalRevenue').textContent = `$${parseFloat(stats.totalRevenue).toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        document.getElementById('totalRevenue').textContent = parseFloat(stats.totalRevenue).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
         document.getElementById('totalSales').textContent = stats.totalSales;
         document.getElementById('totalClients').textContent = stats.totalClients;
         document.getElementById('totalProducts').textContent = stats.totalProducts;
@@ -144,13 +148,13 @@ function initRevenueChart() {
             datasets: [{
                 label: 'Ingresos ($)',
                 data: [], // Se llenarán dinámicamente
-                borderColor: '#4F46E5', // var(--primary)
-                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                borderColor: '#2563EB', // Nuevo Primary Blue
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
                 borderWidth: 3,
                 tension: 0.4, // Curva suave
                 fill: true,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#4F46E5',
+                pointBorderColor: '#2563EB',
                 pointBorderWidth: 2,
                 pointRadius: 4,
                 pointHoverRadius: 6
@@ -165,14 +169,27 @@ function initRevenueChart() {
                     backgroundColor: '#1E293B',
                     padding: 12,
                     titleFont: { size: 13 },
-                    bodyFont: { size: 13 }
+                    bodyFont: { size: 13 },
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) label += new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(context.parsed.y);
+                            return label;
+                        }
+                    }
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     grid: { borderDash: [5, 5], color: '#E2E8F0' },
-                    ticks: { color: '#64748B' }
+                    ticks: { 
+                        color: '#64748B',
+                        callback: function(value) {
+                            return value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                        }
+                    }
                 },
                 x: {
                     grid: { display: false },
@@ -195,7 +212,7 @@ function initTopProductsChart() {
                 label: 'Unidades Vendidas',
                 data: [], // Cantidades vendidas
                 backgroundColor: [
-                    'rgba(37, 99, 235, 0.6)',
+                    'rgba(37, 99, 235, 0.7)', // Primary
                     'rgba(16, 185, 129, 0.6)',
                     'rgba(245, 158, 11, 0.6)',
                     'rgba(239, 68, 68, 0.6)',
@@ -250,7 +267,13 @@ function updateRevenueChart(trendData) {
     for (let i = 6; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        
+        // Usar fecha local (YYYY-MM-DD) para evitar desfases de zona horaria
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+
         // Nombre del día en español (ej: "lun", "mar")
         const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
         
@@ -258,8 +281,13 @@ function updateRevenueChart(trendData) {
         
         // Buscar si hay ventas para este día en los datos del servidor
         const dayData = trendData.find(item => {
-            const itemDate = new Date(item.date).toISOString().split('T')[0];
-            return itemDate === dateStr;
+            // Convertir fecha del servidor a local YYYY-MM-DD
+            const itemDate = new Date(item.date);
+            const iYear = itemDate.getFullYear();
+            const iMonth = String(itemDate.getMonth() + 1).padStart(2, '0');
+            const iDay = String(itemDate.getDate()).padStart(2, '0');
+            const itemDateStr = `${iYear}-${iMonth}-${iDay}`;
+            return itemDateStr === dateStr;
         });
         
         data.push(dayData ? parseFloat(dayData.total) : 0);
@@ -305,7 +333,7 @@ function updateRecentActivity(activities) {
                 iconHtml = '<i class="bi bi-cart-check fs-5"></i>';
                 title = 'Nueva Venta';
                 subtitle = `Cliente: ${activity.text}`;
-                value = `+$${parseFloat(activity.value).toFixed(2)}`;
+                value = `+${parseFloat(activity.value).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
                 break;
             case 'client':
                 iconClass = 'bg-primary text-primary';
@@ -475,7 +503,7 @@ async function fetchDailySummary(date) {
         summaryContent.innerHTML = `
             <div class="row g-0">
                 <div class="col-6 text-center border-end">
-                    <h3 class="mb-1 fw-bold">$${parseFloat(summary.totalRevenue).toLocaleString('en-US', {minimumFractionDigits: 2})}</h3>
+                    <h3 class="mb-1 fw-bold">${parseFloat(summary.totalRevenue).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</h3>
                     <p class="text-muted mb-0 small">Ingresos Totales</p>
                 </div>
                 <div class="col-6 text-center">
@@ -522,7 +550,7 @@ function printDailySummary() {
     printWindow.document.write('</div>');
     
     // Extraer datos del HTML actual para formatearlos mejor
-    const revenue = document.querySelector('#summaryContent h3:first-of-type')?.textContent || '$0.00';
+    const revenue = document.querySelector('#summaryContent h3:first-of-type')?.textContent || '$0';
     const transactions = document.querySelector('#summaryContent h3:last-of-type')?.textContent || '0';
 
     printWindow.document.write(`
@@ -535,7 +563,7 @@ function printDailySummary() {
             <span>${transactions}</span>
         </div>
         <div class="footer">
-            <p>Reporte generado automáticamente<br>Business Control</p>
+            <p>Reporte generado automáticamente<br>&copy; ${new Date().getFullYear()} Business Control - Desarrollado por Cristian David Ruiz. Todos los derechos reservados.</p>
         </div>
     `);
     

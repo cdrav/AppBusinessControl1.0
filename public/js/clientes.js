@@ -223,7 +223,7 @@ async function viewClientHistory(id) {
                         <td><span class="fw-bold">#${sale.id}</span></td>
                         <td>${date}</td>
                         <td class="text-center">${sale.item_count}</td>
-                        <td class="text-end fw-bold">$${parseFloat(sale.total_price).toFixed(2)}</td>
+                        <td class="text-end fw-bold">${parseFloat(sale.total_price).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-outline-primary" onclick="printTicket(${sale.id})" title="Reimprimir Ticket">
                                 <i class="bi bi-printer"></i>

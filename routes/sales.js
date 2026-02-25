@@ -11,8 +11,16 @@ const path = require('path');
 
 // Registrar Venta
 router.post('/', authenticateToken, async (req, res) => {
-    const { clientId, products, saleDate, couponCode, notes } = req.body;
+    let { clientId, products, saleDate, couponCode, notes } = req.body;
     const branchId = req.user.branch_id;
+
+    // Agregar hora actual a la fecha para que los reportes por hora funcionen correctamente
+    if (saleDate && saleDate.length === 10) { // Si es formato YYYY-MM-DD
+        const now = new Date();
+        const time = now.toTimeString().split(' ')[0]; // Obtiene HH:MM:SS local
+        saleDate = `${saleDate} ${time}`;
+    }
+
     let conn;
     try {
         conn = await db.getConnection();
@@ -22,6 +30,9 @@ router.post('/', authenticateToken, async (req, res) => {
         for (const p of products) {
             const [rows] = await conn.query(`SELECT i.product_name, i.price, COALESCE(bs.stock, 0) as stock FROM inventory i LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? WHERE i.id = ? FOR UPDATE`, [branchId, p.productId]);
             if (!rows.length || rows[0].stock < p.quantity) throw new Error(`Stock insuficiente: ${rows[0]?.product_name || 'Producto'}`);
+            
+            if (rows[0].price <= 0) throw new Error(`El producto ${rows[0].product_name} tiene un precio inválido ($${rows[0].price}).`);
+
             const subtotal = rows[0].price * p.quantity;
             total += subtotal;
             details.push({ ...p, subtotal });
@@ -39,7 +50,7 @@ router.post('/', authenticateToken, async (req, res) => {
             await conn.query('INSERT INTO sale_details (sale_id, product_id, quantity, subtotal) VALUES (?, ?, ?, ?)', [sale.insertId, d.productId, d.quantity, d.subtotal]);
             await conn.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id=? AND branch_id=?', [d.quantity, d.productId, branchId]);
             await conn.query('UPDATE inventory SET stock = stock - ? WHERE id=?', [d.quantity, d.productId]); // Sincronizar global
-            const [stk] = await conn.query('SELECT stock, product_name FROM branch_stocks bs JOIN inventory i ON bs.product_id=i.id WHERE product_id=? AND branch_id=?', [d.productId, branchId]);
+            const [stk] = await conn.query('SELECT bs.stock, i.product_name FROM branch_stocks bs JOIN inventory i ON bs.product_id=i.id WHERE bs.product_id=? AND bs.branch_id=?', [d.productId, branchId]);
             if (stk[0].stock <= 10) lowStock.push({ name: stk[0].product_name, stock: stk[0].stock });
         }
         
@@ -74,7 +85,7 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
     doc.pipe(res);
 
     // --- ESTILOS Y FORMATO ---
-    const formatCurrency = (amount) => `$${parseFloat(amount).toFixed(2)}`;
+    const formatCurrency = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
     const divider = () => {
         doc.moveDown(0.5);
         doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).strokeColor('#aaaaaa').stroke();
@@ -86,8 +97,12 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
         if (config.company_logo) {
              const logoPath = path.join(__dirname, '../public', config.company_logo);
              if (fs.existsSync(logoPath)) {
-                 doc.image(logoPath, { fit: [100, 50], align: 'center' });
-                 doc.moveDown(0.5);
+                 try {
+                     doc.image(logoPath, { fit: [100, 50], align: 'center' });
+                     doc.moveDown(0.5);
+                 } catch (error) {
+                     console.error('Error al cargar el logo en ticket térmico:', error.message);
+                 }
              }
         }
         doc.fontSize(10).font('Helvetica-Bold').text(config.company_name, { align: 'center' });
@@ -119,6 +134,7 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
         
         doc.moveDown();
         doc.fontSize(7).font('Helvetica').text('¡Gracias por su compra!', { align: 'center' });
+        doc.text(`© ${new Date().getFullYear()} Business Control - Desarrollado por Cristian David Ruiz. Todos los derechos reservados.`, { align: 'center' });
 
     } else {
         // --- FORMATO A4 (Factura Formal) ---
@@ -126,8 +142,12 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
         if (config.company_logo) {
              const logoPath = path.join(__dirname, '../public', config.company_logo);
              if (fs.existsSync(logoPath)) {
-                 doc.image(logoPath, 50, 45, { width: 50 });
-                 headerX = 110;
+                 try {
+                     doc.image(logoPath, 50, 45, { width: 50 });
+                     headerX = 110;
+                 } catch (error) {
+                     console.error('Error al cargar el logo en ticket A4:', error.message);
+                 }
              }
         }
 
@@ -163,6 +183,9 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
             y += 20;
         });
         doc.fontSize(12).font('Helvetica-Bold').text(`TOTAL: ${formatCurrency(sale[0].total_price)}`, 430, y + 10, { width: 110, align: 'right' });
+        
+        doc.moveDown(2);
+        doc.fontSize(8).font('Helvetica').text(`© ${new Date().getFullYear()} Business Control - Desarrollado por Cristian David Ruiz. Todos los derechos reservados.`, { align: 'center' });
     }
 
     doc.end();

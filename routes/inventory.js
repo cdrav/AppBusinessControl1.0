@@ -9,6 +9,32 @@ router.get('/', authenticateToken, async (req, res) => {
     res.json(results);
 });
 
+// Obtener inventario para la venta (stock de la sucursal del usuario)
+router.get('/for-sale', authenticateToken, async (req, res) => {
+    let branchId = req.user.branch_id;
+    
+    // Fallback: Si el token es antiguo o no tiene branch_id, buscar en BD o usar default (1)
+    if (!branchId) {
+        try {
+            const [u] = await db.query('SELECT branch_id FROM users WHERE id = ?', [req.user.id]);
+            branchId = u[0]?.branch_id || 1; 
+        } catch (e) { branchId = 1; }
+    }
+    try {
+        const [products] = await db.query(`
+            SELECT 
+                i.id, i.product_name, i.price, i.barcode,
+                COALESCE(bs.stock, 0) as stock 
+            FROM inventory i
+            LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ?
+            ORDER BY i.product_name ASC
+        `, [branchId]);
+        res.json(products);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al cargar inventario para la venta.' });
+    }
+});
+
 // Buscar por código de barras
 router.get('/barcode/:code', authenticateToken, async (req, res) => {
     const [results] = await db.query('SELECT * FROM inventory WHERE barcode = ?', [req.params.code]);
