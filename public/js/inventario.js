@@ -225,6 +225,26 @@ async function exportInventory() {
   }
 }
 
+window.syncGlobalInventory = async function() {
+    if (!confirm('¿Deseas recalcular el inventario global basándote en las sucursales? Esto corregirá discrepancias numéricas.')) return;
+    
+    try {
+        const res = await fetch(`${API_URL}/inventory/sync-global`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(data.message);
+            loadInventory();
+        } else {
+            showToast(data.message, true);
+        }
+    } catch (e) {
+        showToast('Error de conexión', true);
+    }
+}
+
 // ==========================================
 // GESTIÓN DE STOCK POR SEDE
 // ==========================================

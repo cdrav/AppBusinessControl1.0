@@ -1,87 +1,111 @@
-const API_URL = ''; // Ruta relativa para producción
+const API_URL = ''; 
+let userModal;
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', () => {
+    userModal = new bootstrap.Modal(document.getElementById('userModal'));
     loadUsers();
+    loadBranches();
 
-    document.getElementById('addUserForm').addEventListener('submit', handleAddUser);
+    document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
 });
 
 async function loadUsers() {
     const tbody = document.getElementById('usersTableBody');
-    const loading = document.getElementById('loadingState');
-
     try {
-        const response = await fetch(`${API_URL}/users`, {
+        const res = await fetch(`${API_URL}/users`, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
+        if (!res.ok) throw new Error('Error cargando usuarios');
+        const users = await res.json();
 
-        if (response.status === 401 || response.status === 403) {
-            window.location.href = 'dashboard.html'; // Si no es admin, fuera
-            return;
-        }
-
-        const users = await response.json();
-        loading.style.display = 'none';
         tbody.innerHTML = '';
-
         users.forEach(user => {
-            const date = new Date(user.created_at).toLocaleDateString();
-            const roleBadge = user.role === 'admin' 
-                ? '<span class="badge bg-primary">Administrador</span>' 
-                : '<span class="badge bg-secondary">Cajero</span>';
-            const branchName = user.branch_name || 'Sin asignar';
+            const roleBadge = user.role === 'admin' ? '<span class="badge bg-primary">Admin</span>' : '<span class="badge bg-secondary">Cajero</span>';
+            const branchName = user.branch_name ? `<span class="text-dark"><i class="bi bi-shop me-1"></i>${user.branch_name}</span>` : '<span class="text-muted fst-italic">Sin asignar</span>';
             
             const row = `
                 <tr>
-                    <td>
-                        <div class="d-flex align-items-center">
-                            <div class="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center me-2 fw-bold" style="width: 35px; height: 35px;">
-                                ${user.username.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                                <div class="fw-bold">${user.username}</div>
-                                <small class="text-muted">${user.email}</small>
-                            </div>
-                        </div>
+                    <td class="ps-4">
+                        <div class="fw-bold">${user.username}</div>
+                        <div class="small text-muted">${user.email}</div>
                     </td>
                     <td>${roleBadge}</td>
-                    <td><small class="text-muted"><i class="bi bi-shop me-1"></i>${branchName}</small></td>
-                    <td>${date}</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})" title="Eliminar usuario">
-                            <i class="bi bi-trash"></i>
-                        </button>
+                    <td>${branchName}</td>
+                    <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                    <td class="text-end pe-4">
+                        <button class="btn btn-sm btn-light text-primary me-1" onclick='openEditModal(${JSON.stringify(user)})'><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-light text-danger" onclick="deleteUser(${user.id})"><i class="bi bi-trash"></i></button>
                     </td>
                 </tr>
             `;
             tbody.insertAdjacentHTML('beforeend', row);
         });
-
     } catch (error) {
-        console.error('Error:', error);
-        loading.innerHTML = '<p class="text-danger">Error al cargar usuarios</p>';
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">${error.message}</td></tr>`;
     }
 }
 
-async function handleAddUser(e) {
+async function loadBranches() {
+    const select = document.getElementById('branchId');
+    try {
+        const res = await fetch(`${API_URL}/branches`, {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        const branches = await res.json();
+        select.innerHTML = '<option value="">-- Seleccionar Sede --</option>';
+        branches.forEach(b => {
+            select.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+        });
+    } catch (error) {
+        select.innerHTML = '<option value="">Error cargando sedes</option>';
+    }
+}
+
+function openUserModal() {
+    document.getElementById('userForm').reset();
+    document.getElementById('userId').value = '';
+    document.getElementById('userModalLabel').textContent = 'Nuevo Usuario';
+    document.getElementById('password').required = true;
+    document.getElementById('passwordHelp').textContent = 'Requerido para nuevos usuarios.';
+    userModal.show();
+}
+
+function openEditModal(user) {
+    document.getElementById('userId').value = user.id;
+    document.getElementById('username').value = user.username;
+    document.getElementById('email').value = user.email;
+    document.getElementById('role').value = user.role;
+    document.getElementById('branchId').value = user.branch_id || ''; // Handle null branch
+    
+    document.getElementById('userModalLabel').textContent = 'Editar Usuario';
+    document.getElementById('password').required = false;
+    document.getElementById('password').value = '';
+    document.getElementById('passwordHelp').textContent = 'Dejar en blanco para mantener la actual.';
+    
+    userModal.show();
+}
+
+async function handleUserSubmit(e) {
     e.preventDefault();
-    const btn = document.querySelector('.btn-submit');
-    const msg = document.getElementById('message');
+    const id = document.getElementById('userId').value;
+    const isEdit = !!id;
     
     const data = {
         username: document.getElementById('username').value,
         email: document.getElementById('email').value,
-        password: document.getElementById('password').value,
-        role: document.getElementById('role').value
+        role: document.getElementById('role').value,
+        branch_id: document.getElementById('branchId').value || null,
+        password: document.getElementById('password').value
     };
 
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creando...';
-    msg.innerHTML = '';
+    if (isEdit && !data.password) delete data.password;
 
     try {
-        const response = await fetch(`${API_URL}/users`, {
-            method: 'POST',
+        const url = isEdit ? `${API_URL}/users/${id}` : `${API_URL}/users`;
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + localStorage.getItem('token')
@@ -89,39 +113,34 @@ async function handleAddUser(e) {
             body: JSON.stringify(data)
         });
 
-        const result = await response.json();
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.message);
 
-        if (!response.ok) throw new Error(result.message);
-
-        msg.innerHTML = '<div class="alert alert-success">Usuario creado correctamente</div>';
-        document.getElementById('addUserForm').reset();
-        loadUsers(); // Recargar tabla
-
+        showToast(result.message);
+        userModal.hide();
+        loadUsers();
     } catch (error) {
-        msg.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Crear Usuario';
+        showToast(error.message, true);
     }
 }
 
-window.deleteUser = async function(id) {
-    if (!confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) return;
-
+async function deleteUser(id) {
+    if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
     try {
-        const response = await fetch(`${API_URL}/users/${id}`, {
+        const res = await fetch(`${API_URL}/users/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
-
-        const result = await response.json();
-        
-        if (!response.ok) throw new Error(result.message);
-        
-        alert('Usuario eliminado');
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.message);
+        showToast(result.message);
         loadUsers();
-
     } catch (error) {
-        alert(error.message);
+        showToast(error.message, true);
     }
+}
+
+function togglePasswordVisibility() {
+    const input = document.getElementById('password');
+    input.type = input.type === 'password' ? 'text' : 'password';
 }
