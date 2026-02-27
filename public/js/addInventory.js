@@ -4,6 +4,11 @@ const API_URL = ''; // Ruta relativa para producción
 document.addEventListener('DOMContentLoaded', function() {
     // Efecto de entrada para los inputs
     loadSuppliers();
+
+    // Enfocar el campo de código de barras de forma segura
+    const barcodeInput = document.getElementById('productBarcode');
+    if (barcodeInput) setTimeout(() => barcodeInput.focus(), 150);
+
     document.querySelectorAll('.form-control').forEach((input, index) => {
       input.style.animationDelay = `${index * 0.1}s`;
       input.classList.add('fade-in');
@@ -45,12 +50,13 @@ async function handleAddProduct(event) {
     const submitBtn = document.querySelector('.btn-submit');
     const messageDiv = document.getElementById('message');
     
+    const barcode = document.getElementById('productBarcode').value.trim();
     const name = document.getElementById('productName').value;
     const quantity = document.getElementById('productQuantity').value;
     const price = document.getElementById('productPrice').value;
     const cost = document.getElementById('productCost').value;
     const category = document.getElementById('productCategory').value;
-    const supplier_id = document.getElementById('productSupplier').value;
+    const supplierId = document.getElementById('productSupplier').value;
     const description = document.getElementById('productDescription').value;
 
     // Validación básica
@@ -71,10 +77,13 @@ async function handleAddProduct(event) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({ name, quantity, price, cost, category, supplier_id, description }),
+        body: JSON.stringify({ name, quantity, price, cost, category, supplier_id: supplierId, description, barcode }),
       });
 
-      if (!response.ok) throw new Error('Error al agregar el producto');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al agregar el producto');
+      }
 
       showToast('¡Producto agregado con éxito!');
       document.getElementById('addProductForm').reset();
@@ -83,7 +92,7 @@ async function handleAddProduct(event) {
       
     } catch (error) {
       console.error('Error:', error.message);
-      showToast('No se pudo agregar el producto. Intente nuevamente.', true);
+      showToast(error.message, true);
     } finally {
       submitBtn.classList.remove('loading');
       submitBtn.disabled = false;

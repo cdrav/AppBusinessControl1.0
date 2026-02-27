@@ -10,6 +10,14 @@ document.addEventListener('DOMContentLoaded', function() {
     initRevenueChart();
     initTopProductsChart();
 
+    // Listener para el filtro de ingresos
+    const revenueFilter = document.getElementById('revenueFilter');
+    if (revenueFilter) {
+        revenueFilter.addEventListener('change', function() {
+            loadDashboardStats(this.value);
+        });
+    }
+
     // --- CIERRE DE CAJA MODAL ---
     const cashSummaryModal = document.getElementById('cashSummaryModal');
     if (cashSummaryModal) {
@@ -67,7 +75,7 @@ function setupUserSession() {
         logoutButton.addEventListener('click', function() {
             localStorage.removeItem('token');
             // Opcional: mostrar un mensaje de "Cerrando sesión..."
-            window.location.href = 'login.html';
+            window.location.href = 'index.html';
         });
     }
 }
@@ -82,9 +90,9 @@ function updateDate() {
     }
 }
 
-async function loadDashboardStats() {
+async function loadDashboardStats(period = '7days') {
     try {
-        const response = await fetch(`${API_URL}/api/dashboard-stats`, {
+        const response = await fetch(`${API_URL}/api/dashboard-stats?period=${period}`, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
 
@@ -118,7 +126,7 @@ async function loadDashboardStats() {
         }
 
         // Actualizar gráfico con datos reales
-        updateRevenueChart(stats.salesTrend);
+        updateRevenueChart(stats.salesTrend, period);
 
         // Actualizar gráfico de productos top
         updateTopProductsChart(stats.topProducts);
@@ -253,7 +261,7 @@ function initTopProductsChart() {
     });
 }
 
-function updateRevenueChart(trendData) {
+function updateRevenueChart(trendData, period = '7days') {
     // Comprobación defensiva: si no hay gráfico o los datos no son un array, no hacer nada.
     if (!revenueChart || !Array.isArray(trendData)) {
         return;
@@ -263,6 +271,52 @@ function updateRevenueChart(trendData) {
     const labels = [];
     const data = [];
     const today = new Date();
+
+    if (period === 'year' || /^\d{4}$/.test(period)) {
+        // Lógica para mostrar los 12 meses del año
+        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        
+        for (let i = 0; i < 12; i++) {
+            labels.push(monthNames[i]);
+
+            // Buscar datos para este mes
+            const monthData = trendData.find(item => {
+                // El backend devuelve fecha tipo "2023-05-01" o objeto Date
+                const d = new Date(item.date);
+                // Ajuste simple: extraemos el mes directamente del string si es posible, o del objeto fecha
+                // Nota: getMonth() es base 0 (Enero = 0)
+                // Si viene como string YYYY-MM-DD, podemos parsearlo seguro:
+                const dateStr = item.date instanceof Date ? item.date.toISOString() : String(item.date);
+                const itemMonth = new Date(dateStr).getMonth(); 
+                // Verificamos coincidencia de mes (y año si fuera multi-año, pero aquí filtramos por este año)
+                return itemMonth === i;
+            });
+
+            data.push(monthData ? parseFloat(monthData.total) : 0);
+        }
+    } else if (period === 'month') {
+        // Lógica para mostrar todo el mes actual
+        const year = today.getFullYear();
+        const month = today.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            
+            labels.push(day); // Eje X: 1, 2, 3...
+
+            // Buscar si hay ventas en este día específico
+            const dayData = trendData.find(item => {
+                const itemDate = new Date(item.date);
+                const iYear = itemDate.getFullYear();
+                const iMonth = String(itemDate.getMonth() + 1).padStart(2, '0');
+                const iDay = String(itemDate.getDate()).padStart(2, '0');
+                return `${iYear}-${iMonth}-${iDay}` === dateStr;
+            });
+
+            data.push(dayData ? parseFloat(dayData.total) : 0);
+        }
+    } else {
     
     for (let i = 6; i >= 0; i--) {
         const d = new Date(today);
@@ -291,6 +345,7 @@ function updateRevenueChart(trendData) {
         });
         
         data.push(dayData ? parseFloat(dayData.total) : 0);
+    }
     }
 
     revenueChart.data.labels = labels;

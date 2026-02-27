@@ -13,6 +13,10 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Listener para cálculo de cambio
   document.getElementById('amountPaid').addEventListener('input', calculateChange);
+
+  // Enfocar el campo de código de barras de forma segura al cargar la página
+  const scannerInput = document.getElementById('barcodeScannerInput');
+  if (scannerInput) setTimeout(() => scannerInput.focus(), 150);
 });
 
 // Establecer fecha actual

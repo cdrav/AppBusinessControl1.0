@@ -51,7 +51,7 @@ async function setup() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         product_name VARCHAR(255) NOT NULL,
         stock INT NOT NULL DEFAULT 0,
-        price DECIMAL(10, 2) NOT NULL,
+        price DECIMAL(15, 2) NOT NULL,
         category VARCHAR(100),
         description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -59,7 +59,7 @@ async function setup() {
       `CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
         client_id INT,
-        total_price DECIMAL(10, 2) NOT NULL,
+        total_price DECIMAL(15, 2) NOT NULL,
         sale_date DATETIME NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (client_id) REFERENCES clients(id)
@@ -69,7 +69,7 @@ async function setup() {
         sale_id INT,
         product_id INT,
         quantity INT NOT NULL,
-        subtotal DECIMAL(10, 2) NOT NULL,
+        subtotal DECIMAL(15, 2) NOT NULL,
         FOREIGN KEY (sale_id) REFERENCES sales(id),
         FOREIGN KEY (product_id) REFERENCES inventory(id)
       )`
@@ -272,6 +272,26 @@ async function setup() {
     } else {
       console.log('ℹ️ El usuario administrador ya existe (admin@business.com).');
     }
+
+    // 7. Verificación y corrección de tipos de columna DECIMAL
+    console.log('🔄 Verificando precisión de columnas de moneda...');
+    const columnsToAlter = [
+        { table: 'inventory', column: 'price', type: 'DECIMAL(15, 2) NOT NULL' },
+        { table: 'inventory', column: 'cost', type: 'DECIMAL(15, 2) DEFAULT 0' },
+        { table: 'sales', column: 'total_price', type: 'DECIMAL(15, 2) NOT NULL' },
+        { table: 'sales', column: 'discount', type: 'DECIMAL(15, 2) DEFAULT 0' },
+        { table: 'sale_details', column: 'subtotal', type: 'DECIMAL(15, 2) NOT NULL' }
+    ];
+
+    for (const col of columnsToAlter) {
+        const [columnInfo] = await connection.query(`SHOW COLUMNS FROM \`${col.table}\` LIKE '${col.column}'`);
+        // Comprueba si la columna existe y si su tipo no es el deseado
+        if (columnInfo.length > 0 && columnInfo[0].Type !== 'decimal(15,2)') {
+            await connection.query(`ALTER TABLE \`${col.table}\` MODIFY COLUMN \`${col.column}\` ${col.type}`);
+            console.log(`✅ Columna '${col.column}' en tabla '${col.table}' actualizada a DECIMAL(15, 2).`);
+        }
+    }
+    console.log('✅ Precisión de moneda verificada.');
 
     console.log('\n🎉 ¡Instalación completada con éxito!');
     console.log('Ahora puedes ejecutar: node server.js');

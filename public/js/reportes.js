@@ -204,13 +204,14 @@ async function fetchAndDisplayStats() {
 
     if (!startDate || !endDate) return;
 
-    const url = new URL(`${API_URL}/api/statistics`, window.location.origin);
-    url.searchParams.append('startDate', startDate);
-    url.searchParams.append('endDate', endDate);
-
     try {
-        const response = await fetch(url, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        const response = await fetch(`${API_URL}/api/generate`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token') 
+            },
+            body: JSON.stringify({ startDate, endDate, type: 'complete' })
         });
 
         if (response.status === 401 || response.status === 403) {
@@ -219,45 +220,46 @@ async function fetchAndDisplayStats() {
         }
         if (!response.ok) throw new Error('No se pudieron cargar las estadísticas.');
 
-        const stats = await response.json();
+        const data = await response.json();
+        const stats = data.totals; // Mapeo de totales
 
         // Update stat cards
-        animateValue('totalRevenue', 0, stats.totalRevenue, 1500, '$');
-        animateValue('totalSales', 0, stats.totalSales, 1500);
-        document.getElementById('totalClients').textContent = stats.newClients;
+        animateValue('totalRevenue', 0, stats.revenue, 1500, '$');
+        animateValue('totalSales', 0, stats.salesCount, 1500);
+        document.getElementById('totalClients').textContent = stats.activeClients;
         document.getElementById('totalProducts').textContent = stats.totalProducts;
 
         // Update sales trend chart
-        if (salesChart) {
-            const trendLabels = stats.salesTrend.map(d => new Date(d.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }));
-            const trendData = stats.salesTrend.map(d => parseFloat(d.total));
+        if (salesChart && data.salesChart) {
+            const trendLabels = data.salesChart.map(d => new Date(d.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }));
+            const trendData = data.salesChart.map(d => parseFloat(d.total));
             salesChart.data.labels = trendLabels;
             salesChart.data.datasets[0].data = trendData;
             salesChart.update();
         }
 
         // Update category distribution chart
-        if (distributionChart) {
-            const categoryLabels = stats.categoryDistribution.map(d => d.category);
-            const categoryData = stats.categoryDistribution.map(d => parseFloat(d.total));
+        if (distributionChart && data.categoryChart) {
+            const categoryLabels = data.categoryChart.map(d => d.category || 'Sin Categoría');
+            const categoryData = data.categoryChart.map(d => parseFloat(d.total));
             distributionChart.data.labels = categoryLabels;
             distributionChart.data.datasets[0].data = categoryData;
             distributionChart.update();
         }
 
         // Update top clients chart
-        if (clientsChart) {
-            const clientLabels = stats.topClients.map(c => c.name);
-            const clientData = stats.topClients.map(c => parseFloat(c.total));
+        if (clientsChart && data.clientsChart) {
+            const clientLabels = data.clientsChart.map(c => c.name);
+            const clientData = data.clientsChart.map(c => parseFloat(c.total));
             clientsChart.data.labels = clientLabels;
             clientsChart.data.datasets[0].data = clientData;
             clientsChart.update();
         }
 
         // Update hourly chart
-        if (hourlyChart && stats.salesByHour) {
+        if (hourlyChart && data.hourlyChart) {
             const hourlyData = new Array(24).fill(0);
-            stats.salesByHour.forEach(item => {
+            data.hourlyChart.forEach(item => {
                 hourlyData[item.hour] = item.count;
             });
             hourlyChart.data.datasets[0].data = hourlyData;
@@ -319,7 +321,7 @@ window.generateReport = async function() {
   btn.classList.add('loading');
 
   try {
-    const url = new URL(`${API_URL}/report`, window.location.origin);
+    const url = new URL(`${API_URL}/api/report-export`, window.location.origin);
     url.searchParams.append('startDate', startDate);
     url.searchParams.append('endDate', endDate);
     url.searchParams.append('type', reportType);
