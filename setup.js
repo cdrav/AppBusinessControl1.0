@@ -15,9 +15,10 @@ async function setup() {
       port: process.env.DB_PORT || 3306
     });
   } catch (error) {
-    console.error('❌ Error de conexión: No se pudo conectar a MySQL.');
-    console.error('   Asegúrate de que XAMPP esté encendido y MySQL en verde.');
-    return;
+    console.error('❌ Error de conexión: No se pudo conectar al servidor de la base de datos.');
+    // Mostrar el error completo para una mejor depuración en la nube
+    console.error('   Error detallado:', error);
+    process.exit(1); // Detiene el script con un código de error para que no continúe.
   }
 
   try {
