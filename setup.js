@@ -5,6 +5,12 @@ const bcrypt = require('bcrypt');
 async function setup() {
   console.log('🔄 Iniciando configuración de la base de datos...');
 
+  // --- DIAGNÓSTICO DE VARIABLES ---
+  console.log('🔍 Verificando variables de entorno:');
+  console.log(`   DB_HOST: ${process.env.DB_HOST || '❌ NO DEFINIDO (Usando localhost)'}`);
+  console.log(`   DB_USER: ${process.env.DB_USER || '❌ NO DEFINIDO (Usando root)'}`);
+  console.log(`   DB_NAME: ${process.env.DB_NAME || '❌ NO DEFINIDO (Usando business_control)'}`);
+
   // 1. Conectar a MySQL sin especificar base de datos (para poder crearla)
   let connection;
   try {
