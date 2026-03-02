@@ -7,22 +7,15 @@ async function setup() {
 
   let connection;
   try {
+    // 1. Conectar al servidor MySQL SIN especificar una base de datos
     const dbConfig = {
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD || '',
       port: process.env.DB_PORT || 3306
     };
-
-    // Si Railway nos da el nombre de la BD, nos conectamos directo a ella
-    // Esto evita errores de permisos al intentar crear la base de datos en la nube
-    if (process.env.DB_NAME) {
-        dbConfig.database = process.env.DB_NAME;
-        console.log(`🔌 Intentando conectar a la base de datos: ${process.env.DB_NAME}`);
-    }
-
     connection = await mysql.createConnection(dbConfig);
-    console.log('✅ ¡Conexión exitosa al servidor MySQL!');
+    console.log('✅ Conexión inicial al servidor MySQL exitosa.');
 
   } catch (error) {
     console.error('❌ Error CRÍTICO de conexión:');
@@ -41,15 +34,13 @@ async function setup() {
   }
 
   try {
-    // Solo intentamos crear la base de datos si NO estamos usando la de Railway (entorno local)
-    if (!process.env.DB_NAME) {
-        const dbName = 'business_control';
-        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
-        await connection.changeUser({ database: dbName });
-        console.log(`✅ Base de datos local '${dbName}' creada/seleccionada.`);
-    }
+    // 2. Asegurarse de que la base de datos exista y seleccionarla
+    const dbName = process.env.DB_NAME || 'business_control';
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
+    await connection.changeUser({ database: dbName });
+    console.log(`✅ Base de datos '${dbName}' creada/seleccionada.`);
 
-    // --- CREACIÓN DE TABLAS ---
+    // 3. --- CREACIÓN DE TABLAS ---
     const tables = [
       `CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -159,7 +150,7 @@ async function setup() {
     for (const sql of tables) {
       await connection.query(sql);
     }
-    console.log('✅ Tablas creadas/verificadas correctamente.');
+    console.log('✅ Todas las tablas fueron creadas/verificadas correctamente.');
 
     // --- DATOS INICIALES ---
     
