@@ -6,14 +6,21 @@ async function setup() {
   console.log('🔄 Iniciando configuración de la base de datos...');
 
   // --- DIAGNÓSTICO DE VARIABLES ---
-  console.log('🔍 --- DIAGNÓSTICO PROFUNDO ---');
-  // 1. Ver qué claves existen realmente (para detectar errores de escritura o espacios)
-  const keys = Object.keys(process.env).filter(k => k.startsWith('DB_') || k.startsWith('RAILWAY_'));
-  console.log('   🔑 Claves encontradas en el sistema:', keys.join(', '));
-  
-  // 2. Ver valores específicos (entre comillas para detectar espacios vacíos)
-  console.log(`   DB_HOST: '${process.env.DB_HOST}'`);
-  console.log(`   DB_NAME: '${process.env.DB_NAME}'`);
+  console.log('🔍 Verificando variables de entorno:');
+  console.log(`   DB_HOST: '${process.env.DB_HOST || ''}'`);
+  console.log(`   DB_NAME: '${process.env.DB_NAME || ''}'`);
+
+  // Diagnóstico: Ver qué variables existen realmente en el sistema
+  console.log('   🔑 Variables disponibles:', Object.keys(process.env).join(', '));
+
+  if (process.env.DB_HOST === '') {
+      console.error('⚠️  ALERTA: DB_HOST está VACÍO. La referencia ${{...}} en Railway es incorrecta (probablemente el nombre del servicio de BD).');
+      console.error('   SOLUCIÓN: Borra la variable y vuelve a crearla seleccionando el valor del menú autocompletar.');
+  }
+  if (process.env.DB_HOST && process.env.DB_HOST.includes('${{')) {
+      console.error('⚠️  ALERTA: DB_HOST contiene texto literal "${{...}}".');
+      console.error('   SOLUCIÓN: Edita la variable en Railway y asegúrate de que NO tenga comillas alrededor (ej: "..." o \'...\'). El valor debe ser exactamente ${{...}}');
+  }
 
   let connection;
   try {
