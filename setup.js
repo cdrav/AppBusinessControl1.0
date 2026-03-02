@@ -5,23 +5,6 @@ const bcrypt = require('bcrypt');
 async function setup() {
   console.log('🔄 Iniciando configuración de la base de datos...');
 
-  // --- DIAGNÓSTICO DE VARIABLES ---
-  console.log('🔍 Verificando variables de entorno:');
-  console.log(`   DB_HOST: '${process.env.DB_HOST || ''}'`);
-  console.log(`   DB_NAME: '${process.env.DB_NAME || ''}'`);
-
-  // Diagnóstico: Ver qué variables existen realmente en el sistema
-  console.log('   🔑 Variables disponibles:', Object.keys(process.env).join(', '));
-
-  if (process.env.DB_HOST === '') {
-      console.error('⚠️  ALERTA: DB_HOST está VACÍO. La referencia ${{...}} en Railway es incorrecta (probablemente el nombre del servicio de BD).');
-      console.error('   SOLUCIÓN: Borra la variable y vuelve a crearla seleccionando el valor del menú autocompletar.');
-  }
-  if (process.env.DB_HOST && process.env.DB_HOST.includes('${{')) {
-      console.error('⚠️  ALERTA: DB_HOST contiene texto literal "${{...}}".');
-      console.error('   SOLUCIÓN: Edita la variable en Railway y asegúrate de que NO tenga comillas alrededor (ej: "..." o \'...\'). El valor debe ser exactamente ${{...}}');
-  }
-
   let connection;
   try {
     const dbConfig = {
@@ -35,7 +18,7 @@ async function setup() {
     // Esto evita el error de "Access denied for user... to database" al intentar crearla
     if (process.env.DB_NAME) {
         dbConfig.database = process.env.DB_NAME;
-        console.log(`🔌 Intentando conectar directamente a la base de datos: ${process.env.DB_NAME}`);
+        console.log(`🔌 Intentando conectar a la base de datos: ${process.env.DB_NAME}`);
     }
 
     connection = await mysql.createConnection(dbConfig);
