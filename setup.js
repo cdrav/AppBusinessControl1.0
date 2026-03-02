@@ -6,10 +6,14 @@ async function setup() {
   console.log('🔄 Iniciando configuración de la base de datos...');
 
   // --- DIAGNÓSTICO DE VARIABLES ---
-  console.log('🔍 Verificando variables de entorno:');
-  console.log(`   DB_HOST: ${process.env.DB_HOST || '❌ NO DEFINIDO (Usando localhost)'}`);
-  console.log(`   DB_USER: ${process.env.DB_USER || '❌ NO DEFINIDO (Usando root)'}`);
-  console.log(`   DB_NAME: ${process.env.DB_NAME || '❌ NO DEFINIDO (Usando business_control)'}`);
+  console.log('🔍 --- DIAGNÓSTICO PROFUNDO ---');
+  // 1. Ver qué claves existen realmente (para detectar errores de escritura o espacios)
+  const keys = Object.keys(process.env).filter(k => k.startsWith('DB_') || k.startsWith('RAILWAY_'));
+  console.log('   🔑 Claves encontradas en el sistema:', keys.join(', '));
+  
+  // 2. Ver valores específicos (entre comillas para detectar espacios vacíos)
+  console.log(`   DB_HOST: '${process.env.DB_HOST}'`);
+  console.log(`   DB_NAME: '${process.env.DB_NAME}'`);
 
   let connection;
   try {
