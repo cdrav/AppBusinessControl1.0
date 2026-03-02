@@ -14,12 +14,6 @@ async function setup() {
       port: process.env.DB_PORT || 3306
     };
 
-    // --- DIAGNÓSTICO DE VARIABLES (TEMPORAL) ---
-    console.log('🔍 Configuración de conexión detectada:');
-    console.log(`   Host: '${dbConfig.host}'`);
-    console.log(`   User: '${dbConfig.user}'`);
-    console.log(`   Port: '${dbConfig.port}'`);
-
     // Si Railway nos da el nombre de la BD, nos conectamos directo a ella
     // Esto evita errores de permisos al intentar crear la base de datos en la nube
     if (process.env.DB_NAME) {
