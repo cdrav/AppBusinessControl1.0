@@ -14,8 +14,14 @@ async function setup() {
       port: process.env.DB_PORT || 3306
     };
 
-    // MEJORA: Si Railway nos da el nombre de la BD, nos conectamos directo a ella
-    // Esto evita el error de "Access denied for user... to database" al intentar crearla
+    // --- DIAGNÓSTICO DE VARIABLES (TEMPORAL) ---
+    console.log('🔍 Configuración de conexión detectada:');
+    console.log(`   Host: '${dbConfig.host}'`);
+    console.log(`   User: '${dbConfig.user}'`);
+    console.log(`   Port: '${dbConfig.port}'`);
+
+    // Si Railway nos da el nombre de la BD, nos conectamos directo a ella
+    // Esto evita errores de permisos al intentar crear la base de datos en la nube
     if (process.env.DB_NAME) {
         dbConfig.database = process.env.DB_NAME;
         console.log(`🔌 Intentando conectar a la base de datos: ${process.env.DB_NAME}`);
@@ -28,16 +34,20 @@ async function setup() {
     console.error('❌ Error CRÍTICO de conexión:');
     console.error('   Mensaje:', error.message);
     console.error('   Código:', error.code);
+    
     if (error.code === 'ECONNREFUSED') {
         console.error('   👉 PISTA: La aplicación no encuentra la base de datos. Revisa las Variables en Railway.');
     } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
         console.error('   👉 PISTA: Usuario o contraseña incorrectos.');
+    } else if (error.code === 'ER_BAD_DB_ERROR') {
+        console.error('   👉 PISTA: La base de datos especificada no existe.');
     }
-    process.exit(1); // Detener despliegue
+    
+    process.exit(1); // Detener el despliegue si falla la conexión
   }
 
   try {
-    // Solo intentamos crear la base de datos si NO estamos usando la de Railway
+    // Solo intentamos crear la base de datos si NO estamos usando la de Railway (entorno local)
     if (!process.env.DB_NAME) {
         const dbName = 'business_control';
         await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
@@ -45,7 +55,7 @@ async function setup() {
         console.log(`✅ Base de datos local '${dbName}' creada/seleccionada.`);
     }
 
-    // 4. Crear Tablas
+    // --- CREACIÓN DE TABLAS ---
     const tables = [
       `CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -155,7 +165,7 @@ async function setup() {
     for (const sql of tables) {
       await connection.query(sql);
     }
-    console.log('✅ Tablas creadas correctamente.');
+    console.log('✅ Tablas creadas/verificadas correctamente.');
 
     // --- DATOS INICIALES ---
     
