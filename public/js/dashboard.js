@@ -5,9 +5,13 @@ let topProductsChart; // Variable para el gráfico de productos top
 
 document.addEventListener('DOMContentLoaded', function() {
     updateDate();
-    setupUserSession();
-    loadBranchCards(); // Cargar tarjetas de sedes al inicio
-    loadDashboardStats();
+    const urlParams = new URLSearchParams(window.location.search);
+    const branchId = urlParams.get('branch_id');
+
+    setupUserSession(branchId);
+    // Solo cargar tarjetas de sedes si estamos en la vista global
+    if (!branchId) loadBranchCards(); 
+    loadDashboardStats('7days', branchId);
     initRevenueChart();
     initTopProductsChart();
 
@@ -15,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const revenueFilter = document.getElementById('revenueFilter');
     if (revenueFilter) {
         revenueFilter.addEventListener('change', function() {
-            loadDashboardStats(this.value);
+            loadDashboardStats(this.value, branchId);
         });
     }
 
@@ -38,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function setupUserSession() {
+function setupUserSession(branchId) {
     const token = localStorage.getItem('token');
     if (!token) {
         window.location.href = 'login.html'; // Si no hay token, no debería estar aquí
@@ -62,6 +66,16 @@ function setupUserSession() {
             adminElements.forEach(el => {
                 el.style.display = 'none'; // Ocultar visualmente
             });
+        }
+
+        // Si estamos en una vista de sede, cambiar el título y mostrar un botón para volver
+        if (branchId) {
+            const pageTitle = document.querySelector('.welcome-card h2');
+            const pageSubtitle = document.querySelector('.welcome-card p');
+            if(pageTitle) pageTitle.textContent = `Dashboard de Sede`;
+            // Podríamos obtener el nombre de la sede y ponerlo en el subtítulo
+            if(pageSubtitle) pageSubtitle.innerHTML = `Resumen de actividad para esta sede. <a href="/dashboard.html" class="btn btn-sm btn-light ms-3">Ver Dashboard Global</a>`;
+            
         }
     } catch (e) {
         console.error('Error decodificando el token:', e);
@@ -144,7 +158,7 @@ function createBranchCard(branch) {
 
     return `
         <div class="col-md-6 col-xl-3 mb-3">
-            <a href="inventario.html?branch_id=${branch.id}" class="card h-100 shadow-sm text-decoration-none border-0 card-hover-effect" style="transition: transform 0.2s;">
+            <a href="dashboard.html?branch_id=${branch.id}" class="card h-100 shadow-sm text-decoration-none border-0 card-hover-effect" style="transition: transform 0.2s;">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <h6 class="fw-bold text-primary mb-0 text-truncate">${branch.name}</h6>
@@ -161,9 +175,14 @@ function createBranchCard(branch) {
     `;
 }
 
-async function loadDashboardStats(period = '7days') {
+async function loadDashboardStats(period = '7days', branchId = null) {
     try {
-        const response = await fetch(`${API_URL}/api/dashboard-stats?period=${period}`, {
+        let url = `${API_URL}/api/dashboard-stats?period=${period}`;
+        if (branchId) {
+            url += `&branch_id=${branchId}`;
+        }
+
+        const response = await fetch(url, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
 
@@ -203,13 +222,19 @@ async function loadDashboardStats(period = '7days') {
         updateTopProductsChart(stats.topProducts);
 
         // Actualizar lista de actividad reciente
-        updateRecentActivity(stats.recentActivity);
+        updateRecentActivity(stats.recentActivity); 
 
-        // Actualizar lista de productos lentos
-        updateStaleProducts(stats.staleProducts);
-
-        // Actualizar lista de clientes inactivos
-        updateInactiveClients(stats.inactiveClients);
+        // Las siguientes tarjetas solo tienen sentido en la vista global
+        if (!branchId) {
+            updateStaleProducts(stats.staleProducts);
+            updateInactiveClients(stats.inactiveClients);
+        } else {
+            // Ocultar estas tarjetas si estamos en una vista de sede
+            const staleCard = document.getElementById('staleProductsCard');
+            const inactiveCard = document.getElementById('inactiveClientsCard');
+            if (staleCard) staleCard.style.display = 'none';
+            if (inactiveCard) inactiveCard.style.display = 'none';
+        }
 
     } catch (error) {
         console.error('Error cargando estadísticas del dashboard:', error);

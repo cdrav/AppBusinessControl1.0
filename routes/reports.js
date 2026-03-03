@@ -9,44 +9,50 @@ const { authenticateToken } = require('../middleware/auth');
 // Estadísticas del Dashboard
 router.get('/dashboard-stats', authenticateToken, async (req, res) => {
     try {
-        const { period } = req.query;
-        let dateCondition;
+        const { period, branch_id } = req.query;
+        let whereClauses = [];
+        let queryParams = [];
+
+        // --- Construcción de filtros ---
         let groupBy = "GROUP BY DATE(sale_date)";
         let selectDate = "DATE(sale_date) as date";
         
-        // Definir condición de fecha según el filtro
         if (period === 'month') {
-            // Mes actual: desde el día 1 del mes actual hasta hoy
-            dateCondition = "sale_date >= DATE_FORMAT(NOW(), '%Y-%m-01 00:00:00')";
+            whereClauses.push("sale_date >= DATE_FORMAT(NOW(), '%Y-%m-01 00:00:00')");
         } else if (period === 'year') {
-            // Año actual: desde el 1 de Enero
-            dateCondition = "sale_date >= DATE_FORMAT(NOW(), '%Y-01-01 00:00:00')";
+            whereClauses.push("sale_date >= DATE_FORMAT(NOW(), '%Y-01-01 00:00:00')");
             groupBy = "GROUP BY YEAR(sale_date), MONTH(sale_date)";
-            selectDate = "DATE_FORMAT(sale_date, '%Y-%m-01') as date"; // Agrupa al primer día del mes
+            selectDate = "DATE_FORMAT(sale_date, '%Y-%m-01') as date";
         } else if (/^\d{4}$/.test(period)) {
-            // Año específico (ej. 2024, 2025)
-            dateCondition = `YEAR(sale_date) = ${period}`;
+            whereClauses.push(`YEAR(sale_date) = ?`);
+            queryParams.push(period);
             groupBy = "GROUP BY MONTH(sale_date)";
             selectDate = "DATE_FORMAT(sale_date, '%Y-%m-01') as date";
         } else {
-            // Últimos 7 días (por defecto)
-            dateCondition = "sale_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+            whereClauses.push("sale_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
         }
 
+        if (branch_id) {
+            whereClauses.push("branch_id = ?");
+            queryParams.push(branch_id);
+        }
+
+        const salesWhereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
         // 1. Ingresos Totales (filtrado)
-        const [revenue] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as total FROM sales WHERE ${dateCondition}`);
+        const [revenue] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as total FROM sales ${salesWhereClause}`, queryParams);
         
         // 2. Total Ventas (filtrado)
-        const [salesCount] = await db.query(`SELECT COUNT(*) as total FROM sales WHERE ${dateCondition}`);
+        const [salesCount] = await db.query(`SELECT COUNT(*) as total FROM sales ${salesWhereClause}`, queryParams);
 
         // 3. Tendencia de Ventas para el Gráfico (filtrado)
         const [salesTrend] = await db.query(`
             SELECT ${selectDate}, SUM(total_price) as total 
             FROM sales 
-            WHERE ${dateCondition}
+            ${salesWhereClause}
             ${groupBy}
             ORDER BY date ASC
-        `);
+        `, queryParams);
 
         // 4. Productos Top (filtrado)
         const [topProducts] = await db.query(`
@@ -54,23 +60,40 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             FROM sale_details sd
             JOIN sales s ON sd.sale_id = s.id
             JOIN inventory i ON sd.product_id = i.id
-            WHERE s.${dateCondition}
+            ${salesWhereClause.replace('branch_id', 's.branch_id').replace('sale_date', 's.sale_date')}
             GROUP BY i.id
             ORDER BY totalSold DESC
             LIMIT 5
-        `);
+        `, queryParams);
 
-        // Datos Globales (no dependen del filtro de fecha)
-        const [clients] = await db.query('SELECT COUNT(*) as total FROM clients');
-        const [products] = await db.query('SELECT COUNT(*) as total FROM inventory');
-        const [lowStock] = await db.query('SELECT COUNT(*) as total FROM branch_stocks WHERE stock < 10');
+        // 5. Datos de tarjetas (dependen de si hay filtro de sede o no)
+        let clients, products, lowStock;
+
+        if (branch_id) {
+            // Datos específicos de la sede
+            [clients] = await db.query(`SELECT COUNT(DISTINCT client_id) as total FROM sales WHERE branch_id = ?`, [branch_id]);
+            [products] = await db.query('SELECT SUM(stock) as total FROM branch_stocks WHERE branch_id = ?', [branch_id]);
+            [lowStock] = await db.query('SELECT COUNT(*) as total FROM branch_stocks WHERE stock < 10 AND branch_id = ?', [branch_id]);
+        } else {
+            // Datos globales
+            [clients] = await db.query('SELECT COUNT(*) as total FROM clients');
+            [products] = await db.query('SELECT SUM(stock) as total FROM inventory');
+            [lowStock] = await db.query('SELECT COUNT(*) as total FROM inventory WHERE stock < 10');
+        }
         
         // Actividad Reciente (últimas 5 acciones globales)
+        let recentActivityWhere = [];
+        let recentActivityParams = [];
+        if (branch_id) {
+            recentActivityWhere.push("s.branch_id = ?");
+            recentActivityParams.push(branch_id);
+        }
         const [recentSales] = await db.query(`
             SELECT 'sale' as type, c.name as text, total_price as value, sale_date as date 
             FROM sales s LEFT JOIN clients c ON s.client_id = c.id 
+            ${recentActivityWhere.length > 0 ? `WHERE ${recentActivityWhere.join(' AND ')}` : ''}
             ORDER BY sale_date DESC LIMIT 5
-        `);
+        `, recentActivityParams);
         
         // Productos estancados (sin ventas en 30 días) - Global
         const [staleProducts] = await db.query(`

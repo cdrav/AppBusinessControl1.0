@@ -79,8 +79,61 @@
         </div>
         <!-- Contenedor para tarjetas de sedes (Accesos Rápidos) -->
         <div id="branchCardsContainer" class="row mb-4" style="display: none;"></div>
-       <!-- Stats Row -->
-        <div class="row g-4 mb-4 fade-in delay-1 rounded-xl">
+
+        <!-- Quick Actions & Management Modules Row -->
+        <div class="row g-4 mb-4">
+            <!-- Quick Actions -->
+            <div class="col-lg-6 fade-in delay-2">
+                <h5 class="mb-3 fw-bold text-dark">Accesos Rápidos</h5>
+                <div class="row g-3">
+                    <div class="col-6 col-md-4">
+                        <a href="addSale.html" class="quick-action-card">
+                            <div class="quick-action-icon"><i class="bi bi-cart-plus"></i></div>
+                            <span class="fw-bold">Nueva Venta</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <a href="addInventory.html" class="quick-action-card admin-only">
+                            <div class="quick-action-icon"><i class="bi bi-plus-square-dotted"></i></div>
+                            <span class="fw-bold">Agregar Producto</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <a href="addClient.html" class="quick-action-card">
+                            <div class="quick-action-icon"><i class="bi bi-person-plus"></i></div>
+                            <span class="fw-bold">Nuevo Cliente</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <!-- Management Modules -->
+            <div class="col-lg-6 fade-in delay-3">
+                <h5 class="mb-3 fw-bold text-dark">Módulos de Gestión</h5>
+                <div class="row g-3">
+                    <div class="col-6 col-md-4">
+                        <a href="clientes.html" class="quick-action-card">
+                            <div class="quick-action-icon"><i class="bi bi-people"></i></div>
+                            <span class="fw-bold">Clientes</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <a href="inventarios.html" class="quick-action-card">
+                            <div class="quick-action-icon"><i class="bi bi-boxes"></i></div>
+                            <span class="fw-bold">Inventario</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <a href="reportes.html" class="quick-action-card admin-only">
+                            <div class="quick-action-icon"><i class="bi bi-graph-up"></i></div>
+                            <span class="fw-bold">Reportes</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="row g-4 mb-4 fade-in delay-1">
               <div class="col-md-3">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-primary">
                   <div class="d-flex justify-content-between align-items-start">
@@ -232,101 +285,6 @@
             </div>
           </div>
 
-          <!-- Quick Actions Row -->
-          <div class="col-12 fade-in delay-4 rounded-xl">
-            <h5 class="mb-3 fw-bold text-dark">Accesos Rápidos</h5>
-            <div class="row g-3">
-              <div class="col-6 col-md-3">
-                <a href="addSale.html" class="quick-action-card">
-                  <div class="quick-action-icon">
-                    <i class="bi bi-cart-plus"></i>
-                  </div>
-                  <span class="fw-bold">Nueva Venta</span>
-                </a>
-              </div>
-              <div class="col-6 col-md-3">
-                <a href="ventas.html" class="quick-action-card">
-                  <div class="quick-action-icon">
-                    <i class="bi bi-receipt-cutoff"></i>
-                  </div>
-                  <span class="fw-bold">Ver Ventas</span>
-                </a>
-              </div>
-              <div class="col-6 col-md-3">
-                <a href="addInventory.html" class="quick-action-card admin-only">
-                  <div class="quick-action-icon">
-                    <i class="bi bi-plus-square-dotted"></i>
-                  </div>
-                  <span class="fw-bold">Agregar Producto</span>
-                </a>
-              </div>
-              <div class="col-6 col-md-3">
-                <a href="addClient.html" class="quick-action-card">
-                  <div class="quick-action-icon">
-                    <i class="bi bi-person-plus"></i>
-                  </div>
-                  <span class="fw-bold">Nuevo Cliente</span>
-                </a>
-              </div>
-              <div class="col-6 col-md-3">
-                <a href="#" class="quick-action-card" data-bs-toggle="modal" data-bs-target="#cashSummaryModal">
-                  <div class="quick-action-icon">
-                    <i class="bi bi-cash-coin"></i>
-                  </div>
-                  <span class="fw-bold">Cierre de Caja</span>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Management Modules Row -->
-          <div class="col-12 fade-in mt-4 delay-5 rounded-xl">
-            <h5 class="mb-3 fw-bold text-dark">Módulos de Gestión</h5>
-            <div class="row g-3">
-              <div class="col-md-4">
-                <a href="clientes.html" class="quick-action-card">
-                  <div class="quick-action-icon"><i class="bi bi-people"></i></div>
-                  <span class="fw-bold">Administrar Clientes</span>
-                </a>
-              </div>
-              <div class="col-md-4">
-                <a href="inventarios.html" class="quick-action-card">
-                  <div class="quick-action-icon"><i class="bi bi-boxes"></i></div>
-                  <span class="fw-bold">Gestionar Inventario</span>
-                </a>
-              </div>
-              <div class="col-md-4">
-                <a href="reportes.html" class="quick-action-card admin-only">
-                  <div class="quick-action-icon"><i class="bi bi-graph-up"></i></div>
-                  <span class="fw-bold">Análisis y Reportes</span>
-                </a>
-              </div>
-              <div class="col-md-4">
-                <a href="usuarios.html" class="quick-action-card admin-only">
-                  <div class="quick-action-icon"><i class="bi bi-shield-lock"></i></div>
-                  <span class="fw-bold">Gestión de Usuarios</span>
-                </a>
-              </div>
-              <div class="col-md-4">
-                <a href="configuracion.html" class="quick-action-card admin-only">
-                  <div class="quick-action-icon"><i class="bi bi-gear"></i></div>
-                  <span class="fw-bold">Configuración Empresa</span>
-                </a>
-              </div>
-              <div class="col-md-4">
-                <a href="cupones.html" class="quick-action-card admin-only">
-                  <div class="quick-action-icon"><i class="bi bi-ticket-perforated"></i></div>
-                  <span class="fw-bold">Gestión de Cupones</span>
-                </a>
-              </div>
-              <div class="col-md-4">
-                <a href="proveedores.html" class="quick-action-card admin-only">
-                  <div class="quick-action-icon"><i class="bi bi-truck"></i></div>
-                  <span class="fw-bold">Proveedores</span>
-                </a>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -24,6 +24,8 @@ async function setup() {
     
     if (error.code === 'ECONNREFUSED') {
         console.error('   👉 PISTA: La aplicación no encuentra la base de datos. Revisa las Variables en Railway.');
+    } else if (error.code === 'ETIMEDOUT') {
+        console.error('   👉 PISTA: Tiempo de espera agotado. Verifica que el DB_HOST sea correcto (usa el dominio privado) y que la base de datos esté activa.');
     } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
         console.error('   👉 PISTA: Usuario o contraseña incorrectos.');
     } else if (error.code === 'ER_BAD_DB_ERROR') {
