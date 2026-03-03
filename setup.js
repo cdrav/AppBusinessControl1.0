@@ -81,7 +81,7 @@ async function setup() {
         notes TEXT,
         sale_date DATETIME NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (client_id) REFERENCES clients(id)
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
       )`,
       `CREATE TABLE IF NOT EXISTS sale_details (
         id INT AUTO_INCREMENT PRIMARY KEY,

@@ -43,10 +43,23 @@ function setupEventListeners() {
 
 // Función para cargar inventario
 async function loadInventory() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const branchId = urlParams.get('branch_id');
+  const endpoint = branchId ? `${INVENTORY_ENDPOINT}?branch_id=${branchId}` : INVENTORY_ENDPOINT;
+
   const loadingState = document.getElementById('loadingState');
 
+  // Cambiar título si estamos viendo el inventario de una sede
+  if (branchId) {
+      const pageTitle = document.querySelector('.container-fluid h1');
+      if (pageTitle) {
+          pageTitle.textContent = 'Inventario por Sede';
+          // Opcional: añadir un subtítulo o un breadcrumb
+      }
+  }
+
   try {
-    const response = await fetch(INVENTORY_ENDPOINT, {
+    const response = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 

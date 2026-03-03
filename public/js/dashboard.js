@@ -6,6 +6,7 @@ let topProductsChart; // Variable para el gráfico de productos top
 document.addEventListener('DOMContentLoaded', function() {
     updateDate();
     setupUserSession();
+    loadBranchCards(); // Cargar tarjetas de sedes al inicio
     loadDashboardStats();
     initRevenueChart();
     initTopProductsChart();
@@ -88,6 +89,76 @@ function updateDate() {
         dateElement.textContent = today.toLocaleDateString('es-ES', options);
         dateElement.style.opacity = '1';
     }
+}
+
+async function loadBranchCards() {
+    // Buscamos el contenedor. Asegúrate de haber agregado <div id="branchCardsContainer" class="row mb-4"></div> en tu HTML
+    const container = document.getElementById('branchCardsContainer');
+    if (!container) return; 
+
+    // Solo los admins ven esto
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.role !== 'admin') {
+            container.style.display = 'none';
+            return;
+        }
+
+        const response = await fetch(`${API_URL}/api/branch-stats`, {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        
+        if (!response.ok) return;
+
+        const branches = await response.json();
+
+        // Si solo hay una sede (la principal) o ninguna, no mostramos este panel de acceso rápido
+        if (branches.length <= 1) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.innerHTML = ''; // Limpiar
+        container.style.display = 'flex'; // Mostrar
+
+        // Título de la sección
+        const titleHtml = `<div class="col-12 mb-2"><h5 class="text-muted fw-bold"><i class="bi bi-shop-window me-2"></i>Accesos Rápidos a Sedes</h5></div>`;
+        container.insertAdjacentHTML('beforeend', titleHtml);
+
+        branches.forEach(branch => {
+            const card = createBranchCard(branch);
+            container.insertAdjacentHTML('beforeend', card);
+        });
+
+    } catch (error) {
+        console.error('Error cargando tarjetas de sedes:', error);
+        container.style.display = 'none';
+    }
+}
+
+function createBranchCard(branch) {
+    const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+    return `
+        <div class="col-md-6 col-xl-3 mb-3">
+            <a href="inventario.html?branch_id=${branch.id}" class="card h-100 shadow-sm text-decoration-none border-0 card-hover-effect" style="transition: transform 0.2s;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="fw-bold text-primary mb-0 text-truncate">${branch.name}</h6>
+                        <span class="badge bg-light text-dark border">${branch.totalStock} un.</span>
+                    </div>
+                    <p class="text-muted small mb-2 text-truncate"><i class="bi bi-geo-alt me-1"></i>${branch.address || 'Sin dirección'}</p>
+                    <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                        <small class="text-muted">Ventas</small>
+                        <span class="fw-bold text-success">${formatCurrency(branch.totalRevenue)}</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+    `;
 }
 
 async function loadDashboardStats(period = '7days') {

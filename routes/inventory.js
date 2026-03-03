@@ -5,8 +5,31 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
 // Obtener inventario
 router.get('/', authenticateToken, async (req, res) => {
-    const [results] = await db.query(`SELECT i.*, s.name as supplier_name FROM inventory i LEFT JOIN suppliers s ON i.supplier_id = s.id ORDER BY i.product_name ASC`);
-    res.json(results);
+    const { branch_id } = req.query;
+
+    try {
+        if (branch_id) {
+            // Si se pide el inventario de una sede específica, se une con branch_stocks
+            const [results] = await db.query(`
+                SELECT 
+                    i.id, i.product_name, i.price, i.cost, i.category, i.barcode, i.description, i.supplier_id,
+                    s.name as supplier_name,
+                    COALESCE(bs.stock, 0) as stock 
+                FROM inventory i
+                LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ?
+                LEFT JOIN suppliers s ON i.supplier_id = s.id
+                ORDER BY i.product_name ASC
+            `, [branch_id]);
+            res.json(results);
+        } else {
+            // Comportamiento original: inventario global para la vista principal de inventarios
+            const [results] = await db.query(`SELECT i.*, s.name as supplier_name FROM inventory i LEFT JOIN suppliers s ON i.supplier_id = s.id ORDER BY i.product_name ASC`);
+            res.json(results);
+        }
+    } catch (error) {
+        console.error('Error al obtener inventario:', error);
+        res.status(500).json({ message: 'Error interno del servidor al obtener el inventario.' });
+    }
 });
 
 // Obtener inventario para la venta (stock de la sucursal del usuario)

@@ -666,4 +666,50 @@ router.get('/report-export', authenticateToken, async (req, res) => {
     }
 });
 
+// NUEVO ENDPOINT PARA ESTADÍSTICAS DE SEDES
+router.get('/branch-stats', authenticateToken, async (req, res) => {
+    // Solo para administradores
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado' });
+    }
+
+    try {
+        // 1. Obtener todas las sedes activas
+        const [branches] = await db.query('SELECT id, name, address FROM branches WHERE is_active = true ORDER BY id ASC');
+
+        // 2. Obtener ventas agregadas por sede
+        const [salesStats] = await db.query(`
+            SELECT 
+                branch_id, 
+                COALESCE(SUM(total_price), 0) as totalRevenue, 
+                COUNT(id) as totalSales 
+            FROM sales 
+            WHERE branch_id IS NOT NULL
+            GROUP BY branch_id
+        `);
+
+        // 3. Obtener inventario agregado por sede
+        const [inventoryStats] = await db.query(`
+            SELECT 
+                branch_id, 
+                COALESCE(SUM(stock), 0) as totalStock,
+                COUNT(product_id) as uniqueProducts
+            FROM branch_stocks
+            GROUP BY branch_id
+        `);
+
+        // 4. Combinar los datos en un solo objeto por sede
+        const combinedStats = branches.map(branch => {
+            const sale = salesStats.find(s => s.branch_id === branch.id) || { totalRevenue: 0, totalSales: 0 };
+            const inventory = inventoryStats.find(i => i.branch_id === branch.id) || { totalStock: 0, uniqueProducts: 0 };
+            return { ...branch, ...sale, ...inventory };
+        });
+
+        res.json(combinedStats);
+    } catch (error) {
+        console.error('Error en /api/branch-stats:', error);
+        res.status(500).json({ message: 'Error interno del servidor al obtener estadísticas de sedes' });
+    }
+});
+
 module.exports = router;
