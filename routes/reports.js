@@ -154,20 +154,32 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
 
 // Resumen Diario (para el modal de cierre de caja)
 router.get('/daily-summary', authenticateToken, async (req, res) => {
-    const { date } = req.query;
+    const { date, branch_id } = req.query;
     if (!date) return res.status(400).json({ message: 'Fecha requerida' });
 
-    try {
-        const [summary] = await db.query(`
-            SELECT COALESCE(SUM(total_price), 0) as totalRevenue, COUNT(*) as totalSales
-            FROM sales WHERE DATE(sale_date) = ?
-        `, [date]);
+    let targetBranchId = branch_id;
 
-        // Obtener gastos del día
-        const [dailyExpenses] = await db.query(`
-            SELECT COALESCE(SUM(amount), 0) as totalExpenses
-            FROM expenses WHERE DATE(expense_date) = ?
-        `, [date]);
+    // Seguridad: Si no es admin, forzar su propia sede
+    if (req.user.role !== 'admin') {
+        targetBranchId = req.user.branch_id;
+    }
+
+    let whereClause = "WHERE DATE(sale_date) = ?";
+    let expenseWhereClause = "WHERE DATE(expense_date) = ?";
+    const params = [date];
+    const expenseParams = [date];
+
+    if (targetBranchId) {
+        whereClause += " AND branch_id = ?";
+        expenseWhereClause += " AND branch_id = ?";
+        params.push(targetBranchId);
+        expenseParams.push(targetBranchId);
+    }
+
+    try {
+        const [summary] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as totalRevenue, COUNT(*) as totalSales FROM sales ${whereClause}`, params);
+        const [dailyExpenses] = await db.query(`SELECT COALESCE(SUM(amount), 0) as totalExpenses FROM expenses ${expenseWhereClause}`, expenseParams);
+        
         res.json({ ...summary[0], ...dailyExpenses[0] });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener resumen diario' });
@@ -453,7 +465,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.fillColor('#000').font('Helvetica');
 
             details.forEach((item, i) => {
-                if (y > 700) { doc.addPage(); drawHeader(); y = 150; }
+                if (y > 700) { doc.addPage(); drawHeader(); y = doc.y + 25; }
                 if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
                 doc.fillColor('#000');
 
@@ -473,15 +485,25 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 y += 18;
             });
             
+            // Sincronizar cursor del PDF con el cursor manual
+            doc.y = y;
+
             // NUEVO: Sección de Gastos en el PDF
             let totalExpenses = 0;
             if (expensesList.length > 0) {
-                doc.addPage();
-                drawHeader();
-                doc.fontSize(12).font('Helvetica-Bold').text('GASTOS OPERATIVOS', 50, doc.y);
-                doc.moveDown(0.5);
+                // Solo agregar página si queda poco espacio (menos de ~100px)
+                if (y > 650) {
+                    doc.addPage();
+                    drawHeader();
+                    y = doc.y;
+                } else {
+                    y += 30; // Espacio separador
+                }
                 
-                const expTableTop = doc.y;
+                doc.fontSize(12).font('Helvetica-Bold').text('GASTOS OPERATIVOS', 50, y);
+                y += 20;
+
+                const expTableTop = y;
                 doc.rect(50, expTableTop, 495, 20).fill('#EF4444'); // Rojo para gastos
                 doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
                 doc.text('DESCRIPCIÓN', 55, expTableTop + 6);
@@ -492,13 +514,20 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 doc.fillColor('#000').font('Helvetica');
                 
                 expensesList.forEach((exp) => {
+                    if (yExp > 700) {
+                        doc.addPage();
+                        drawHeader();
+                        yExp = doc.y + 25;
+                    }
                     doc.text(exp.description.substring(0, 50), 55, yExp);
                     doc.text(new Date(exp.expense_date).toLocaleDateString('es-CO'), 350, yExp);
                     doc.text(formatCurrency(exp.amount), 450, yExp, { width: 80, align: 'right' });
                     totalExpenses += parseFloat(exp.amount);
                     yExp += 18;
                 });
-                doc.moveDown(2);
+                
+                // Actualizar y final
+                doc.y = yExp;
             }
 
             doc.moveDown(2);
@@ -530,7 +559,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.fillColor('#000').font('Helvetica');
 
             products.forEach((p, i) => {
-                if (y > 700) { doc.addPage(); drawHeader(); y = 150; }
+                if (y > 700) { doc.addPage(); drawHeader(); y = doc.y + 25; }
                 if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
                 doc.fillColor('#000');
 
@@ -545,6 +574,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 y += 18;
             });
 
+            doc.y = y; // Sincronizar cursor
             doc.moveDown(2);
             doc.font('Helvetica-Bold');
             doc.text(`Total Unidades: ${totalItems}`, { align: 'right' });
@@ -570,7 +600,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 doc.fillColor('#000').font('Helvetica');
 
                 products.forEach((p, i) => {
-                    if (y > 700) { doc.addPage(); drawHeader(); y = 150; }
+                    if (y > 700) { doc.addPage(); drawHeader(); y = doc.y + 25; }
                     if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
                     doc.fillColor('#000');
                     doc.text(p.product_name, 55, y);
@@ -590,7 +620,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.font('Helvetica');
             
             clients.forEach((c, i) => {
-                if (y > 680) { doc.addPage(); drawHeader(); y = 150; }
+                if (y > 680) { doc.addPage(); drawHeader(); y = doc.y + 25; }
                 
                 // Tarjeta de cliente
                 doc.rect(50, y, 495, 50).stroke('#e0e0e0');

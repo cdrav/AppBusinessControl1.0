@@ -35,11 +35,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const day = String(d.getDate()).padStart(2, '0');
             const today = `${year}-${month}-${day}`;
             document.getElementById('summaryDate').value = today;
-            fetchDailySummary(today);
+            fetchDailySummary(today, branchId);
         });
 
         document.getElementById('summaryDate').addEventListener('change', function() {
-            fetchDailySummary(this.value);
+            fetchDailySummary(this.value, branchId);
         });
     }
 });
@@ -766,7 +766,7 @@ function formatTimeAgo(date) {
     return `Hace ${days} día(s)`;
 }
 
-async function fetchDailySummary(date) {
+async function fetchDailySummary(date, branchId = null) {
     const summaryContent = document.getElementById('summaryContent');
     summaryContent.innerHTML = `
         <div class="spinner-border text-primary" role="status">
@@ -781,6 +781,9 @@ async function fetchDailySummary(date) {
     try {
         const url = new URL(`${API_URL}/api/daily-summary`, window.location.origin);
         url.searchParams.append('date', date);
+        if (branchId) {
+            url.searchParams.append('branch_id', branchId);
+        }
 
         const response = await fetch(url, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }

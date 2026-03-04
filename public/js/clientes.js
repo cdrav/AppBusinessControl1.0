@@ -1,12 +1,24 @@
 // Clientes Page JavaScript
 const API_URL = ''; // Ruta relativa para producción
 let clients = [];
+let userRole = 'cajero'; // Por defecto
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
+  setupUserSession();
   loadClients();
   setupEventListeners();
 });
+
+function setupUserSession() {
+    const token = localStorage.getItem('token');
+    if (token) {
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            userRole = payload.role;
+        } catch (e) { console.error(e); }
+    }
+}
 
 // Setup event listeners
 function setupEventListeners() {
@@ -86,6 +98,20 @@ function renderClients(clientsToRender) {
 
   clientsToRender.forEach(client => {
     const initial = client.name ? client.name.charAt(0).toUpperCase() : '?';
+    
+    // Botones condicionales según el rol
+    let actionButtons = '';
+    if (userRole === 'admin') {
+        actionButtons = `
+              <button class="btn btn-light flex-fill text-primary btn-sm" onclick="editClient(${client.id})">
+                <i class="bi bi-pencil me-1"></i> Editar
+              </button>
+              <button class="btn btn-light flex-fill text-danger btn-sm" onclick="deleteClient(${client.id})">
+                <i class="bi bi-trash me-1"></i> Eliminar
+              </button>
+        `;
+    }
+
     // Diseño de tarjeta moderna
     const cardHtml = `
       <div class="col-md-6 col-lg-4 fade-in">
@@ -116,12 +142,7 @@ function renderClients(clientsToRender) {
               <button class="btn btn-light flex-fill text-info btn-sm" onclick="viewClientHistory(${client.id})">
                 <i class="bi bi-clock-history me-1"></i> Historial
               </button>
-              <button class="btn btn-light flex-fill text-primary btn-sm" onclick="editClient(${client.id})">
-                <i class="bi bi-pencil me-1"></i> Editar
-              </button>
-              <button class="btn btn-light flex-fill text-danger btn-sm" onclick="deleteClient(${client.id})">
-                <i class="bi bi-trash me-1"></i> Eliminar
-              </button>
+              ${actionButtons}
             </div>
           </div>
         </div>
