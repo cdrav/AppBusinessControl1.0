@@ -39,6 +39,16 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) =
     }
 });
 
+// Actualizar un gasto existente
+router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { description, amount, category, supplier_id, branch_id, expense_date } = req.body;
+    await db.query(
+        'UPDATE expenses SET description=?, amount=?, category=?, supplier_id=?, branch_id=?, expense_date=? WHERE id=?',
+        [description, amount, category, supplier_id || null, branch_id || null, expense_date, req.params.id]
+    );
+    res.json({ message: 'Gasto actualizado correctamente.' });
+});
+
 // Eliminar un gasto
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     await db.query('DELETE FROM expenses WHERE id = ?', [req.params.id]);

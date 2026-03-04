@@ -66,16 +66,7 @@ async function loadClients() {
     }
   } catch (error) {
     console.error('Error loading clients:', error);
-    showMessage(`Error al cargar clientes: ${error.message}`, 'danger');
-    const grid = document.getElementById('clientsGrid');
-    grid.innerHTML = `
-      <div class="col-12">
-          <div class="alert-custom alert-danger">
-            <i class="bi bi-exclamation-triangle"></i>
-            No se pudieron cargar los datos. Verifique la conexión con el servidor.
-          </div>
-      </div>
-    `;
+    showToast(`Error al cargar clientes: ${error.message}`, true);
   }
 }
 
@@ -196,14 +187,14 @@ async function deleteClient(id) {
       });
 
       if (response.ok) {
-        showMessage('Cliente eliminado exitosamente', 'success');
+        showToast('Cliente eliminado exitosamente');
         loadClients(); // Recargar la lista de clientes desde el servidor
       } else {
         throw new Error('No se pudo eliminar el cliente');
       }
     } catch (error) {
       console.error('Error al eliminar cliente:', error);
-      showMessage('Hubo un error al eliminar el cliente.', 'danger');
+      showToast('Hubo un error al eliminar el cliente.', true);
     }
   }
 }
@@ -274,21 +265,6 @@ window.printTicket = function(id) {
     window.open(url, '_blank');
   })
   .catch(err => alert('No se pudo imprimir el ticket.'));
-}
-
-// Show message
-function showMessage(message, type) {
-  const messageDiv = document.getElementById('message');
-  messageDiv.innerHTML = `
-    <div class="alert-custom">
-      <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-      ${message}
-    </div>
-  `;
-  
-  setTimeout(() => {
-    messageDiv.innerHTML = '';
-  }, 3000);
 }
 
 // Función para escapar HTML y prevenir XSS, aunque la inserción segura es mejor.

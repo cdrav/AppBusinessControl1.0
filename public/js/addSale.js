@@ -337,11 +337,10 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
   event.preventDefault();
   
   const submitBtn = document.querySelector('.btn-submit');
-  const messageDiv = document.getElementById('message');
   
   // Validar productos
   const saleProducts = [];
-  let hasError = false;
+  let errorMessage = '';
   
   document.querySelectorAll('.product-item').forEach(item => {
     const productId = item.querySelector('.product-select').value;
@@ -352,17 +351,24 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
       if (product && quantity <= product.stock) {
         saleProducts.push({ productId, quantity });
       } else {
-        hasError = true;
-        messageDiv.innerHTML = '<div class="alert alert-danger">Stock insuficiente para uno de los productos</div>';
+        errorMessage = 'Stock insuficiente para uno de los productos';
       }
     }
   });
   
-  if (hasError || saleProducts.length === 0) {
-    if (!hasError) {
-      messageDiv.innerHTML = '<div class="alert alert-danger">Debes agregar al menos un producto</div>';
-    }
+  if (errorMessage || saleProducts.length === 0) {
+    showToast(errorMessage || 'Debes agregar al menos un producto', true);
     return;
+  }
+
+  // Validar Monto Recibido (Obligatorio)
+  const total = parseFloat(document.getElementById('total').dataset.value) || 0;
+  const amountPaid = parseFloat(document.getElementById('amountPaid').value);
+
+  if (isNaN(amountPaid) || amountPaid < total) {
+      showToast('El monto recibido es obligatorio y debe cubrir el total.', true);
+      document.getElementById('amountPaid').focus();
+      return;
   }
   
   const urlParams = new URLSearchParams(window.location.search);
@@ -380,7 +386,6 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
   // Mostrar loading
   submitBtn.classList.add('loading');
   submitBtn.disabled = true;
-  messageDiv.innerHTML = '';
   
   try {
     const response = await fetch(`${API_URL}/sales`, {
@@ -395,7 +400,7 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     const data = await response.json();
     
     if (response.ok) {
-      messageDiv.innerHTML = '<div class="alert alert-success">¡Venta registrada con éxito!</div>';
+      showToast('¡Venta registrada con éxito!');
       document.getElementById('addSaleForm').reset();
       setTodayDate();
       
@@ -438,7 +443,7 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     }
   } catch (error) {
     console.error('Error:', error);
-    messageDiv.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+    showToast(error.message, true);
   } finally {
     submitBtn.classList.remove('loading');
     submitBtn.disabled = false;

@@ -1,5 +1,6 @@
 const API_URL = '';
 let expenseModal;
+let currentExpenses = []; // Almacenar gastos para edición
 
 document.addEventListener('DOMContentLoaded', () => {
     expenseModal = new bootstrap.Modal(document.getElementById('expenseModal'));
@@ -24,12 +25,12 @@ async function loadExpenses() {
             return;
         }
         if (!res.ok) throw new Error('Error cargando gastos');
-        const expenses = await res.json();
+        currentExpenses = await res.json(); // Guardar en variable global
 
         loading.style.display = 'none';
         tbody.innerHTML = '';
 
-        if (expenses.length === 0) {
+        if (currentExpenses.length === 0) {
             empty.style.display = 'block';
             return;
         }
@@ -37,7 +38,7 @@ async function loadExpenses() {
 
         const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-        expenses.forEach(expense => {
+        currentExpenses.forEach(expense => {
             const date = new Date(expense.expense_date);
             // Ajustar por zona horaria para que muestre la fecha correcta
             const userTimezoneOffset = date.getTimezoneOffset() * 60000;
@@ -52,6 +53,7 @@ async function loadExpenses() {
                     <td>${expense.branch_name || 'General'}</td>
                     <td>${localDate.toLocaleDateString('es-CO')}</td>
                     <td class="text-end">
+                        <button class="btn btn-sm btn-light text-primary me-1" onclick="editExpense(${expense.id})"><i class="bi bi-pencil"></i></button>
                         <button class="btn btn-sm btn-light text-danger" onclick="deleteExpense(${expense.id})"><i class="bi bi-trash"></i></button>
                     </td>
                 </tr>
@@ -103,10 +105,30 @@ function openExpenseModal() {
     expenseModal.show();
 }
 
+function editExpense(id) {
+    const expense = currentExpenses.find(e => e.id === id);
+    if (!expense) return;
+
+    document.getElementById('expenseId').value = expense.id;
+    document.getElementById('expenseDescription').value = expense.description;
+    document.getElementById('expenseAmount').value = expense.amount;
+    document.getElementById('expenseCategory').value = expense.category;
+    document.getElementById('expenseSupplier').value = expense.supplier_id || '';
+    document.getElementById('expenseBranch').value = expense.branch_id || '';
+    
+    // Formatear fecha para input date (YYYY-MM-DD)
+    const date = new Date(expense.expense_date);
+    document.getElementById('expenseDate').value = date.toISOString().split('T')[0];
+
+    document.getElementById('expenseModalLabel').textContent = 'Editar Gasto';
+    expenseModal.show();
+}
+
 async function handleExpenseSubmit(e) {
     e.preventDefault();
     const btn = document.querySelector('#expenseForm .btn-submit');
     
+    const id = document.getElementById('expenseId').value;
     const data = {
         description: document.getElementById('expenseDescription').value,
         amount: document.getElementById('expenseAmount').value,
@@ -116,12 +138,15 @@ async function handleExpenseSubmit(e) {
         expense_date: document.getElementById('expenseDate').value,
     };
 
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `${API_URL}/api/expenses/${id}` : `${API_URL}/api/expenses`;
+
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
 
     try {
-        const res = await fetch(`${API_URL}/api/expenses`, {
-            method: 'POST',
+        const res = await fetch(url, {
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + localStorage.getItem('token')
@@ -139,7 +164,7 @@ async function handleExpenseSubmit(e) {
         showToast(error.message, true);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = 'Guardar Gasto';
+        btn.innerHTML = id ? 'Actualizar Gasto' : 'Guardar Gasto';
     }
 }
 

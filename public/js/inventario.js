@@ -209,8 +209,10 @@ async function deleteProduct(id) {
     });
     if (!response.ok) throw new Error('Error al eliminar el producto');
     loadInventory(); // Recargar todo desde el servidor para asegurar consistencia
+    showToast('Producto eliminado correctamente');
   } catch (error) {
     console.error('Error:', error.message);
+    showToast('Error al eliminar el producto', true);
   }
 }
 
@@ -235,7 +237,7 @@ async function exportInventory() {
     a.click();
     a.remove();
   } catch (error) {
-    alert('No se pudo descargar el archivo: ' + error.message);
+    showToast('No se pudo descargar el archivo: ' + error.message, true);
   }
 }
 

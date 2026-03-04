@@ -528,16 +528,22 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 
                 // Actualizar y final
                 doc.y = yExp;
+                y = yExp; // Actualizar variable y local también
             }
 
-            doc.moveDown(2);
+            // Totales con posicionamiento manual para evitar páginas en blanco
+            if (y > 700) { doc.addPage(); drawHeader(); y = doc.y + 20; } else { y += 30; }
+
             doc.font('Helvetica-Bold').fillColor('#000');
-            doc.text(`Total Ventas: ${formatCurrency(totalRevenue)}`, { align: 'right' });
-            doc.text(`Costo de Mercancía: -${formatCurrency(totalCost)}`, { align: 'right' });
-            doc.text(`Gastos Operativos: -${formatCurrency(totalExpenses)}`, { align: 'right' });
-            doc.moveDown(0.5);
+            doc.text(`Total Ventas: ${formatCurrency(totalRevenue)}`, 50, y, { align: 'right' });
+            y += 15;
+            doc.text(`Costo de Mercancía: -${formatCurrency(totalCost)}`, 50, y, { align: 'right' });
+            y += 15;
+            doc.text(`Gastos Operativos: -${formatCurrency(totalExpenses)}`, 50, y, { align: 'right' });
+            y += 20;
+            
             const netProfit = totalRevenue - totalCost - totalExpenses;
-            doc.fontSize(14).fillColor(netProfit >= 0 ? 'green' : 'red').text(`Utilidad Neta Real: ${formatCurrency(netProfit)}`, { align: 'right' });
+            doc.fontSize(14).fillColor(netProfit >= 0 ? 'green' : 'red').text(`Utilidad Neta Real: ${formatCurrency(netProfit)}`, 50, y, { align: 'right' });
         }
 
         // ==========================================
@@ -575,10 +581,14 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             });
 
             doc.y = y; // Sincronizar cursor
-            doc.moveDown(2);
+            
+            // Totales manuales
+            if (y > 750) { doc.addPage(); drawHeader(); y = doc.y + 20; } else { y += 30; }
+
             doc.font('Helvetica-Bold');
-            doc.text(`Total Unidades: ${totalItems}`, { align: 'right' });
-            doc.fontSize(12).text(`Valor del Inventario: ${formatCurrency(totalValue)}`, { align: 'right' });
+            doc.text(`Total Unidades: ${totalItems}`, 50, y, { align: 'right' });
+            y += 15;
+            doc.fontSize(12).text(`Valor del Inventario: ${formatCurrency(totalValue)}`, 50, y, { align: 'right' });
         }
 
         // ==========================================
@@ -752,6 +762,42 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 }
                 const dateStr = new Date(s.date).toLocaleDateString('es-CO', { timeZone: 'UTC' });
                 doc.text(dateStr, 60, currentY).text(s.count, 350, currentY, {width: 80, align: 'center'}).text(formatCurrency(s.total), 440, currentY, {width: 90, align: 'right'});
+                currentY += 15;
+            });
+
+            // --- 4. INVENTARIO DISPONIBLE (NUEVO) ---
+            const [fullInventory] = await db.query('SELECT product_name, stock, price FROM inventory ORDER BY product_name ASC');
+            
+            currentY += 30;
+            checkAddPage(60);
+            doc.fontSize(12).font('Helvetica-Bold').text('Inventario Disponible', 50, currentY);
+            currentY += 20;
+
+            doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
+            doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
+            doc.text('Producto', 60, currentY + 6);
+            doc.text('Precio', 350, currentY + 6, {width: 80, align: 'right'});
+            doc.text('Stock', 440, currentY + 6, {width: 90, align: 'center'});
+            currentY += 25;
+
+            doc.font('Helvetica');
+            fullInventory.forEach(p => {
+                if (currentY > doc.page.height - 50) {
+                    doc.addPage();
+                    drawHeader();
+                    currentY = doc.y;
+                    // Header de tabla
+                    doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
+                    doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
+                    doc.text('Producto', 60, currentY + 6);
+                    doc.text('Precio', 350, currentY + 6, {width: 80, align: 'right'});
+                    doc.text('Stock', 440, currentY + 6, {width: 90, align: 'center'});
+                    currentY += 25;
+                    doc.font('Helvetica');
+                }
+                doc.text(p.product_name.substring(0, 50), 60, currentY);
+                doc.text(formatCurrency(p.price), 350, currentY, {width: 80, align: 'right'});
+                doc.text(p.stock, 440, currentY, {width: 90, align: 'center'});
                 currentY += 15;
             });
 
