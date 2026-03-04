@@ -66,16 +66,48 @@ function setupUserSession(branchId) {
             adminElements.forEach(el => {
                 el.style.display = 'none'; // Ocultar visualmente
             });
+
+            // Si es un cajero, tiene una sede asignada y no está ya en la vista de esa sede, redirigir.
+            if (payload.branch_id && !branchId) {
+                window.location.href = `dashboard.html?branch_id=${payload.branch_id}`;
+                return; // Detener la ejecución para que la redirección ocurra
+            }
         }
 
         // Si estamos en una vista de sede, cambiar el título y mostrar un botón para volver
         if (branchId) {
             const pageTitle = document.querySelector('.welcome-card h2');
             const pageSubtitle = document.querySelector('.welcome-card p');
-            if(pageTitle) pageTitle.textContent = `Dashboard de Sede`;
-            // Podríamos obtener el nombre de la sede y ponerlo en el subtítulo
-            if(pageSubtitle) pageSubtitle.innerHTML = `Resumen de actividad para esta sede. <a href="/dashboard.html" class="btn btn-sm btn-light ms-3">Ver Dashboard Global</a>`;
             
+            // Usamos el endpoint que ya existe para no crear uno nuevo
+            fetch('/api/branch-stats', { headers: { 'Authorization': `Bearer ${token}` } })
+                .then(res => res.ok ? res.json() : Promise.reject('Failed to load branches'))
+                .then(branches => {
+                    const currentBranch = branches.find(b => b.id == branchId);
+                    if (currentBranch) {
+                        if(pageTitle) pageTitle.textContent = `Dashboard: ${currentBranch.name}`;
+                        if(pageSubtitle) pageSubtitle.innerHTML = `Resumen de actividad para esta sede. <a href="/dashboard.html" class="btn btn-sm btn-light ms-3 admin-only">Ver Dashboard Global</a>`;
+                        
+                        // Ocultar el botón de volver si no es admin
+                        if (payload.role !== 'admin') {
+                            const backButton = pageSubtitle.querySelector('.admin-only');
+                            if (backButton) backButton.style.display = 'none';
+                        } else {
+                            // Si es admin, actualizar el enlace de "Nueva Venta" para que apunte a esta sede
+                            const addSaleLink = document.querySelector('a[href="addSale.html"]');
+                            if (addSaleLink) {
+                                addSaleLink.href = `addSale.html?branch_id=${branchId}`;
+                            }
+                        }
+                    } else {
+                        if(pageTitle) pageTitle.textContent = `Dashboard de Sede`;
+                        if(pageSubtitle) pageSubtitle.innerHTML = `Resumen de actividad para esta sede.`;
+                    }
+                })
+                .catch(() => { // Fallback en caso de error
+                    if(pageTitle) pageTitle.textContent = `Dashboard de Sede`;
+                    if(pageSubtitle) pageSubtitle.innerHTML = `Resumen de actividad para esta sede.`;
+                });
         }
     } catch (e) {
         console.error('Error decodificando el token:', e);

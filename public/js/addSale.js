@@ -92,8 +92,11 @@ async function loadClients() {
 
 // Cargar productos
 async function loadProducts() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const branchId = urlParams.get('branch_id');
+  const endpoint = branchId ? `${API_URL}/inventory/for-sale?branch_id=${branchId}` : `${API_URL}/inventory/for-sale`;
   try {
-    const response = await fetch(`${API_URL}/inventory/for-sale`, {
+    const response = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
     if (response.ok) {
@@ -362,12 +365,16 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     return;
   }
   
+  const urlParams = new URLSearchParams(window.location.search);
+  const branchId = urlParams.get('branch_id');
+
   const saleData = {
     clientId: document.getElementById('clientId').value,
     products: saleProducts,
     saleDate: document.getElementById('saleDate').value,
     couponCode: currentCoupon ? currentCoupon.code : null,
-    notes: document.getElementById('saleNotes').value
+    notes: document.getElementById('saleNotes').value,
+    branchId: branchId // Enviar la sede si existe en la URL (solo funcionará si es admin en el backend)
   };
   
   // Mostrar loading

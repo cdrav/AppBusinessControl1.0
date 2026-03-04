@@ -107,9 +107,9 @@ function renderInventory(products) {
     const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
     products.forEach((product, index) => {
-      const stockLevel = product.stock < 10 ? 'low' : product.stock < 50 ? 'medium' : 'high';
+      const stockLevel = product.stock < 5 ? 'low' : product.stock < 20 ? 'medium' : 'high';
       const stockBadge = `stock-${stockLevel}`;
-      const stockText = product.stock < 10 ? 'Bajo' : product.stock < 50 ? 'Medio' : 'Alto';
+      const stockText = product.stock < 5 ? 'Bajo' : product.stock < 20 ? 'Medio' : 'Alto';
       
       // Generar botones solo si es admin
       let actionButtons = '';
@@ -175,7 +175,7 @@ function renderInventory(products) {
 
       totalProducts++;
       totalStock += product.stock;
-      if (product.stock < 10) lowStockCount++;
+      if (product.stock < 5) lowStockCount++;
       totalValue += totalProductValue;
     });
 

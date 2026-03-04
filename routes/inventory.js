@@ -36,6 +36,11 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/for-sale', authenticateToken, async (req, res) => {
     let branchId = req.user.branch_id;
     
+    // Permitir a administradores consultar el stock de una sede específica para la venta
+    if (req.user.role === 'admin' && req.query.branch_id) {
+        branchId = req.query.branch_id;
+    }
+
     // Fallback: Si el token es antiguo o no tiene branch_id, buscar en BD o usar default (1)
     if (!branchId) {
         try {

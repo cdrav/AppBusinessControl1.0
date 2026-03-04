@@ -11,8 +11,15 @@ const path = require('path');
 
 // Registrar Venta
 router.post('/', authenticateToken, async (req, res) => {
-    let { clientId, products, saleDate, couponCode, notes } = req.body;
-    const branchId = req.user.branch_id;
+    let { clientId, products, saleDate, couponCode, notes, branchId } = req.body;
+    
+    // Lógica de Sede:
+    // Si NO es admin, forzamos la sede asignada al usuario (seguridad).
+    if (req.user.role !== 'admin') {
+        branchId = req.user.branch_id;
+    }
+    // Si ES admin y no envió sede, usa la suya o la principal por defecto.
+    if (!branchId) branchId = req.user.branch_id || 1;
 
     // Agregar hora actual a la fecha para que los reportes por hora funcionen correctamente
     if (saleDate && saleDate.length === 10) { // Si es formato YYYY-MM-DD
@@ -49,9 +56,10 @@ router.post('/', authenticateToken, async (req, res) => {
         for (const d of details) {
             await conn.query('INSERT INTO sale_details (sale_id, product_id, quantity, subtotal) VALUES (?, ?, ?, ?)', [sale.insertId, d.productId, d.quantity, d.subtotal]);
             await conn.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id=? AND branch_id=?', [d.quantity, d.productId, branchId]);
-            await conn.query('UPDATE inventory SET stock = stock - ? WHERE id=?', [d.quantity, d.productId]); // Sincronizar global
+            // Recalcular el stock global para mantener la consistencia
+            await conn.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(stock), 0) FROM branch_stocks WHERE product_id = ?) WHERE id = ?', [d.productId, d.productId]);
             const [stk] = await conn.query('SELECT bs.stock, i.product_name FROM branch_stocks bs JOIN inventory i ON bs.product_id=i.id WHERE bs.product_id=? AND bs.branch_id=?', [d.productId, branchId]);
-            if (stk[0].stock <= 10) lowStock.push({ name: stk[0].product_name, stock: stk[0].stock });
+            if (stk[0].stock < 5) lowStock.push({ name: stk[0].product_name, stock: stk[0].stock });
         }
         
         await conn.commit();
@@ -233,8 +241,10 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, r
 
         const [details] = await conn.query('SELECT product_id, quantity FROM sale_details WHERE sale_id=?', [req.params.id]);
         for (const d of details) {
-            await conn.query('UPDATE inventory SET stock = stock + ? WHERE id=?', [d.quantity, d.product_id]);
+            // Restaurar stock en la sucursal
             if (branchId) await conn.query('UPDATE branch_stocks SET stock = stock + ? WHERE product_id=? AND branch_id=?', [d.quantity, d.product_id, branchId]);
+            // Recalcular el stock global
+            await conn.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(stock), 0) FROM branch_stocks WHERE product_id = ?) WHERE id = ?', [d.product_id, d.product_id]);
         }
         await conn.query('DELETE FROM sale_details WHERE sale_id=?', [req.params.id]);
         await conn.query('DELETE FROM sales WHERE id=?', [req.params.id]);
@@ -265,8 +275,9 @@ router.post('/:id/return', authenticateToken, authorizeRole(['admin', 'cajero'])
             
             if (details.length > 0) {
                 // 2. Restaurar stock (Global y Sucursal)
-                await connection.query('UPDATE inventory SET stock = stock + ? WHERE id = ?', [item.quantity, item.productId]);
                 if (branchId) await connection.query('UPDATE branch_stocks SET stock = stock + ? WHERE product_id=? AND branch_id=?', [item.quantity, item.productId, branchId]);
+                // Recalcular stock global
+                await connection.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(stock), 0) FROM branch_stocks WHERE product_id = ?) WHERE id = ?', [item.productId, item.productId]);
                 
                 // 3. Registrar la devolución (Actualizando notas de la venta)
                 await connection.query('UPDATE sales SET notes = CONCAT(IFNULL(notes, ""), " [Devolución: Prod ID ", ?, " Cant ", ?, "]") WHERE id = ?', [item.productId, item.quantity, id]);

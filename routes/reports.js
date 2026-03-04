@@ -73,12 +73,12 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             // Datos específicos de la sede
             [clients] = await db.query(`SELECT COUNT(DISTINCT client_id) as total FROM sales WHERE branch_id = ?`, [branch_id]);
             [products] = await db.query('SELECT SUM(stock) as total FROM branch_stocks WHERE branch_id = ?', [branch_id]);
-            [lowStock] = await db.query('SELECT COUNT(*) as total FROM branch_stocks WHERE stock < 10 AND branch_id = ?', [branch_id]);
+            [lowStock] = await db.query('SELECT COUNT(*) as total FROM branch_stocks WHERE stock < 5 AND branch_id = ?', [branch_id]);
         } else {
             // Datos globales
             [clients] = await db.query('SELECT COUNT(*) as total FROM clients');
             [products] = await db.query('SELECT SUM(stock) as total FROM inventory');
-            [lowStock] = await db.query('SELECT COUNT(*) as total FROM inventory WHERE stock < 10');
+            [lowStock] = await db.query('SELECT COUNT(*) as total FROM inventory WHERE stock < 5');
         }
         
         // Actividad Reciente (últimas 5 acciones globales)
@@ -493,7 +493,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         // REPORTE DE STOCK BAJO
         // ==========================================
         if (type === 'low-stock') {
-            const [products] = await db.query('SELECT * FROM inventory WHERE stock < 10 ORDER BY stock ASC');
+            const [products] = await db.query('SELECT * FROM inventory WHERE stock < 5 ORDER BY stock ASC');
             
             if (products.length === 0) {
                 doc.fontSize(12).text('¡Excelente! No hay productos con stock crítico.', { align: 'center' });
