@@ -66,6 +66,21 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             LIMIT 5
         `, queryParams);
 
+        // NUEVO: Obtener gastos totales y su tendencia para el periodo
+        const expensesWhereClauses = whereClauses.map(c => c.replace('sale_date', 'expense_date'));
+        const expensesWhereClause = expensesWhereClauses.length > 0 ? `WHERE ${expensesWhereClauses.join(' AND ')}` : '';
+        
+        const [expenses] = await db.query(`SELECT COALESCE(SUM(amount), 0) as total FROM expenses ${expensesWhereClause}`, queryParams);
+
+        const [expensesTrend] = await db.query(`
+            SELECT ${selectDate.replace('sale_date', 'expense_date')}, SUM(amount) as total 
+            FROM expenses 
+            ${expensesWhereClause}
+            ${groupBy.replace('sale_date', 'expense_date')}
+            ORDER BY date ASC
+        `, queryParams);
+
+
         // 5. Datos de tarjetas (dependen de si hay filtro de sede o no)
         let clients, products, lowStock;
 
@@ -118,11 +133,13 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
 
         res.json({
             totalRevenue: revenue[0].total,
+            totalExpenses: expenses[0].total,
             totalSales: salesCount[0].total,
             totalClients: clients[0].total,
             totalProducts: products[0].total,
             lowStockCount: lowStock[0].total,
             salesTrend,
+            expensesTrend,
             topProducts,
             recentActivity: recentSales,
             staleProducts,
@@ -145,7 +162,13 @@ router.get('/daily-summary', authenticateToken, async (req, res) => {
             SELECT COALESCE(SUM(total_price), 0) as totalRevenue, COUNT(*) as totalSales
             FROM sales WHERE DATE(sale_date) = ?
         `, [date]);
-        res.json(summary[0]);
+
+        // Obtener gastos del día
+        const [dailyExpenses] = await db.query(`
+            SELECT COALESCE(SUM(amount), 0) as totalExpenses
+            FROM expenses WHERE DATE(expense_date) = ?
+        `, [date]);
+        res.json({ ...summary[0], ...dailyExpenses[0] });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener resumen diario' });
     }
@@ -408,6 +431,14 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 WHERE 1=1 ${dateFilter.replace('sale_date', 's.sale_date')} 
                 ORDER BY s.sale_date ASC
             `, params);
+            
+            // NUEVO: Obtener gastos del periodo
+            const [expensesList] = await db.query(`
+                SELECT description, amount, expense_date 
+                FROM expenses 
+                WHERE 1=1 ${dateFilter.replace('sale_date', 'expense_date')}
+                ORDER BY expense_date ASC
+            `, params);
 
             const tableTop = doc.y;
             doc.rect(50, tableTop, 495, 20).fill('#10B981'); // Verde para ganancias
@@ -441,12 +472,43 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 totalCost += costVal;
                 y += 18;
             });
+            
+            // NUEVO: Sección de Gastos en el PDF
+            let totalExpenses = 0;
+            if (expensesList.length > 0) {
+                doc.addPage();
+                drawHeader();
+                doc.fontSize(12).font('Helvetica-Bold').text('GASTOS OPERATIVOS', 50, doc.y);
+                doc.moveDown(0.5);
+                
+                const expTableTop = doc.y;
+                doc.rect(50, expTableTop, 495, 20).fill('#EF4444'); // Rojo para gastos
+                doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
+                doc.text('DESCRIPCIÓN', 55, expTableTop + 6);
+                doc.text('FECHA', 350, expTableTop + 6);
+                doc.text('MONTO', 450, expTableTop + 6, { width: 80, align: 'right' });
+                
+                let yExp = expTableTop + 25;
+                doc.fillColor('#000').font('Helvetica');
+                
+                expensesList.forEach((exp) => {
+                    doc.text(exp.description.substring(0, 50), 55, yExp);
+                    doc.text(new Date(exp.expense_date).toLocaleDateString('es-CO'), 350, yExp);
+                    doc.text(formatCurrency(exp.amount), 450, yExp, { width: 80, align: 'right' });
+                    totalExpenses += parseFloat(exp.amount);
+                    yExp += 18;
+                });
+                doc.moveDown(2);
+            }
 
             doc.moveDown(2);
             doc.font('Helvetica-Bold').fillColor('#000');
             doc.text(`Total Ventas: ${formatCurrency(totalRevenue)}`, { align: 'right' });
-            doc.text(`Total Costos: ${formatCurrency(totalCost)}`, { align: 'right' });
-            doc.fontSize(12).text(`Ganancia Neta: ${formatCurrency(totalRevenue - totalCost)}`, { align: 'right' });
+            doc.text(`Costo de Mercancía: -${formatCurrency(totalCost)}`, { align: 'right' });
+            doc.text(`Gastos Operativos: -${formatCurrency(totalExpenses)}`, { align: 'right' });
+            doc.moveDown(0.5);
+            const netProfit = totalRevenue - totalCost - totalExpenses;
+            doc.fontSize(14).fillColor(netProfit >= 0 ? 'green' : 'red').text(`Utilidad Neta Real: ${formatCurrency(netProfit)}`, { align: 'right' });
         }
 
         // ==========================================

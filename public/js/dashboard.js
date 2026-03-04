@@ -2,6 +2,7 @@
 const API_URL = ''; // Ruta relativa para producción
 let revenueChart; // Variable global para el gráfico
 let topProductsChart; // Variable para el gráfico de productos top
+let comparisonChart; // Variable para el gráfico de comparación
 
 document.addEventListener('DOMContentLoaded', function() {
     updateDate();
@@ -14,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDashboardStats('7days', branchId);
     initRevenueChart();
     initTopProductsChart();
+    initComparisonChart();
 
     // Listener para el filtro de ingresos
     const revenueFilter = document.getElementById('revenueFilter');
@@ -233,11 +235,11 @@ async function loadDashboardStats(period = '7days', branchId = null) {
         }
         
         const stats = await response.json();
-        
+
         document.getElementById('totalRevenue').textContent = parseFloat(stats.totalRevenue).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        document.getElementById('totalExpenses').textContent = parseFloat(stats.totalExpenses).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
         document.getElementById('totalSales').textContent = stats.totalSales;
         document.getElementById('totalClients').textContent = stats.totalClients;
-        document.getElementById('totalProducts').textContent = stats.totalProducts;
 
         // Actualizar la alerta de stock bajo dedicada
         const lowStockAlert = document.getElementById('lowStockAlert');
@@ -255,6 +257,9 @@ async function loadDashboardStats(period = '7days', branchId = null) {
 
         // Actualizar gráfico con datos reales
         updateRevenueChart(stats.salesTrend, period);
+
+        // Actualizar gráfico de comparación
+        updateComparisonChart(stats.salesTrend, stats.expensesTrend, period);
 
         // Actualizar gráfico de productos top
         updateTopProductsChart(stats.topProducts);
@@ -393,6 +398,105 @@ function initTopProductsChart() {
             }
         }
     });
+}
+
+function initComparisonChart() {
+    const ctx = document.getElementById('comparisonChart');
+    if (!ctx) return;
+
+    comparisonChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [], // Se llenarán dinámicamente
+            datasets: [
+                {
+                    label: 'Ingresos',
+                    data: [],
+                    backgroundColor: 'rgba(37, 99, 235, 0.6)', // Primary
+                    borderColor: '#2563EB',
+                    borderWidth: 2,
+                    borderRadius: 5
+                },
+                {
+                    label: 'Gastos',
+                    data: [],
+                    backgroundColor: 'rgba(239, 68, 68, 0.6)', // Danger
+                    borderColor: '#EF4444',
+                    borderWidth: 2,
+                    borderRadius: 5
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) label += new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(context.parsed.y);
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            if (value >= 1000000) return (value / 1000000) + 'M';
+                            if (value >= 1000) return (value / 1000) + 'k';
+                            return value;
+                        }
+                    }
+                },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+function updateComparisonChart(salesData, expensesData, period = '7days') {
+    if (!comparisonChart || !Array.isArray(salesData) || !Array.isArray(expensesData)) {
+        return;
+    }
+
+    const processData = (trendData) => {
+        return new Map(trendData.map(item => {
+            const d = new Date(item.date);
+            const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            return [dateKey, parseFloat(item.total)];
+        }));
+    };
+    
+    const salesMap = processData(salesData);
+    const expensesMap = processData(expensesData);
+
+    const labels = [];
+    const income = [];
+    const expenses = [];
+    const today = new Date();
+
+    if (period === '7days') {
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' });
+            labels.push(dayName.charAt(0).toUpperCase() + dayName.slice(1));
+            income.push(salesMap.get(dateStr) || 0);
+            expenses.push(expensesMap.get(dateStr) || 0);
+        }
+    }
+
+    comparisonChart.data.labels = labels;
+    comparisonChart.data.datasets[0].data = income;
+    comparisonChart.data.datasets[1].data = expenses;
+    comparisonChart.update();
 }
 
 function updateRevenueChart(trendData, period = '7days') {
@@ -690,14 +794,22 @@ async function fetchDailySummary(date) {
         const summary = await response.json();
 
         summaryContent.innerHTML = `
-            <div class="row g-0">
+            <div class="row g-3">
                 <div class="col-6 text-center border-end">
-                    <h3 class="mb-1 fw-bold">${parseFloat(summary.totalRevenue).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</h3>
+                    <h4 class="mb-1 fw-bold text-success">${parseFloat(summary.totalRevenue).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</h4>
                     <p class="text-muted mb-0 small">Ingresos Totales</p>
                 </div>
                 <div class="col-6 text-center">
-                    <h3 class="mb-1 fw-bold">${summary.totalSales}</h3>
+                    <h4 class="mb-1 fw-bold">${summary.totalSales}</h4>
                     <p class="text-muted mb-0 small">Transacciones</p>
+                </div>
+                <div class="col-12 text-center pt-3 border-top">
+                     <h4 class="mb-1 fw-bold text-danger">${parseFloat(summary.totalExpenses).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</h4>
+                     <p class="text-muted mb-0 small">Gastos del Día</p>
+                </div>
+                <div class="col-12 text-center pt-3 border-top bg-light rounded-bottom">
+                     <h4 class="mb-1 fw-bold text-primary">${parseFloat(summary.totalRevenue - summary.totalExpenses).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</h4>
+                     <p class="text-muted mb-0 small">Efectivo Esperado en Caja</p>
                 </div>
             </div>
         `;

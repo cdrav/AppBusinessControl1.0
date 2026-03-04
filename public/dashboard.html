@@ -104,6 +104,18 @@
                             <span class="fw-bold">Nuevo Cliente</span>
                         </a>
                     </div>
+                    <div class="col-6 col-md-4">
+                        <a href="#" class="quick-action-card" data-bs-toggle="modal" data-bs-target="#cashSummaryModal">
+                            <div class="quick-action-icon"><i class="bi bi-cash-coin"></i></div>
+                            <span class="fw-bold">Cierre de Caja</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <a href="#" class="quick-action-card" data-bs-toggle="modal" data-bs-target="#cashSummaryModal">
+                            <div class="quick-action-icon"><i class="bi bi-cash-coin"></i></div>
+                            <span class="fw-bold">Cierre de Caja</span>
+                        </a>
+                    </div>
                 </div>
             </div>
             <!-- Management Modules -->
@@ -150,6 +162,12 @@
                         <a href="gastos.html" class="quick-action-card admin-only">
                             <div class="quick-action-icon"><i class="bi bi-wallet2"></i></div>
                             <span class="fw-bold">Gastos</span>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <a href="#" class="quick-action-card" data-bs-toggle="modal" data-bs-target="#cashSummaryModal">
+                            <div class="quick-action-icon"><i class="bi bi-cash-coin"></i></div>
+                            <span class="fw-bold">Cierre de Caja</span>
                         </a>
                     </div>
                 </div>
@@ -206,14 +224,14 @@
                 </div>
               </div>
               <div class="col-md-3">
-                <div class="stat-card h-100 text-start p-4 border-start border-4 border-warning">
+                <div class="stat-card h-100 text-start p-4 border-start border-4 border-danger">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
-                      <p class="text-muted mb-1">Productos en Stock</p>
-                      <h3 class="mb-0" id="totalProducts" data-counter="0">0</h3>
+                      <p class="text-muted mb-1">Gastos Totales</p>
+                      <h3 class="mb-0" id="totalExpenses">$0</h3>
                     </div>
-                    <div class="bg-warning bg-opacity-10 text-warning rounded p-2">
-                      <i class="bi bi-box-seam fs-4"></i>
+                    <div class="bg-danger bg-opacity-10 text-danger rounded p-2">
+                      <i class="bi bi-wallet2 fs-4"></i>
                     </div>
                   </div>
                 </div>
@@ -221,8 +239,8 @@
         </div>
 
         <div class="row g-4 mb-4">
-          <!-- Main Chart Column -->
-          <div class="col-lg-8 fade-in" style="animation-delay: 0.2s">
+          <!-- Revenue Chart Column -->
+          <div class="col-lg-7 fade-in" style="animation-delay: 0.2s">
             <div class="card h-100 p-4 border-0 shadow-sm">
               <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="mb-0 fw-bold text-dark">Resumen de Ingresos</h5>
@@ -240,14 +258,12 @@
             </div>
           </div>
 
-          <!-- Recent Activity Column -->
-          <div class="col-lg-4 fade-in" style="animation-delay: 0.3s">
+          <!-- Income vs Expense Chart Column -->
+          <div class="col-lg-5 fade-in" style="animation-delay: 0.3s">
             <div class="card h-100 p-4 border-0 shadow-sm">
-              <div class="d-flex justify-content-between align-items-center mb-4 rounded-xl">
-                <h5 class="mb-0 fw-bold text-dark">Actividad Reciente</h5>
-              </div>
-              <div class="activity-list" id="recentActivityList">
-                <!-- Contenido dinámico se insertará aquí -->
+              <h5 class="mb-4 fw-bold text-dark">Ingresos vs. Gastos</h5>
+              <div class="chart-container" style="position: relative; height: 300px;">
+                <canvas id="comparisonChart"></canvas>
               </div>
             </div>
           </div>
