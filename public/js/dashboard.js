@@ -98,6 +98,12 @@ function setupUserSession(branchId) {
                             if (addSaleLink) {
                                 addSaleLink.href = `addSale.html?branch_id=${branchId}`;
                             }
+
+                            // Ocultar el módulo de gestión de sedes, ya que no tiene sentido dentro de una sede.
+                            const sedesModuleLink = document.querySelector('a[href="sedes.html"]');
+                            if (sedesModuleLink) {
+                                sedesModuleLink.closest('.col-6').style.display = 'none';
+                            }
                         }
                     } else {
                         if(pageTitle) pageTitle.textContent = `Dashboard de Sede`;

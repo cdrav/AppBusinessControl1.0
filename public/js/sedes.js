@@ -1,7 +1,23 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // La sesión se configura desde el script principal que carga el sidebar
+    setupUserSession();
     loadBranches();
 });
+
+function setupUserSession() {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = 'login.html';
+        return;
+    }
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.role !== 'admin') {
+            window.location.href = 'dashboard.html'; // Solo admins pueden ver esta página
+        }
+    } catch (e) {
+        window.location.href = 'login.html';
+    }
+}
 
 async function loadBranches() {
     const grid = document.getElementById('branchesGrid');
@@ -15,12 +31,6 @@ async function loadBranches() {
     }
 
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.role !== 'admin') {
-            window.location.href = 'dashboard.html'; // Redirigir si no es admin
-            return;
-        }
-
         const response = await fetch('/api/branch-stats', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -78,7 +88,7 @@ function createBranchCard(branch) {
                     </div>
 
                     <div class="mt-auto">
-                        <a href="inventario.html?branch_id=${branch.id}" class="btn btn-outline-primary w-100">Ver Inventario de Sede</a>
+                        <a href="dashboard.html?branch_id=${branch.id}" class="btn btn-outline-primary w-100">Ver Dashboard de Sede</a>
                     </div>
                 </div>
             </div>

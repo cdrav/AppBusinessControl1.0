@@ -138,6 +138,18 @@ async function setup() {
         FOREIGN KEY (product_id) REFERENCES inventory(id) ON DELETE CASCADE,
         UNIQUE KEY unique_stock (branch_id, product_id)
       )`,
+      `CREATE TABLE IF NOT EXISTS expenses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        description VARCHAR(255) NOT NULL,
+        amount DECIMAL(15, 2) NOT NULL,
+        category VARCHAR(100),
+        supplier_id INT,
+        branch_id INT,
+        expense_date DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL,
+        FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
+      )`,
       `CREATE TABLE IF NOT EXISTS inventory_transfers (
         id INT AUTO_INCREMENT PRIMARY KEY, 
         product_id INT, 
