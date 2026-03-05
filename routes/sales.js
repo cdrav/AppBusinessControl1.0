@@ -59,7 +59,7 @@ router.post('/', authenticateToken, async (req, res) => {
             // Recalcular el stock global para mantener la consistencia
             await conn.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(stock), 0) FROM branch_stocks WHERE product_id = ?) WHERE id = ?', [d.productId, d.productId]);
             const [stk] = await conn.query('SELECT bs.stock, i.product_name FROM branch_stocks bs JOIN inventory i ON bs.product_id=i.id WHERE bs.product_id=? AND bs.branch_id=?', [d.productId, branchId]);
-            if (stk[0].stock < 5) lowStock.push({ name: stk[0].product_name, stock: stk[0].stock });
+            if (stk.length > 0 && stk[0].stock < 5) lowStock.push({ name: stk[0].product_name, stock: stk[0].stock });
         }
         
         await conn.commit();

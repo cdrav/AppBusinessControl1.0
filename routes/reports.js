@@ -303,6 +303,15 @@ router.get('/report-export', authenticateToken, async (req, res) => {
 
         // --- FUNCIONES AUXILIARES DE DISEÑO ---
         const formatCurrency = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+
+        // Función centralizada para controlar saltos de página
+        const checkAddPage = (currentY, neededHeight) => {
+            if (currentY + neededHeight > 730) { // Margen de seguridad antes del footer
+                doc.addPage(); // Esto disparará el evento 'pageAdded' que dibuja el header principal
+                return doc.y; // Retorna la nueva posición Y después del header principal
+            }
+            return currentY;
+        };
         
         const generateFooter = (docInstance) => {
             const pageNumber = docInstance.bufferedPageRange().start + docInstance.bufferedPageRange().count -1;
@@ -417,7 +426,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             if (salesList.length === 0) {
                 doc.text('No hay ventas registradas en este período.');
             } else {
-                // Función para dibujar encabezados de tabla de ventas
+                // Encabezado de tabla Ventas
                 const drawSalesTableHeader = (y) => {
                     doc.rect(50, y, 495, 20).fill('#4F46E5');
                     doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
@@ -434,18 +443,28 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 doc.fillColor('#000').font('Helvetica');
 
                 salesList.forEach((sale, i) => {
-                    if (y > 700) { // Umbral de seguridad para salto de página
-                        doc.addPage(); tableTop = doc.y; drawSalesTableHeader(tableTop); y = tableTop + 25; 
-                    }
-                    if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
-                    doc.fillColor('#000');
-                    
                     const dateStr = new Date(sale.sale_date).toLocaleDateString('es-CO');
+                    const clientStr = (sale.client_name || 'General').substring(0, 25);
+                    const totalStr = formatCurrency(sale.total_price);
+                    
+                    // Calcular altura dinámica
+                    const rowHeight = Math.max(doc.heightOfString(clientStr, { width: 190 }), 18);
+
+                    const newY = checkAddPage(y, rowHeight + 5);
+                    if (newY !== y) {
+                        y = newY;
+                        drawSalesTableHeader(y);
+                        y += 25;
+                    }
+
+                    if (i % 2 === 0) doc.rect(50, y - 5, 495, rowHeight + 5).fill('#f9f9f9');
+                    doc.fillColor('#000').font('Helvetica');
+                    
                     doc.text(`#${sale.id}`, 60, y);
                     doc.text(dateStr, 120, y);
-                    doc.text((sale.client_name || 'General').substring(0, 25), 250, y);
-                    doc.text(formatCurrency(sale.total_price), 450, y, { align: 'right', width: 80 });
-                    y += 18;
+                    doc.text(clientStr, 250, y, { width: 190 });
+                    doc.text(totalStr, 450, y, { align: 'right', width: 80 });
+                    y += rowHeight + 5;
                 });
             }
         }
@@ -473,28 +492,40 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 ORDER BY expense_date ASC
             `, params);
 
-            const tableTop = doc.y;
-            doc.rect(50, tableTop, 495, 20).fill('#10B981'); // Verde para ganancias
-            doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-            doc.text('PRODUCTO', 55, tableTop + 6);
-            doc.text('VENTA', 300, tableTop + 6, { width: 60, align: 'right' });
-            doc.text('COSTO', 370, tableTop + 6, { width: 60, align: 'right' });
-            doc.text('GANANCIA', 440, tableTop + 6, { width: 60, align: 'right' });
+            const drawProfitsHeader = (posY) => {
+                doc.rect(50, posY, 495, 20).fill('#10B981'); // Verde
+                doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
+                doc.text('PRODUCTO', 55, posY + 6);
+                doc.text('VENTA', 300, posY + 6, { width: 60, align: 'right' });
+                doc.text('COSTO', 370, posY + 6, { width: 60, align: 'right' });
+                doc.text('GANANCIA', 440, posY + 6, { width: 60, align: 'right' });
+            };
 
-            let y = tableTop + 25;
+            let y = doc.y;
+            drawProfitsHeader(y);
+            y += 25;
+
             let totalRevenue = 0, totalCost = 0;
-            doc.fillColor('#000').font('Helvetica');
 
             details.forEach((item, i) => {
-                if (y > 700) { doc.addPage(); y = doc.y; } // Dejar que el header automático ajuste 'y'
-                if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
-                doc.fillColor('#000');
+                const productStr = (item.product_name || 'Producto Borrado').substring(0, 35);
+                const rowHeight = Math.max(doc.heightOfString(productStr, { width: 240 }), 18);
+
+                const newY = checkAddPage(y, rowHeight + 5);
+                if (newY !== y) {
+                    y = newY;
+                    drawProfitsHeader(y);
+                    y += 25;
+                }
+
+                if (i % 2 === 0) doc.rect(50, y - 5, 495, rowHeight + 5).fill('#f9f9f9');
+                doc.fillColor('#000').font('Helvetica');
 
                 const saleVal = parseFloat(item.sale_price);
                 const costVal = parseFloat(item.total_cost || 0);
                 const profitVal = saleVal - costVal;
 
-                doc.text((item.product_name || 'Producto Borrado').substring(0, 35), 55, y);
+                doc.text(productStr, 55, y, { width: 240 });
                 doc.text(formatCurrency(saleVal), 300, y, { width: 60, align: 'right' });
                 doc.text(formatCurrency(costVal), 370, y, { width: 60, align: 'right' });
                 
@@ -503,38 +534,50 @@ router.get('/report-export', authenticateToken, async (req, res) => {
 
                 totalRevenue += saleVal;
                 totalCost += costVal;
-                y += 18;
+                y += rowHeight + 5;
             });
             
             // NUEVO: Sección de Gastos en el PDF
             let totalExpenses = 0;
             if (expensesList.length > 0) {
-                const expTableTop = y;
-                doc.rect(50, expTableTop, 495, 20).fill('#EF4444'); // Rojo para gastos
-                doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-                doc.text('DESCRIPCIÓN', 55, expTableTop + 6);
-                doc.text('FECHA', 350, expTableTop + 6);
-                doc.text('MONTO', 450, expTableTop + 6, { width: 80, align: 'right' });
+                y = checkAddPage(y, 60);
+                y += 20;
+                doc.fontSize(12).font('Helvetica-Bold').fillColor('#000').text('GASTOS OPERATIVOS', 50, y);
+                y += 20;
+
+                const drawExpensesHeader = (posY) => {
+                    doc.rect(50, posY, 495, 20).fill('#EF4444'); // Rojo para gastos
+                    doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
+                    doc.text('DESCRIPCIÓN', 55, posY + 6);
+                    doc.text('FECHA', 350, posY + 6);
+                    doc.text('MONTO', 450, posY + 6, { width: 80, align: 'right' });
+                };
+                drawExpensesHeader(y);
                 
-                let yExp = expTableTop + 25;
-                doc.fillColor('#000').font('Helvetica');
+                y += 25;
                 
                 expensesList.forEach((exp) => {
-                    if (yExp > 700) {
-                        doc.addPage();
-                        yExp = doc.y;
+                    const descStr = exp.description.substring(0, 50);
+                    const rowHeight = Math.max(doc.heightOfString(descStr, { width: 290 }), 18);
+
+                    const newY = checkAddPage(y, rowHeight + 5);
+                    if (newY !== y) {
+                        y = newY;
+                        drawExpensesHeader(y);
+                        y += 25;
                     }
-                    doc.text(exp.description.substring(0, 50), 55, yExp);
-                    doc.text(new Date(exp.expense_date).toLocaleDateString('es-CO'), 350, yExp);
-                    doc.text(formatCurrency(exp.amount), 450, yExp, { width: 80, align: 'right' });
+                    
+                    doc.fillColor('#000').font('Helvetica');
+                    doc.text(descStr, 55, y, { width: 290 });
+                    doc.text(new Date(exp.expense_date).toLocaleDateString('es-CO'), 350, y);
+                    doc.text(formatCurrency(exp.amount), 450, y, { width: 80, align: 'right' });
                     totalExpenses += parseFloat(exp.amount);
-                    yExp += 18;
+                    y += rowHeight + 5;
                 });
-                
-                y = yExp; // Actualizar variable y local también
             }
 
-            if (y > 650) { doc.addPage(); y = doc.y; } else { y += 15; }
+            y = checkAddPage(y, 80);
+            y += 20;
 
             doc.font('Helvetica-Bold').fillColor('#000');
             doc.text(`Total Ventas: ${formatCurrency(totalRevenue)}`, 50, y, { align: 'right' });
@@ -554,36 +597,49 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         if (type === 'inventory') {
             const [products] = await db.query('SELECT * FROM inventory ORDER BY product_name ASC');
             
-            const tableTop = doc.y;
-            doc.rect(50, tableTop, 495, 20).fill('#F59E0B'); // Naranja
-            doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-            doc.text('PRODUCTO', 55, tableTop + 6);
-            doc.text('STOCK', 320, tableTop + 6, { width: 40, align: 'center' });
-            doc.text('PRECIO', 370, tableTop + 6, { width: 70, align: 'right' });
-            doc.text('VALOR TOTAL', 450, tableTop + 6, { width: 80, align: 'right' });
+            const drawInventoryHeader = (posY) => {
+                doc.rect(50, posY, 495, 20).fill('#F59E0B'); // Naranja
+                doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
+                doc.text('PRODUCTO', 55, posY + 6);
+                doc.text('STOCK', 320, posY + 6, { width: 40, align: 'center' });
+                doc.text('PRECIO', 370, posY + 6, { width: 70, align: 'right' });
+                doc.text('VALOR TOTAL', 450, posY + 6, { width: 80, align: 'right' });
+            };
 
-            let y = tableTop + 25;
+            let y = doc.y;
+            drawInventoryHeader(y);
+            y += 25;
+
             let totalValue = 0, totalItems = 0;
-            doc.fillColor('#000').font('Helvetica');
 
             products.forEach((p, i) => {
-                if (y > 700) { doc.addPage(); y = doc.y; }
-                if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
-                doc.fillColor('#000');
+                const nameStr = p.product_name.substring(0, 40);
+                const rowHeight = Math.max(doc.heightOfString(nameStr, { width: 260 }), 18);
+
+                const newY = checkAddPage(y, rowHeight + 5);
+                if (newY !== y) {
+                    y = newY;
+                    drawInventoryHeader(y);
+                    y += 25;
+                }
+
+                if (i % 2 === 0) doc.rect(50, y - 5, 495, rowHeight + 5).fill('#f9f9f9');
+                doc.fillColor('#000').font('Helvetica');
 
                 const val = p.stock * p.price;
                 totalValue += val;
                 totalItems += p.stock;
 
-                doc.text(p.product_name.substring(0, 40), 55, y);
+                doc.text(nameStr, 55, y, { width: 260 });
                 doc.text(p.stock, 320, y, { width: 40, align: 'center' });
                 doc.text(formatCurrency(p.price), 370, y, { width: 70, align: 'right' });
                 doc.text(formatCurrency(val), 450, y, { width: 80, align: 'right' });
-                y += 18;
+                y += rowHeight + 5;
             });
 
             // Totales manuales
-            if (y > 700) { doc.addPage(); y = doc.y; } else { y += 15; }
+            y = checkAddPage(y, 50);
+            y += 20;
 
             doc.font('Helvetica-Bold');
             doc.text(`Total Unidades: ${totalItems}`, 50, y, { align: 'right' });
@@ -600,22 +656,33 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             if (products.length === 0) {
                 doc.fontSize(12).text('¡Excelente! No hay productos con stock crítico.', { align: 'center' });
             } else {
-                const tableTop = doc.y;
-                doc.rect(50, tableTop, 495, 20).fill('#EF4444'); // Rojo
-                doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-                doc.text('PRODUCTO', 55, tableTop + 6);
-                doc.text('STOCK ACTUAL', 400, tableTop + 6, { align: 'right' });
+                const drawLowStockHeader = (posY) => {
+                    doc.rect(50, posY, 495, 20).fill('#EF4444'); // Rojo
+                    doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
+                    doc.text('PRODUCTO', 55, posY + 6);
+                    doc.text('STOCK ACTUAL', 400, posY + 6, { align: 'right' });
+                };
 
-                let y = tableTop + 25;
-                doc.fillColor('#000').font('Helvetica');
+                let y = doc.y;
+                drawLowStockHeader(y);
+                y += 25;
 
                 products.forEach((p, i) => {
-                    if (y > 700) { doc.addPage(); y = doc.y; }
-                    if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
-                    doc.fillColor('#000');
-                    doc.text(p.product_name, 55, y);
-                    doc.text(p.stock, 400, y, { align: 'right' });
-                    y += 18;
+                    const nameStr = p.product_name;
+                    const rowHeight = Math.max(doc.heightOfString(nameStr, { width: 340 }), 18);
+
+                    const newY = checkAddPage(y, rowHeight + 5);
+                    if (newY !== y) {
+                        y = newY;
+                        drawLowStockHeader(y);
+                        y += 25;
+                    }
+
+                    if (i % 2 === 0) doc.rect(50, y - 5, 495, rowHeight + 5).fill('#f9f9f9');
+                    doc.fillColor('#000').font('Helvetica');
+                    doc.text(nameStr, 55, y, { width: 340 });
+                    doc.text(p.stock.toString(), 400, y, { align: 'right' });
+                    y += rowHeight + 5;
                 });
             }
         }
@@ -627,10 +694,10 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             const [clients] = await db.query('SELECT * FROM clients ORDER BY name ASC');
             
             let y = doc.y;
-            doc.font('Helvetica');
             
             clients.forEach((c, i) => {
-                if (y > 680) { doc.addPage(); y = doc.y; }
+                const newY = checkAddPage(y, 60);
+                if (newY !== y) y = newY;
                 
                 // Tarjeta de cliente
                 doc.rect(50, y, 495, 50).stroke('#e0e0e0');
@@ -709,13 +776,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             // Usar control manual de Y para evitar páginas en blanco por moveDown
             let currentY = y + 60; // Espacio después de la caja de inventario
 
-            const checkAddPage = (currentY, neededHeight) => {
-                if (currentY + neededHeight > doc.page.height - 50) {
-                    doc.addPage();
-                    return doc.y;
-                }
-                return currentY;
-            };
+            // La función checkAddPage ya está definida arriba y es accesible aquí
 
             // Tabla Top 5 Productos
             currentY = checkAddPage(currentY, 120); // Verificar espacio para título + tabla pequeña
