@@ -1,5 +1,12 @@
-# Dependencias
-node_modules
+# Archivo para ignorar ficheros y carpetas en Git
 
-# Variables de entorno locales
+# Dependencias de Node.js
+# Esta carpeta se genera localmente y en el servidor, no debe subirse.
+node_modules/
+
+# Archivo de variables de entorno
+# Contiene secretos y configuración local. ¡Nunca subir a GitHub!
 .env
+
+# Logs y archivos de depuración
+npm-debug.log

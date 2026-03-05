@@ -304,6 +304,20 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         // --- FUNCIONES AUXILIARES DE DISEÑO ---
         const formatCurrency = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
         
+        const generateFooter = (docInstance) => {
+            const pageNumber = docInstance.bufferedPageRange().start + docInstance.bufferedPageRange().count -1;
+            const totalPages = docInstance.bufferedPageRange().count;
+
+            docInstance.fontSize(8).fillColor('#666666');
+            
+            // Línea separadora footer
+            docInstance.moveTo(50, docInstance.page.height - 50).lineTo(545, docInstance.page.height - 50).strokeColor('#cccccc').stroke();
+            
+            docInstance.text(`Generado el ${new Date().toLocaleString('es-CO')}`, 50, docInstance.page.height - 40);
+            docInstance.text(`Página ${pageNumber + 1} de ${totalPages}`, 0, docInstance.page.height - 40, { align: 'center' });
+            docInstance.text('© Business Control System', 0, docInstance.page.height - 40, { align: 'right' });
+        };
+
         const drawHeader = () => {
             doc.fillColor('#000'); // Asegurar color negro al inicio
             // Logo
@@ -345,7 +359,14 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.moveDown(1.5);
         };
 
+        // --- LÓGICA DE PAGINACIÓN POR EVENTOS (LA CORRECTA) ---
+        doc.on('pageAdded', () => {
+            drawHeader();
+        });
+
+        // Dibujar el encabezado en la primera página
         drawHeader();
+
 
         // --- PREPARACIÓN DE DATOS ---
         let dateFilter = "";
@@ -413,8 +434,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 doc.fillColor('#000').font('Helvetica');
 
                 salesList.forEach((sale, i) => {
-                    if (y > 700) { 
-                        doc.addPage(); drawHeader(); tableTop = doc.y; drawSalesTableHeader(tableTop); y = tableTop + 25; 
+                    if (y > 700) { // Umbral de seguridad para salto de página
+                        doc.addPage(); tableTop = doc.y; drawSalesTableHeader(tableTop); y = tableTop + 25; 
                     }
                     if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
                     doc.fillColor('#000');
@@ -465,7 +486,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.fillColor('#000').font('Helvetica');
 
             details.forEach((item, i) => {
-                if (y > 700) { doc.addPage(); drawHeader(); y = doc.y + 25; }
+                if (y > 700) { doc.addPage(); y = doc.y; } // Dejar que el header automático ajuste 'y'
                 if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
                 doc.fillColor('#000');
 
@@ -485,24 +506,9 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 y += 18;
             });
             
-            // Sincronizar cursor del PDF con el cursor manual
-            doc.y = y;
-
             // NUEVO: Sección de Gastos en el PDF
             let totalExpenses = 0;
             if (expensesList.length > 0) {
-                // Solo agregar página si queda poco espacio (menos de ~100px)
-                if (y > 650) {
-                    doc.addPage();
-                    drawHeader();
-                    y = doc.y;
-                } else {
-                    y += 30; // Espacio separador
-                }
-                
-                doc.fontSize(12).font('Helvetica-Bold').text('GASTOS OPERATIVOS', 50, y);
-                y += 20;
-
                 const expTableTop = y;
                 doc.rect(50, expTableTop, 495, 20).fill('#EF4444'); // Rojo para gastos
                 doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
@@ -516,8 +522,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 expensesList.forEach((exp) => {
                     if (yExp > 700) {
                         doc.addPage();
-                        drawHeader();
-                        yExp = doc.y + 25;
+                        yExp = doc.y;
                     }
                     doc.text(exp.description.substring(0, 50), 55, yExp);
                     doc.text(new Date(exp.expense_date).toLocaleDateString('es-CO'), 350, yExp);
@@ -526,13 +531,10 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                     yExp += 18;
                 });
                 
-                // Actualizar y final
-                doc.y = yExp;
                 y = yExp; // Actualizar variable y local también
             }
 
-            // Totales con posicionamiento manual para evitar páginas en blanco
-            if (y > 700) { doc.addPage(); drawHeader(); y = doc.y + 20; } else { y += 30; }
+            if (y > 650) { doc.addPage(); y = doc.y; } else { y += 15; }
 
             doc.font('Helvetica-Bold').fillColor('#000');
             doc.text(`Total Ventas: ${formatCurrency(totalRevenue)}`, 50, y, { align: 'right' });
@@ -565,7 +567,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.fillColor('#000').font('Helvetica');
 
             products.forEach((p, i) => {
-                if (y > 700) { doc.addPage(); drawHeader(); y = doc.y + 25; }
+                if (y > 700) { doc.addPage(); y = doc.y; }
                 if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
                 doc.fillColor('#000');
 
@@ -580,10 +582,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 y += 18;
             });
 
-            doc.y = y; // Sincronizar cursor
-            
             // Totales manuales
-            if (y > 750) { doc.addPage(); drawHeader(); y = doc.y + 20; } else { y += 30; }
+            if (y > 700) { doc.addPage(); y = doc.y; } else { y += 15; }
 
             doc.font('Helvetica-Bold');
             doc.text(`Total Unidades: ${totalItems}`, 50, y, { align: 'right' });
@@ -610,7 +610,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 doc.fillColor('#000').font('Helvetica');
 
                 products.forEach((p, i) => {
-                    if (y > 700) { doc.addPage(); drawHeader(); y = doc.y + 25; }
+                    if (y > 700) { doc.addPage(); y = doc.y; }
                     if (i % 2 === 0) doc.rect(50, y - 5, 495, 18).fill('#f9f9f9');
                     doc.fillColor('#000');
                     doc.text(p.product_name, 55, y);
@@ -630,7 +630,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.font('Helvetica');
             
             clients.forEach((c, i) => {
-                if (y > 680) { doc.addPage(); drawHeader(); y = doc.y + 25; }
+                if (y > 680) { doc.addPage(); y = doc.y; }
                 
                 // Tarjeta de cliente
                 doc.rect(50, y, 495, 50).stroke('#e0e0e0');
@@ -670,153 +670,216 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             let y = doc.y;
             doc.rect(50, y, 495, 60).fill('#f8f9fa').stroke('#e9ecef');
             doc.fillColor('#000');
-            doc.fontSize(10).font('Helvetica-Bold').text('INGRESOS', 70, y + 10).text('COSTOS', 230, y + 10).text('GANANCIA BRUTA', 380, y + 10);
-            doc.fontSize(14).font('Helvetica').text(formatCurrency(revenue), 70, y + 25).text(formatCurrency(cogs), 230, y + 25).text(formatCurrency(grossProfit), 380, y + 25);
-            doc.fontSize(10).font('Helvetica-Bold').fillColor(margin < 0 ? 'red' : 'green').text(`${margin.toFixed(1)}% Margen`, 380, y + 45);
+            doc.fontSize(10).font('Helvetica-Bold');
+            doc.text('INGRESOS', 70, y + 10, { width: 150 });
+            doc.text('COSTOS', 230, y + 10, { width: 140 });
+            doc.text('GANANCIA BRUTA', 380, y + 10, { width: 150 });
+            doc.fontSize(14).font('Helvetica');
+            doc.text(formatCurrency(revenue), 70, y + 25, { width: 150 });
+            doc.text(formatCurrency(cogs), 230, y + 25, { width: 140 });
+            doc.text(formatCurrency(grossProfit), 380, y + 25, { width: 150 });
+            doc.fontSize(10).font('Helvetica-Bold').fillColor(margin < 0 ? 'red' : 'green');
+            doc.text(`${margin.toFixed(1)}% Margen`, 380, y + 45, { width: 150 });
             y += 70;
 
             // Caja de Operaciones
             doc.rect(50, y, 495, 50).fill('#f8f9fa').stroke('#e9ecef');
             doc.fillColor('#000');
-            doc.fontSize(10).font('Helvetica-Bold').text('TRANSACCIONES', 70, y + 10).text('TICKET PROMEDIO', 230, y + 10).text('UNIDADES VENDIDAS', 380, y + 10);
-            doc.fontSize(14).font('Helvetica').text(totals[0].salesCount, 70, y + 25).text(formatCurrency(totals[0].avgTicket || 0), 230, y + 25).text(items[0].totalItems, 380, y + 25);
+            doc.fontSize(10).font('Helvetica-Bold');
+            doc.text('TRANSACCIONES', 70, y + 10, { width: 150 });
+            doc.text('TICKET PROMEDIO', 230, y + 10, { width: 140 });
+            doc.text('UNIDADES VENDIDAS', 380, y + 10, { width: 150 });
+            doc.fontSize(14).font('Helvetica');
+            doc.text(String(totals[0].salesCount), 70, y + 25, { width: 150 });
+            doc.text(formatCurrency(totals[0].avgTicket || 0), 230, y + 25, { width: 140 });
+            doc.text(String(items[0].totalItems), 380, y + 25, { width: 150 });
             y += 60;
 
             // Caja de Inventario (Snapshot)
             doc.rect(50, y, 495, 50).fill('#f8f9fa').stroke('#e9ecef');
             doc.fillColor('#000');
-            doc.fontSize(10).font('Helvetica-Bold').text('VALOR INVENTARIO', 70, y + 10).text('PRODUCTOS CON STOCK BAJO', 300, y + 10);
-            doc.fontSize(14).font('Helvetica').text(formatCurrency(inventoryStats[0].totalValue || 0), 70, y + 25).text(inventoryStats[0].lowStockCount, 300, y + 25);
+            doc.fontSize(10).font('Helvetica-Bold');
+            doc.text('VALOR INVENTARIO', 70, y + 10, { width: 200 });
+            doc.text('PRODUCTOS CON STOCK BAJO', 300, y + 10, { width: 200 });
+            doc.fontSize(14).font('Helvetica');
+            doc.text(formatCurrency(inventoryStats[0].totalValue || 0), 70, y + 25, { width: 200 });
+            doc.text(String(inventoryStats[0].lowStockCount), 300, y + 25, { width: 200 });
 
             // --- 3. DIBUJAR DESGLOSES ---
             // Usar control manual de Y para evitar páginas en blanco por moveDown
             let currentY = y + 60; // Espacio después de la caja de inventario
 
-            const checkAddPage = (neededHeight) => {
+            const checkAddPage = (currentY, neededHeight) => {
                 if (currentY + neededHeight > doc.page.height - 50) {
                     doc.addPage();
-                    drawHeader();
-                    currentY = doc.y;
+                    return doc.y;
                 }
+                return currentY;
             };
 
             // Tabla Top 5 Productos
-            checkAddPage(120); // Verificar espacio para título + tabla pequeña
+            currentY = checkAddPage(currentY, 120); // Verificar espacio para título + tabla pequeña
             doc.fontSize(12).font('Helvetica-Bold').text('Top 5 Productos Vendidos', 50, currentY);
             currentY += 20;
 
             doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
             doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-            doc.text('Producto', 60, currentY + 6).text('Unidades', 350, currentY + 6, {width: 80, align: 'center'}).text('Ingreso', 440, currentY + 6, {width: 90, align: 'right'});
+            doc.text('Producto', 60, currentY + 6, { width: 280 });
+            doc.text('Unidades', 350, currentY + 6, {width: 80, align: 'center'});
+            doc.text('Ingreso', 440, currentY + 6, {width: 90, align: 'right'});
             currentY += 25;
             
             doc.font('Helvetica');
-            topProducts.forEach(p => {
-                doc.text(p.product_name.substring(0, 40), 60, currentY).text(p.totalSold, 350, currentY, {width: 80, align: 'center'}).text(formatCurrency(p.totalRevenue), 440, currentY, {width: 90, align: 'right'});
-                currentY += 15;
+            topProducts.forEach((p, i) => {
+                const productText = p.product_name.substring(0, 40);
+                const soldText = String(p.totalSold);
+                const revenueText = formatCurrency(p.totalRevenue);
+                const rowHeight = Math.max(doc.heightOfString(productText, { width: 290 }), doc.heightOfString(soldText, { width: 80 }), doc.heightOfString(revenueText, { width: 90 }));
+
+                const newY = checkAddPage(currentY, rowHeight + 5);
+                if (newY !== currentY) {
+                    currentY = newY;
+                    doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
+                    doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
+                    doc.text('Producto', 60, currentY + 6, { width: 280 });
+                    doc.text('Unidades', 350, currentY + 6, {width: 80, align: 'center'});
+                    doc.text('Ingreso', 440, currentY + 6, {width: 90, align: 'right'});
+                    currentY += 25;
+                    doc.font('Helvetica').fillColor('#000'); // Restablecer fuente
+                }
+
+                doc.font('Helvetica').fillColor('#000');
+                doc.text(productText, 60, currentY, { width: 290 });
+                doc.text(soldText, 350, currentY, {width: 80, align: 'center'});
+                doc.text(revenueText, 440, currentY, {width: 90, align: 'right'});
+                currentY += rowHeight + 5;
             });
             
             currentY += 20; // Espacio entre tablas
 
             // Tabla Top 5 Clientes
-            checkAddPage(120);
+            currentY = checkAddPage(currentY, 120);
             doc.fontSize(12).font('Helvetica-Bold').text('Top 5 Clientes', 50, currentY);
             currentY += 20;
 
             doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
             doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-            doc.text('Cliente', 60, currentY + 6).text('Compras', 350, currentY + 6, {width: 80, align: 'center'}).text('Total Gastado', 440, currentY + 6, {width: 90, align: 'right'});
+            doc.text('Cliente', 60, currentY + 6, { width: 280 });
+            doc.text('Compras', 350, currentY + 6, {width: 80, align: 'center'});
+            doc.text('Total Gastado', 440, currentY + 6, {width: 90, align: 'right'});
             currentY += 25;
             
             doc.font('Helvetica');
-            topClients.forEach(c => {
-                doc.text(c.name.substring(0, 30), 60, currentY).text(c.purchases, 350, currentY, {width: 80, align: 'center'}).text(formatCurrency(c.total), 440, currentY, {width: 90, align: 'right'});
-                currentY += 15;
+            topClients.forEach((c, i) => {
+                const clientText = c.name.substring(0, 30);
+                const purchasesText = String(c.purchases);
+                const totalText = formatCurrency(c.total);
+                const rowHeight = Math.max(doc.heightOfString(clientText, { width: 290 }), doc.heightOfString(purchasesText, { width: 80 }), doc.heightOfString(totalText, { width: 90 }));
+
+                const newY = checkAddPage(currentY, rowHeight + 5);
+                if (newY !== currentY) {
+                    currentY = newY;
+                    doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
+                    doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
+                    doc.text('Cliente', 60, currentY + 6, { width: 280 });
+                    doc.text('Compras', 350, currentY + 6, {width: 80, align: 'center'});
+                    doc.text('Total Gastado', 440, currentY + 6, {width: 90, align: 'right'});
+                    currentY += 25;
+                    doc.font('Helvetica').fillColor('#000'); // Restablecer fuente
+                }
+                doc.font('Helvetica').fillColor('#000');
+                doc.text(clientText, 60, currentY, { width: 290 });
+                doc.text(purchasesText, 350, currentY, {width: 80, align: 'center'});
+                doc.text(totalText, 440, currentY, {width: 90, align: 'right'});
+                currentY += rowHeight + 5;
             });
             
             currentY += 20;
 
             // Tabla Desglose Diario
-            checkAddPage(60);
+            currentY = checkAddPage(currentY, 60);
             doc.fontSize(12).font('Helvetica-Bold').text('Desglose de Ventas por Día', 50, currentY);
             currentY += 20;
             
             doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
             doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-            doc.text('Fecha', 60, currentY + 6).text('Transacciones', 350, currentY + 6, {width: 80, align: 'center'}).text('Total Vendido', 440, currentY + 6, {width: 90, align: 'right'});
+            doc.text('Fecha', 60, currentY + 6, { width: 280 });
+            doc.text('Transacciones', 350, currentY + 6, {width: 80, align: 'center'});
+            doc.text('Total Vendido', 440, currentY + 6, {width: 90, align: 'right'});
             currentY += 25;
             
             doc.font('Helvetica');
-            salesByDay.forEach(s => {
-                if (currentY > doc.page.height - 50) {
-                    doc.addPage();
-                    drawHeader();
-                    currentY = doc.y;
-                    
-                    // Redibujar encabezado en nueva página
+            salesByDay.forEach((s, i) => {
+                const dateStr = new Date(s.date).toLocaleDateString('es-CO', { timeZone: 'UTC' });
+                const countText = String(s.count);
+                const totalText = formatCurrency(s.total);
+                const rowHeight = Math.max(doc.heightOfString(dateStr, { width: 290 }), doc.heightOfString(countText, { width: 80 }), doc.heightOfString(totalText, { width: 90 }));
+
+                const newY = checkAddPage(currentY, rowHeight + 5);
+                if (newY !== currentY) {
+                    currentY = newY;
                     doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
                     doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-                    doc.text('Fecha', 60, currentY + 6).text('Transacciones', 350, currentY + 6, {width: 80, align: 'center'}).text('Total Vendido', 440, currentY + 6, {width: 90, align: 'right'});
+                    doc.text('Fecha', 60, currentY + 6, { width: 280 });
+                    doc.text('Transacciones', 350, currentY + 6, {width: 80, align: 'center'});
+                    doc.text('Total Vendido', 440, currentY + 6, {width: 90, align: 'right'});
                     currentY += 25;
-                    doc.font('Helvetica');
+                    doc.font('Helvetica').fillColor('#000'); // Restablecer fuente
                 }
-                const dateStr = new Date(s.date).toLocaleDateString('es-CO', { timeZone: 'UTC' });
-                doc.text(dateStr, 60, currentY).text(s.count, 350, currentY, {width: 80, align: 'center'}).text(formatCurrency(s.total), 440, currentY, {width: 90, align: 'right'});
-                currentY += 15;
+                doc.text(dateStr, 60, currentY, { width: 290 });
+                doc.text(String(s.count), 350, currentY, {width: 80, align: 'center'});
+                doc.text(formatCurrency(s.total), 440, currentY, {width: 90, align: 'right'});
+                currentY += rowHeight + 5;
             });
 
             // --- 4. INVENTARIO DISPONIBLE (NUEVO) ---
             const [fullInventory] = await db.query('SELECT product_name, stock, price FROM inventory ORDER BY product_name ASC');
             
-            currentY += 30;
-            checkAddPage(60);
+            currentY = checkAddPage(currentY, 90);
             doc.fontSize(12).font('Helvetica-Bold').text('Inventario Disponible', 50, currentY);
             currentY += 20;
 
             doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
             doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-            doc.text('Producto', 60, currentY + 6);
+            doc.text('Producto', 60, currentY + 6, { width: 280 });
             doc.text('Precio', 350, currentY + 6, {width: 80, align: 'right'});
             doc.text('Stock', 440, currentY + 6, {width: 90, align: 'center'});
             currentY += 25;
 
             doc.font('Helvetica');
-            fullInventory.forEach(p => {
-                if (currentY > doc.page.height - 50) {
-                    doc.addPage();
-                    drawHeader();
-                    currentY = doc.y;
-                    // Header de tabla
+            fullInventory.forEach((p, i) => {
+                const productText = p.product_name.substring(0, 50);
+                const priceText = formatCurrency(p.price);
+                const stockText = String(p.stock);
+                const rowHeight = Math.max(doc.heightOfString(productText, { width: 290 }), doc.heightOfString(priceText, { width: 80 }), doc.heightOfString(stockText, { width: 90 }));
+                
+                const newY = checkAddPage(currentY, rowHeight + 5);
+                if (newY !== currentY) {
+                    currentY = newY;
                     doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
                     doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-                    doc.text('Producto', 60, currentY + 6);
+                    doc.text('Producto', 60, currentY + 6, { width: 280 });
                     doc.text('Precio', 350, currentY + 6, {width: 80, align: 'right'});
                     doc.text('Stock', 440, currentY + 6, {width: 90, align: 'center'});
                     currentY += 25;
-                    doc.font('Helvetica');
+                    doc.font('Helvetica').fillColor('#000'); // Restablecer fuente
                 }
-                doc.text(p.product_name.substring(0, 50), 60, currentY);
-                doc.text(formatCurrency(p.price), 350, currentY, {width: 80, align: 'right'});
-                doc.text(p.stock, 440, currentY, {width: 90, align: 'center'});
-                currentY += 15;
+                
+                doc.font('Helvetica').fillColor('#000'); // <--- CORRECCIÓN: Restablecer fuente
+                doc.text(productText, 60, currentY, { width: 290 });
+                doc.text(priceText, 350, currentY, {width: 80, align: 'right'});
+                doc.text(stockText, 440, currentY, {width: 90, align: 'center'});
+                currentY += rowHeight + 5;
             });
-
-            // Actualizar cursor final
-            doc.y = currentY;
         }
 
         // --- PIE DE PÁGINA (Copyright y Paginación) ---
+        // El listener se encarga de los headers, ahora el footer al final
         const range = doc.bufferedPageRange();
         for (let i = range.start; i < range.start + range.count; i++) {
             doc.switchToPage(i);
-            doc.fontSize(8).fillColor('#666666');
-            
-            // Línea separadora footer
-            doc.moveTo(50, doc.page.height - 50).lineTo(545, doc.page.height - 50).strokeColor('#cccccc').stroke();
-            
-            doc.text(`Generado el ${new Date().toLocaleString('es-CO')}`, 50, doc.page.height - 40);
-            doc.text(`Página ${i + 1} de ${range.count}`, 0, doc.page.height - 40, { align: 'center' });
-            doc.text('© Business Control System', 0, doc.page.height - 40, { align: 'right' });
+            // Re-usamos la función generateFooter para consistencia
+            generateFooter(doc);
         }
 
         doc.end();

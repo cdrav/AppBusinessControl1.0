@@ -107,76 +107,13 @@ function renderInventory(products) {
     const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
     products.forEach((product, index) => {
-      const stockLevel = product.stock < 5 ? 'low' : product.stock < 20 ? 'medium' : 'high';
-      const stockBadge = `stock-${stockLevel}`;
-      const stockText = product.stock < 5 ? 'Bajo' : product.stock < 20 ? 'Medio' : 'Alto';
-      
-      // Generar botones solo si es admin
-      let actionButtons = '';
-      // Escapar comillas dobles y simples para evitar errores en el HTML
-      const safeName = product.product_name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-      if (userRole === 'admin') {
-        actionButtons = `
-          <button class="btn btn-outline-primary w-100 mb-2 btn-sm" onclick="manageStock(${product.id}, '${safeName}')">
-            <i class="bi bi-shop me-1"></i> Gestionar Stock por Sede
-          </button>
-          <div class="d-flex gap-2 pt-3 border-top">
-            <button class="btn btn-light flex-fill text-primary btn-sm" onclick="editProduct(${product.id})">
-              <i class="bi bi-pencil me-1"></i> Editar
-            </button>
-            <button class="btn btn-light flex-fill text-danger btn-sm" onclick="deleteProduct(${product.id})">
-              <i class="bi bi-trash me-1"></i> Eliminar
-            </button>
-          </div>
-        `;
-      }
-
-      const totalProductValue = product.stock * product.price;
-      const barcodeHtml = product.barcode ? `<div class="mb-2"><span class="badge bg-light text-dark border"><i class="bi bi-upc-scan me-1"></i>${product.barcode}</span></div>` : '';
-      
-      const cardHtml = `
-        <div class="col-md-6 col-lg-4 fade-in">
-          <div class="card h-100 border-0 shadow-sm" style="border-radius: 15px;">
-            <div class="card-body p-4">
-              <div class="d-flex justify-content-between align-items-start mb-3">
-                <div class="d-flex align-items-center">
-                  <div class="rounded-circle bg-light p-2 me-3 text-primary">
-                    <i class="bi bi-box-seam fs-4"></i>
-                  </div>
-                  <div>
-                    <h5 class="card-title mb-0 fw-bold">${product.product_name}</h5>
-                    <small class="text-muted">ID: #${product.id || index + 1}</small>
-                  </div>
-                </div>
-                <span class="stock-badge ${stockBadge}">${stockText}</span>
-              </div>
-              ${barcodeHtml}
-              
-              <div class="row g-2 mb-4">
-                <div class="col-4">
-                  <small class="text-muted d-block">Precio</small>
-                  <span class="fw-bold">${formatCurrency(product.price || 0)}</span>
-                </div>
-                <div class="col-4">
-                  <small class="text-muted d-block">Costo</small>
-                  <span class="fw-bold text-secondary">${formatCurrency(product.cost || 0)}</span>
-                </div>
-                <div class="col-4">
-                  <small class="text-muted d-block">Stock</small>
-                  <span class="fw-bold">${product.stock} un.</span>
-                </div>
-              </div>
-              ${actionButtons}
-            </div>
-          </div>
-        </div>
-      `;
-      grid.insertAdjacentHTML('beforeend', cardHtml);
+      const cardElement = createProductCardElement(product, index, formatCurrency);
+      grid.appendChild(cardElement);
 
       totalProducts++;
       totalStock += product.stock;
       if (product.stock < 5) lowStockCount++;
-      totalValue += totalProductValue;
+      totalValue += product.stock * product.price;
     });
 
     document.getElementById('totalProducts').textContent = totalProducts;
@@ -184,6 +121,88 @@ function renderInventory(products) {
     document.getElementById('lowStock').textContent = lowStockCount;
     document.getElementById('totalValue').textContent = formatCurrency(totalValue || 0);
   }
+}
+
+function createProductCardElement(product, index, formatCurrency) {
+    const stockLevel = product.stock < 5 ? 'low' : product.stock < 20 ? 'medium' : 'high';
+    const stockBadgeClass = `stock-${stockLevel}`;
+    const stockText = product.stock < 5 ? 'Bajo' : product.stock < 20 ? 'Medio' : 'Alto';
+
+    const col = document.createElement('div');
+    col.className = 'col-md-6 col-lg-4 fade-in';
+
+    const card = document.createElement('div');
+    card.className = 'card h-100 border-0 shadow-sm';
+    card.style.borderRadius = '15px';
+
+    const cardBody = document.createElement('div');
+    cardBody.className = 'card-body p-4 d-flex flex-column';
+
+    let barcodeHtml = '';
+    if (product.barcode) {
+        barcodeHtml = `<div class="mb-2"><span class="badge bg-light text-dark border"><i class="bi bi-upc-scan me-1"></i>${product.barcode}</span></div>`;
+    }
+
+    // Usamos textContent para insertar datos de forma segura
+    const title = document.createElement('h5');
+    title.className = 'card-title mb-0 fw-bold';
+    title.textContent = product.product_name;
+
+    const idText = document.createElement('small');
+    idText.className = 'text-muted';
+    idText.textContent = `ID: #${product.id || index + 1}`;
+
+    cardBody.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div class="d-flex align-items-center">
+                <div class="rounded-circle bg-light p-2 me-3 text-primary">
+                    <i class="bi bi-box-seam fs-4"></i>
+                </div>
+                <div class="title-container"></div>
+            </div>
+            <span class="stock-badge ${stockBadgeClass}">${stockText}</span>
+        </div>
+        ${barcodeHtml}
+        <div class="row g-2 mb-4">
+            <div class="col-4"><small class="text-muted d-block">Precio</small><span class="fw-bold">${formatCurrency(product.price || 0)}</span></div>
+            <div class="col-4"><small class="text-muted d-block">Costo</small><span class="fw-bold text-secondary">${formatCurrency(product.cost || 0)}</span></div>
+            <div class="col-4"><small class="text-muted d-block">Stock</small><span class="fw-bold">${product.stock} un.</span></div>
+        </div>
+    `;
+    
+    cardBody.querySelector('.title-container').append(title, idText);
+
+    // Añadir botones de acción programáticamente si es admin
+    if (userRole === 'admin') {
+        const buttonWrapper = document.createElement('div');
+        buttonWrapper.className = 'mt-auto'; // Empuja los botones al final
+
+        const manageStockBtn = document.createElement('button');
+        manageStockBtn.className = 'btn btn-outline-primary w-100 mb-2 btn-sm';
+        manageStockBtn.innerHTML = '<i class="bi bi-shop me-1"></i> Gestionar Stock por Sede';
+        manageStockBtn.onclick = () => manageStock(product.id, product.product_name);
+
+        const actionButtonsContainer = document.createElement('div');
+        actionButtonsContainer.className = 'd-flex gap-2 pt-3 border-top';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-light flex-fill text-primary btn-sm';
+        editBtn.innerHTML = '<i class="bi bi-pencil me-1"></i> Editar';
+        editBtn.onclick = () => editProduct(product.id);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-light flex-fill text-danger btn-sm';
+        deleteBtn.innerHTML = '<i class="bi bi-trash me-1"></i> Eliminar';
+        deleteBtn.onclick = () => deleteProduct(product.id);
+
+        actionButtonsContainer.append(editBtn, deleteBtn);
+        buttonWrapper.append(manageStockBtn, actionButtonsContainer);
+        cardBody.appendChild(buttonWrapper);
+    }
+
+    card.appendChild(cardBody);
+    col.appendChild(card);
+    return col;
 }
 
 function filterInventory() {

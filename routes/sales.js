@@ -184,13 +184,27 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
         doc.text('SUBTOTAL', 430, tableTop + 5, { width: 110, align: 'right' });
 
         let y = tableTop + 25;
+        
+        // Función para controlar el salto de página
+        const checkAddPage = (currentY) => {
+            if (currentY > 750) { // Si nos acercamos al final de la página A4
+                doc.addPage();
+                return 50; // Reiniciar Y al margen superior
+            }
+            return currentY;
+        };
+
         doc.fillColor('#000').font('Helvetica');
         details.forEach((d, i) => {
+            y = checkAddPage(y); // Verificar espacio antes de escribir
+            
             if (i % 2 === 1) doc.rect(50, y - 5, 500, 20).fill('#f9f9f9');
             doc.fillColor('#000').text(d.product_name, 60, y).text(d.quantity, 300, y, { width: 40, align: 'center' }).text(formatCurrency(d.unit_price), 350, y, { width: 70, align: 'right' }).text(formatCurrency(d.subtotal), 430, y, { width: 110, align: 'right' });
             y += 20;
         });
-        doc.fontSize(12).font('Helvetica-Bold').text(`TOTAL: ${formatCurrency(sale[0].total_price)}`, 430, y + 10, { width: 110, align: 'right' });
+        
+        y = checkAddPage(y + 20); // Verificar espacio para el total
+        doc.fontSize(12).font('Helvetica-Bold').text(`TOTAL: ${formatCurrency(sale[0].total_price)}`, 430, y, { width: 110, align: 'right' });
         
         doc.moveDown(2);
         doc.fontSize(8).font('Helvetica').text(`© ${new Date().getFullYear()} Business Control - Desarrollado por Cristian David Ruiz. Todos los derechos reservados.`, { align: 'center' });
