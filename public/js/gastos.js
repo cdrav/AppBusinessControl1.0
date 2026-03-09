@@ -1,15 +1,33 @@
 const API_URL = '';
 let expenseModal;
 let currentExpenses = []; // Almacenar gastos para edición
+let userRole = 'cajero'; // Valor por defecto
 
 document.addEventListener('DOMContentLoaded', () => {
     expenseModal = new bootstrap.Modal(document.getElementById('expenseModal'));
+    checkUserRole();
     loadExpenses();
     loadSuppliers();
     loadBranches();
 
     document.getElementById('expenseForm').addEventListener('submit', handleExpenseSubmit);
 });
+
+function checkUserRole() {
+    const token = localStorage.getItem('token');
+    if (token) {
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            userRole = payload.role;
+            
+            // Si no es admin, ocultar el selector de sucursal en el formulario
+            if (userRole !== 'admin') {
+                const branchContainer = document.getElementById('expenseBranch').closest('.col-md-6') || document.getElementById('expenseBranch').parentElement;
+                if (branchContainer) branchContainer.style.display = 'none';
+            }
+        } catch (e) { console.error(e); }
+    }
+}
 
 async function loadExpenses() {
     const tbody = document.getElementById('expensesTableBody');
@@ -82,6 +100,9 @@ async function loadSuppliers() {
 }
 
 async function loadBranches() {
+    // Si no es admin, no necesitamos cargar las sedes
+    if (userRole !== 'admin') return;
+
     const select = document.getElementById('expenseBranch');
     try {
         const res = await fetch(`${API_URL}/branches`, {

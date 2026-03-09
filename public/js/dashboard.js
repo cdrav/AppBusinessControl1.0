@@ -101,6 +101,12 @@ function setupUserSession(branchId) {
                                 addSaleLink.href = `addSale.html?branch_id=${branchId}`;
                             }
 
+                            // Sugerencia: Actualizar también el enlace de "Inventario"
+                            const inventoryLink = document.querySelector('a[href="inventarios.html"]');
+                            if (inventoryLink) {
+                                inventoryLink.href = `inventarios.html?branch_id=${branchId}`;
+                            }
+
                             // Ocultar el módulo de gestión de sedes, ya que no tiene sentido dentro de una sede.
                             const sedesModuleLink = document.querySelector('a[href="sedes.html"]');
                             if (sedesModuleLink) {

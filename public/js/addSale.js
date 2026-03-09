@@ -4,8 +4,16 @@ let products = [];
 let clients = [];
 let currentCoupon = null; // Almacenar cupón activo
 
+// Fallback de seguridad: Si utils.js no está cargado, usamos alert() para evitar errores
+if (typeof showToast === 'undefined') {
+    window.showToast = function(message, isError = false) {
+        alert(message);
+    };
+}
+
 // Cargar datos al iniciar
 document.addEventListener('DOMContentLoaded', function() {
+  injectSuccessModal(); // Inyectar el HTML del modal de éxito
   loadClients();
   loadProducts();
   setTodayDate();
@@ -18,6 +26,70 @@ document.addEventListener('DOMContentLoaded', function() {
   const scannerInput = document.getElementById('barcodeScannerInput');
   if (scannerInput) setTimeout(() => scannerInput.focus(), 150);
 });
+
+// Inyectar el modal de éxito en el DOM para no modificar el HTML
+function injectSuccessModal() {
+    if (document.getElementById('saleSuccessModal')) return;
+
+    const modalHtml = `
+    <div class="modal fade" id="saleSuccessModal" tabindex="-1" aria-labelledby="saleSuccessModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
+          <div class="modal-body text-center p-4 p-lg-5">
+            <div class="mb-4">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-success">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/>
+                </svg>
+            </div>
+            <h3 class="modal-title fw-bold" id="saleSuccessModalLabel">¡Venta Exitosa!</h3>
+            <p class="text-muted mt-2">La venta ha sido registrada correctamente.</p>
+            
+            <div class="bg-light p-3 rounded mt-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Total Pagado:</span>
+                    <span class="fw-bold fs-5" id="modalTotalPaid"></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="text-muted">Cambio a devolver:</span>
+                    <span class="fw-bold fs-5 text-primary" id="modalChange"></span>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+                <button type="button" class="btn btn-primary" onclick="window.location.href='ventas.html'">Ver Historial de Ventas</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" onclick="resetSaleForm()">Registrar Nueva Venta</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// Función para resetear el formulario desde el modal
+function resetSaleForm() {
+    document.getElementById('addSaleForm').reset();
+    setTodayDate();
+    currentCoupon = null; // Limpiar cupón
+    document.getElementById('couponMessage').innerHTML = '';
+    
+    // Resetear la primera fila de producto y eliminar las adicionales
+    const productsContainer = document.getElementById('productsContainer');
+    while (productsContainer.children.length > 1) {
+        productsContainer.removeChild(productsContainer.lastChild);
+    }
+    const firstItem = productsContainer.querySelector('.product-item');
+    if (firstItem) {
+        firstItem.querySelector('.product-select').value = '';
+        firstItem.querySelector('.quantity-input').value = '';
+    }
+    
+    updateSummary();
+
+    // Re-enfocar el scanner
+    const scannerInput = document.getElementById('barcodeScannerInput');
+    if (scannerInput) scannerInput.focus();
+}
 
 // Establecer fecha actual
 function setTodayDate() {
@@ -400,44 +472,16 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     const data = await response.json();
     
     if (response.ok) {
-      showToast('¡Venta registrada con éxito!');
-      document.getElementById('addSaleForm').reset();
-      setTodayDate();
+      // Mostrar el nuevo modal de éxito en lugar del toast y el redirect
+      const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      const change = Math.max(0, amountPaid - total);
+
+      document.getElementById('modalTotalPaid').textContent = formatCurrency(total);
+      document.getElementById('modalChange').textContent = formatCurrency(change);
       
-      // Resetear productos
-      document.getElementById('productsContainer').innerHTML = `
-        <div class="product-item">
-          <div class="product-info">
-            <select class="form-control product-select" required style="width: 250px;">
-              <option value="">Selecciona un producto</option>
-            </select>
-          </div>
-          <div class="d-flex align-items-center gap-3">
-            <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 130px;">
-            <span class="product-price">$0</span>
-            <button type="button" class="btn btn-danger btn-sm remove-product">
-              <i class="bi bi-trash"></i>
-            </button>
-          </div>
-        </div>
-      `;
-      
-      updateProductSelects();
-      updateSummary();
-      
-      // Re-agregar event listeners
-      document.querySelector('.product-select').addEventListener('change', updateSummary);
-      document.querySelector('.quantity-input').addEventListener('input', updateSummary);
-      document.querySelector('.remove-product').addEventListener('click', function() {
-        if (document.querySelectorAll('.product-item').length > 1) {
-          this.closest('.product-item').remove();
-          updateSummary();
-        }
-      });
-      
-      setTimeout(() => {
-        window.location.href = 'ventas.html';
-      }, 2000);
+      const successModal = new bootstrap.Modal(document.getElementById('saleSuccessModal'));
+      successModal.show();
+
     } else {
       throw new Error(data.message || 'Error al registrar la venta');
     }

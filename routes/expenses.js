@@ -20,11 +20,17 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Registrar un nuevo gasto
-router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    const { description, amount, category, supplier_id, branch_id, expense_date } = req.body;
+router.post('/', authenticateToken, async (req, res) => {
+    const { description, amount, category, supplier_id, expense_date } = req.body;
+    let { branch_id } = req.body;
 
     if (!description || !amount || !expense_date) {
         return res.status(400).json({ message: 'Descripción, monto y fecha son requeridos.' });
+    }
+
+    // Si el usuario NO es admin, forzamos que el gasto sea de su sucursal
+    if (req.user.role !== 'admin') {
+        branch_id = req.user.branch_id;
     }
 
     try {

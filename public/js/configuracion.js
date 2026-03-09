@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSettings();
     loadBranches();
     document.getElementById('configForm')?.addEventListener('submit', saveSettings);
+    document.getElementById('branchesTableBody')?.addEventListener('click', handleBranchActions);
     document.getElementById('addBranchForm')?.addEventListener('submit', handleAddBranch);
 
     // Previsualización inmediata del logo al seleccionar archivo
@@ -140,7 +141,7 @@ async function loadBranches() {
                 <td>${b.phone || '-'}</td>
                 <td class="text-end">
                     ${b.id !== 1 ? `
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBranch(${b.id})">
+                    <button class="btn btn-sm btn-outline-danger" data-action="delete" data-id="${b.id}" title="Eliminar Sucursal">
                         <i class="bi bi-trash"></i>
                     </button>` : ''}
                 </td>
@@ -179,7 +180,19 @@ async function handleAddBranch(e) {
     }
 }
 
-window.deleteBranch = async function(id) {
+function handleBranchActions(e) {
+    const target = e.target.closest('button');
+    if (!target) return;
+
+    const action = target.dataset.action;
+    const id = target.dataset.id;
+
+    if (action === 'delete') {
+        deleteBranch(id);
+    }
+}
+
+async function deleteBranch(id) {
     if (!confirm('¿Eliminar esta sucursal?')) return;
     try {
         const response = await fetch(`${API_URL}/branches/${id}`, {
