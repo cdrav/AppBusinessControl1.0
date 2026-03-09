@@ -42,6 +42,18 @@ async function setup() {
     await connection.changeUser({ database: dbName });
     console.log(`✅ Base de datos '${dbName}' creada/seleccionada.`);
 
+    // --- REPARACIÓN AVANZADA DE TABLAS ---
+    // En lugar de borrar la BD, borramos todas las tablas para evitar errores de 'rmdir'.
+    console.log(`🧹 Forzando limpieza de todas las tablas en '${dbName}'...`);
+    await connection.query(`SET FOREIGN_KEY_CHECKS = 0;`);
+    const [tablesToDrop] = await connection.query(`SHOW TABLES;`);
+    for (const tableRow of tablesToDrop) {
+        const tableName = Object.values(tableRow)[0];
+        await connection.query(`DROP TABLE IF EXISTS \`${tableName}\`;`);
+    }
+    await connection.query(`SET FOREIGN_KEY_CHECKS = 1;`);
+    console.log('✅ Todas las tablas existentes han sido eliminadas para una recreación limpia.');
+
     // 3. --- CREACIÓN DE TABLAS ---
     const tables = [
       `CREATE TABLE IF NOT EXISTS users (

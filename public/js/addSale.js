@@ -4,23 +4,17 @@ let products = [];
 let clients = [];
 let currentCoupon = null; // Almacenar cupón activo
 
-// Fallback de seguridad: Si utils.js no está cargado, usamos alert() para evitar errores
-if (typeof showToast === 'undefined') {
-    window.showToast = function(message, isError = false) {
-        alert(message);
-    };
-}
-
 // Cargar datos al iniciar
 document.addEventListener('DOMContentLoaded', function() {
-  injectSuccessModal(); // Inyectar el HTML del modal de éxito
+  injectSuccessModal();
   loadClients();
   loadProducts();
   setTodayDate();
   setupBarcodeScanner();
   
   // Listener para cálculo de cambio
-  document.getElementById('amountPaid').addEventListener('input', calculateChange);
+  const amountPaidInput = document.getElementById('amountPaid');
+  if(amountPaidInput) amountPaidInput.addEventListener('input', calculateChange);
 
   // Enfocar el campo de código de barras de forma segura al cargar la página
   const scannerInput = document.getElementById('barcodeScannerInput');
@@ -67,7 +61,7 @@ function injectSuccessModal() {
 }
 
 // Función para resetear el formulario desde el modal
-function resetSaleForm() {
+window.resetSaleForm = function() {
     document.getElementById('addSaleForm').reset();
     setTodayDate();
     currentCoupon = null; // Limpiar cupón
@@ -472,14 +466,15 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     const data = await response.json();
     
     if (response.ok) {
-      // Mostrar el nuevo modal de éxito en lugar del toast y el redirect
       const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
       const change = Math.max(0, amountPaid - total);
-
+      
+      // Ahora podemos llamar al modal directamente y con seguridad.
       document.getElementById('modalTotalPaid').textContent = formatCurrency(total);
       document.getElementById('modalChange').textContent = formatCurrency(change);
       
-      const successModal = new bootstrap.Modal(document.getElementById('saleSuccessModal'));
+      const successModalEl = document.getElementById('saleSuccessModal');
+      const successModal = bootstrap.Modal.getOrCreateInstance(successModalEl);
       successModal.show();
 
     } else {
