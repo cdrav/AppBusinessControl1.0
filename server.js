@@ -49,14 +49,25 @@ cron.schedule('0 20 * * *', async () => {
     console.log('🕒 Ejecutando cierre de caja diario...');
     try {
         const msg = await sendDailySummaryEmail(new Date());
-        console.log(`✅ ${msg}`);
+        console.log(`${msg}`);
     } catch (error) {
-        console.error('❌ Error en cierre de caja:', error);
+        console.error('Error en cierre de caja:', error);
     }
 }, { scheduled: true, timezone: "America/Bogota" });
 
-// Iniciar Servidor
+// Health check endpoint para Railway
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor modular iniciado en puerto ${PORT}`);
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
 });
