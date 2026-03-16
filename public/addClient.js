@@ -1,3 +1,5 @@
+import { API_URL } from './config.js'; // Importar la URL de la API
+
 // Manejar el envío del formulario para agregar clientes
 document.getElementById('addClientForm').addEventListener('submit', function (event) {
     event.preventDefault(); // Evita que se recargue la página
@@ -12,8 +14,6 @@ document.getElementById('addClientForm').addEventListener('submit', function (ev
     const phone = document.getElementById('phone').value;
     const address = document.getElementById('address').value;
   
-    const API_URL = '';
-
     // Realizar una solicitud al backend para agregar el cliente
     fetch(`${API_URL}/clients`, {
       method: 'POST',

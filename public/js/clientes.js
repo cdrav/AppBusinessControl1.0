@@ -1,24 +1,16 @@
 // Clientes Page JavaScript
-const API_URL = ''; // Ruta relativa para producción
+import { API_URL } from './config.js';
+import { getUserRole, protectRoute } from './auth.js';
+
 let clients = [];
-let userRole = 'cajero'; // Por defecto
+const userRole = getUserRole();
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
-  setupUserSession();
+  protectRoute(); // Si no hay token, redirige a login
   loadClients();
   setupEventListeners();
 });
-
-function setupUserSession() {
-    const token = localStorage.getItem('token');
-    if (token) {
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            userRole = payload.role;
-        } catch (e) { console.error(e); }
-    }
-}
 
 // Setup event listeners
 function setupEventListeners() {
