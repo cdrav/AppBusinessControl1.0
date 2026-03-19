@@ -1,7 +1,7 @@
 // Leer el ID del cliente desde la URL
+import { API_URL } from '../config.js';
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get('id');
-const API_URL = ''; // Ruta relativa para producción
 
 // Función para cargar los datos del cliente
 function loadClientData() {

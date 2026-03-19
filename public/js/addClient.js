@@ -1,50 +1,43 @@
-// Add Client Page JavaScript
-const API_URL = ''; // Ruta relativa para producción
+import { API_URL } from '../config.js'; // Ruta corregida para estar dentro de js/
 
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('addClientForm');
-    
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
-        
-        // Datos del formulario
-        const clientData = {
-            name: document.getElementById('name').value,
-            email: document.getElementById('email').value,
-            phone: document.getElementById('phone').value,
-            address: document.getElementById('address').value
-        };
+// Manejar el envío del formulario para agregar clientes
+document.getElementById('addClientForm').addEventListener('submit', function (event) {
+    event.preventDefault(); // Evita que se recargue la página
+  
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Guardando...';
 
-        // Estado de carga
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Guardando...';
-
-        try {
-            const response = await fetch(`${API_URL}/clients`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + localStorage.getItem('token')
-                },
-                body: JSON.stringify(clientData)
-            });
-
-            if (response.ok) {
-                alert('Cliente agregado exitosamente');
-                window.location.href = 'clientes.html';
-            } else {
-                const data = await response.json();
-                alert('Error: ' + (data.message || 'No se pudo agregar el cliente'));
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Error de conexión al servidor');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    const phone = document.getElementById('phone').value;
+    const address = document.getElementById('address').value;
+  
+    // Realizar una solicitud al backend para agregar el cliente
+    fetch(`${API_URL}/clients`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token'), // Token de autenticación
+      },
+      body: JSON.stringify({ name, email, phone, address }), // Enviar datos en JSON
+    })
+    .then(async response => {
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'No se pudo agregar el cliente');
         }
+        return data;
+    })
+    .then(data => {
+        showToast(data.message || 'Cliente agregado exitosamente');
+        setTimeout(() => window.location.href = 'clientes.html', 1500); // Redirigir tras un momento
+    })
+    .catch(error => {
+        console.error('Error al agregar cliente:', error);
+        showToast(error.message, true);
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
     });
 });

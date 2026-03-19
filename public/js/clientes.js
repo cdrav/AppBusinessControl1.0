@@ -1,5 +1,5 @@
 // Clientes Page JavaScript
-import { API_URL } from './config.js';
+import { API_URL } from '../config.js';
 import { getUserRole, protectRoute } from './auth.js';
 
 let clients = [];

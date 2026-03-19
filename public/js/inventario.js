@@ -1,5 +1,5 @@
 // Lógica para la página de inventario
-const API_URL = ''; // Ruta relativa para producción
+import { API_URL } from '../config.js';
 const INVENTORY_ENDPOINT = `${API_URL}/inventory`;
 let allProducts = [];
 let userRole = 'cajero'; // Valor por defecto seguro
@@ -69,7 +69,8 @@ async function loadInventory() {
     }
 
     if (!response.ok) {
-      throw new Error('Error al cargar el inventario');
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.message || 'Error al cargar el inventario');
     }
 
     allProducts = await response.json();
