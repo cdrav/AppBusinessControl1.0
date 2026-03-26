@@ -3,6 +3,7 @@ const API_URL = ''; // Ruta relativa para producción
 let revenueChart; // Variable global para el gráfico
 let topProductsChart; // Variable para el gráfico de productos top
 let comparisonChart; // Variable para el gráfico de comparación
+let cashVsCreditChart; // Variable para el nuevo gráfico
 
 document.addEventListener('DOMContentLoaded', function() {
     updateDate();
@@ -15,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDashboardStats('7days', branchId);
     initRevenueChart();
     initTopProductsChart();
+    initCashVsCreditChart();
     initComparisonChart();
 
     // Listener para el filtro de ingresos
@@ -242,8 +244,15 @@ async function loadDashboardStats(period = '7days', branchId = null) {
         
         const stats = await response.json();
 
-        document.getElementById('totalRevenue').textContent = parseFloat(stats.totalRevenue).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        document.getElementById('totalExpenses').textContent = parseFloat(stats.totalExpenses).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        const formatCOP = (val) => parseFloat(val || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
+
+        document.getElementById('totalRevenue').textContent = formatCOP(stats.totalRevenue);
+        document.getElementById('totalExpenses').textContent = formatCOP(stats.totalExpenses);
+        
+        if (document.getElementById('totalCredits')) {
+            document.getElementById('totalCredits').textContent = formatCOP(stats.totalCredits);
+        }
+
         document.getElementById('totalSales').textContent = stats.totalSales;
         document.getElementById('totalClients').textContent = stats.totalClients;
 
@@ -270,6 +279,12 @@ async function loadDashboardStats(period = '7days', branchId = null) {
         // Actualizar gráfico de productos top
         updateTopProductsChart(stats.topProducts);
 
+        // Actualizar gráfico de Efectivo vs Crédito
+        if (cashVsCreditChart) {
+            cashVsCreditChart.data.datasets[0].data = [parseFloat(stats.cashRevenue), parseFloat(stats.creditRevenue)];
+            cashVsCreditChart.update();
+        }
+
         // Actualizar lista de actividad reciente
         updateRecentActivity(stats.recentActivity); 
 
@@ -281,8 +296,11 @@ async function loadDashboardStats(period = '7days', branchId = null) {
             // Ocultar estas tarjetas si estamos en una vista de sede
             const staleCard = document.getElementById('staleProductsCard');
             const inactiveCard = document.getElementById('inactiveClientsCard');
+            const delinquentCard = document.getElementById('topDelinquentClientsCard'); // New card
+            if (delinquentCard) delinquentCard.style.display = 'block';
             if (staleCard) staleCard.style.display = 'none';
             if (inactiveCard) inactiveCard.style.display = 'none';
+            if (delinquentCard) delinquentCard.style.display = 'none'; // Hide if in branch view
         }
 
     } catch (error) {
@@ -464,6 +482,45 @@ function initComparisonChart() {
             }
         }
     });
+}
+
+function initCashVsCreditChart() {
+    const ctx = document.getElementById('cashVsCreditChart');
+    if (!ctx) return;
+
+    cashVsCreditChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Efectivo', 'Crédito'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: ['#10B981', '#F59E0B'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed || 0;
+                            return context.label + ': ' + new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
+                        }
+                    }
+                }
+            },
+            cutout: '70%'
+        }
+    });
+}
+
+function updateCashVsCreditChart(cash, credit) {
+    if (!cashVsCreditChart) return;
+    cashVsCreditChart.data.datasets[0].data = [parseFloat(cash), parseFloat(credit)];
+    cashVsCreditChart.update();
 }
 
 function updateComparisonChart(salesData, expensesData, period = '7days') {
@@ -760,6 +817,60 @@ function updateInactiveClients(clients) {
         list.insertAdjacentHTML('beforeend', row);
     });
 }
+
+function updateTopDelinquentClients(clients) {
+    const card = document.getElementById('topDelinquentClientsCard');
+    const list = document.getElementById('topDelinquentClientsList');
+
+    if (!card || !list) return;
+
+    if (!clients || clients.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+
+    card.style.display = 'block';
+    list.innerHTML = '';
+
+    const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+    clients.forEach(client => {
+        const row = `
+            <tr>
+                <td>
+                    <div class="fw-bold">${client.client_name}</div>
+                </td>
+                <td>
+                    <div class="small"><i class="bi bi-envelope me-1"></i>${client.email || '-'}</div>
+                    <div class="small"><i class="bi bi-telephone me-1"></i>${client.phone || '-'}</div>
+                </td>
+                <td>
+                    <span class="badge bg-danger text-white">${formatCurrency(client.total_debt)}</span>
+                </td>
+                <td class="text-end">
+                    <a href="mailto:${client.email}" class="btn btn-sm btn-outline-primary" title="Enviar Correo">
+                        <i class="bi bi-envelope"></i>
+                    </a>
+                    <a href="https://wa.me/${client.phone ? client.phone.replace(/[^0-9]/g, '') : ''}" target="_blank" class="btn btn-sm btn-outline-success" title="Contactar por WhatsApp">
+                        <i class="bi bi-whatsapp"></i>
+                    </a>
+                    <a href="clientes.html?id=${client.client_id}" class="btn btn-sm btn-outline-info" title="Ver Historial">
+                        <i class="bi bi-clock-history"></i>
+                    </a>
+                </td>
+            </tr>
+        `;
+        list.insertAdjacentHTML('beforeend', row);
+    });
+}
+
+
+// ... existing code ...
+
+        // Actualizar lista de clientes morosos
+        if (!branchId) { // Solo si no estamos en la vista de una sede específica
+            updateTopDelinquentClients(stats.topDelinquentClients);
+        }
 
 function formatTimeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);

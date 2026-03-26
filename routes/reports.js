@@ -42,6 +42,13 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         // 1. Ingresos Totales (filtrado)
         const [revenue] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as total FROM sales ${salesWhereClause}`, queryParams);
         
+        // 1.1 Desglose Efectivo vs Crédito
+        const cashWhere = salesWhereClause ? `${salesWhereClause} AND is_credit = 0` : "WHERE is_credit = 0";
+        const creditWhereSales = salesWhereClause ? `${salesWhereClause} AND is_credit = 1` : "WHERE is_credit = 1";
+        
+        const [cashRevenue] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as total FROM sales ${cashWhere}`, queryParams);
+        const [creditRevenue] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as total FROM sales ${creditWhereSales}`, queryParams);
+        
         // 2. Total Ventas (filtrado)
         const [salesCount] = await db.query(`SELECT COUNT(*) as total FROM sales ${salesWhereClause}`, queryParams);
 
@@ -71,6 +78,15 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         const expensesWhereClause = expensesWhereClauses.length > 0 ? `WHERE ${expensesWhereClauses.join(' AND ')}` : '';
         
         const [expenses] = await db.query(`SELECT COALESCE(SUM(amount), 0) as total FROM expenses ${expensesWhereClause}`, queryParams);
+
+        // NUEVO: Cartera Pendiente (Total de deudas activas)
+        let creditsWhere = "WHERE tenant_id = ? AND status = 'active'";
+        let creditsParams = [req.user.tenant_id];
+        if (branch_id) {
+            creditsWhere += " AND sale_id IN (SELECT id FROM sales WHERE branch_id = ?)";
+            creditsParams.push(branch_id);
+        }
+        const [credits] = await db.query(`SELECT COALESCE(SUM(remaining_balance), 0) as totalDebt FROM credits ${creditsWhere}`, creditsParams);
 
         const [expensesTrend] = await db.query(`
             SELECT ${selectDate.replace('sale_date', 'expense_date')}, SUM(amount) as total 
@@ -130,10 +146,29 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             HAVING last_purchase < DATE_SUB(NOW(), INTERVAL 60 DAY)
             LIMIT 5
         `);
+        
+        // NUEVO: Top Clientes Morosos (con saldo pendiente)
+        const [topDelinquentClients] = await db.query(`
+            SELECT 
+                cl.id as client_id,
+                cl.name as client_name,
+                cl.email,
+                cl.phone,
+                SUM(c.remaining_balance) as total_debt
+            FROM credits c
+            JOIN clients cl ON c.client_id = cl.id
+            WHERE c.tenant_id = ? AND c.status = 'active'
+            GROUP BY cl.id, cl.name, cl.email, cl.phone
+            ORDER BY total_debt DESC
+            LIMIT 5
+        `, [req.user.tenant_id]);
 
         res.json({
             totalRevenue: revenue[0].total,
+            cashRevenue: cashRevenue[0].total,
+            creditRevenue: creditRevenue[0].total,
             totalExpenses: expenses[0].total,
+            totalCredits: credits[0].totalDebt, // Enviamos el total de cartera
             totalSales: salesCount[0].total,
             totalClients: clients[0].total,
             totalProducts: products[0].total,
@@ -142,8 +177,9 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             expensesTrend,
             topProducts,
             recentActivity: recentSales,
-            staleProducts,
-            inactiveClients
+            staleProducts, // Productos sin ventas en 30 días
+            inactiveClients, // Clientes sin compras en 60 días
+            topDelinquentClients // Clientes con mayor deuda pendiente
         });
 
     } catch (error) {

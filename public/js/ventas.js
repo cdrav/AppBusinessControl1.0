@@ -63,6 +63,11 @@ function renderSalesTable(sales) {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
     
+    // Badge para crédito
+    const statusBadge = sale.is_credit ? 
+        '<span class="badge bg-warning text-dark rounded-pill">Crédito</span>' : 
+        '<span class="badge bg-success bg-opacity-10 text-success rounded-pill">Completado</span>';
+
     const row = `
       <tr class="fade-in">
         <td><span class="fw-bold">#${sale.id}</span></td>
@@ -81,7 +86,7 @@ function renderSalesTable(sales) {
         </td>
         <td class="fw-bold text-success">${formatCOP(parseFloat(sale.total_price))}</td>
         <td class="text-muted small">${date}</td>
-        <td><span class="badge bg-success bg-opacity-10 text-success rounded-pill">Completado</span></td>
+        <td>${statusBadge}</td>
         <td>
           <button class="btn btn-sm btn-light text-danger" onclick="processReturn(${sale.id})" title="Devolución">
             <i class="bi bi-arrow-counterclockwise"></i>
