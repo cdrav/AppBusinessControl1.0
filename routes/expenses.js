@@ -6,13 +6,15 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 // Obtener todos los gastos
 router.get('/', authenticateToken, async (req, res) => {
     try {
+        // Filtramos por tenant_id para asegurar aislamiento de datos
         const [expenses] = await db.query(`
             SELECT e.*, s.name as supplier_name, b.name as branch_name
             FROM expenses e
             LEFT JOIN suppliers s ON e.supplier_id = s.id
             LEFT JOIN branches b ON e.branch_id = b.id
+            WHERE e.tenant_id = ?
             ORDER BY e.expense_date DESC
-        `);
+        `, [req.user.tenant_id]);
         res.json(expenses);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener gastos.' });

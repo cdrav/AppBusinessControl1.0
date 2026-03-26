@@ -21,6 +21,7 @@ const clientRoutes = require('./routes/clients');
 const reportRoutes = require('./routes/reports');
 const settingsRoutes = require('./routes/settings');
 const expensesRoutes = require('./routes/expenses');
+const creditRoutes = require('./routes/credits');
 
 // Usar Rutas
 app.use('/', authRoutes); // Login, Register
@@ -28,6 +29,7 @@ app.use('/users', userRoutes);
 app.use('/inventory', inventoryRoutes);
 app.use('/sales', salesRoutes);
 app.use('/clients', clientRoutes);
+app.use('/api/credits', creditRoutes);
 app.use('/api', reportRoutes); // Dashboard, Backup
 app.use('/api/expenses', expensesRoutes);
 // Montar reportRoutes también en la raíz para soportar /report y /statistics

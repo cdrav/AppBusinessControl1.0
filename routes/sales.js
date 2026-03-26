@@ -11,7 +11,7 @@ const path = require('path');
 
 // Registrar Venta
 router.post('/', authenticateToken, async (req, res) => {
-    let { clientId, products, saleDate, couponCode, notes, branchId } = req.body;
+    let { clientId, products, saleDate, couponCode, notes, branchId, isCredit, initialPayment } = req.body;
     
     // Lógica de Sede:
     // Si NO es admin, forzamos la sede asignada al usuario (seguridad).
@@ -51,8 +51,16 @@ router.post('/', authenticateToken, async (req, res) => {
             if (c.length) discount = c[0].discount_type === 'percent' ? total * (c[0].value/100) : parseFloat(c[0].value);
         }
 
-        const [sale] = await conn.query('INSERT INTO sales (client_id, branch_id, total_price, discount, coupon_code, sale_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)', [clientId, branchId, Math.max(0, total - discount), discount, couponCode, saleDate, notes]);
+        const finalPrice = Math.max(0, total - discount);
+        const [sale] = await conn.query('INSERT INTO sales (client_id, branch_id, total_price, discount, coupon_code, sale_date, notes, is_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [clientId, branchId, finalPrice, discount, couponCode, saleDate, notes, isCredit || false]);
         
+        if (isCredit) {
+            const debt = finalPrice - (initialPayment || 0);
+            // Establecemos la primera cuota en 30 días por defecto
+            await conn.query('INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, next_payment_date) VALUES (?, ?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 MONTH))', 
+            [req.user.tenant_id, sale.insertId, clientId, debt, debt]);
+        }
+
         for (const d of details) {
             await conn.query('INSERT INTO sale_details (sale_id, product_id, quantity, subtotal) VALUES (?, ?, ?, ?)', [sale.insertId, d.productId, d.quantity, d.subtotal]);
             await conn.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id=? AND branch_id=?', [d.quantity, d.productId, branchId]);

@@ -56,14 +56,24 @@ async function setup() {
 
     // 3. --- CREACIÓN DE TABLAS ---
     const tables = [
+      `CREATE TABLE IF NOT EXISTS tenants (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        plan_type ENUM('basic', 'pro', 'enterprise') DEFAULT 'basic',
+        status ENUM('active', 'suspended', 'trial') DEFAULT 'trial',
+        db_prefix VARCHAR(50) UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`,
       `CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         username VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
         role VARCHAR(50) DEFAULT 'admin',
         branch_id INT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE IF NOT EXISTS clients (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -75,6 +85,7 @@ async function setup() {
       )`,
       `CREATE TABLE IF NOT EXISTS inventory (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         product_name VARCHAR(255) NOT NULL,
         stock INT NOT NULL DEFAULT 0,
         price DECIMAL(15, 2) NOT NULL,
@@ -83,10 +94,12 @@ async function setup() {
         description TEXT,
         barcode VARCHAR(50) UNIQUE,
         supplier_id INT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         client_id INT,
         branch_id INT,
         total_price DECIMAL(15, 2) NOT NULL,
@@ -94,8 +107,34 @@ async function setup() {
         coupon_code VARCHAR(50),
         notes TEXT,
         sale_date DATETIME NOT NULL,
+        is_credit BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS credits (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
+        sale_id INT,
+        client_id INT,
+        total_debt DECIMAL(15, 2) NOT NULL,
+        remaining_balance DECIMAL(15, 2) NOT NULL,
+        status ENUM('active', 'paid', 'default') DEFAULT 'active',
+        next_payment_date DATE,
+        FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )`,
+      `CREATE TABLE IF NOT EXISTS credit_payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
+        credit_id INT,
+        collector_id INT,
+        amount DECIMAL(15, 2) NOT NULL,
+        payment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        payment_method VARCHAR(50) DEFAULT 'cash',
+        notes TEXT,
+        FOREIGN KEY (credit_id) REFERENCES credits(id) ON DELETE CASCADE,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE IF NOT EXISTS sale_details (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -108,6 +147,7 @@ async function setup() {
       )`,
       `CREATE TABLE IF NOT EXISTS settings (
         id INT PRIMARY KEY,
+        tenant_id INT,
         company_name VARCHAR(255) DEFAULT 'Business Control',
         company_address VARCHAR(255) DEFAULT 'Calle Principal #123',
         company_phone VARCHAR(50) DEFAULT '555-0000',
@@ -183,25 +223,35 @@ async function setup() {
     // 1. Configuración
     await connection.query(`INSERT IGNORE INTO settings (id, company_name) VALUES (1, 'Business Control')`);
 
-    // 2. Sucursal Principal
+    // 2. Tenant Inicial (Demo/Admin)
+    const [tenants] = await connection.query('SELECT * FROM tenants');
+    let defaultTenantId = 1;
+    if (tenants.length === 0) {
+        const [res] = await connection.query("INSERT INTO tenants (name, plan_type, status) VALUES ('Empresa Default', 'enterprise', 'active')");
+        defaultTenantId = res.insertId;
+        console.log("✅ Tenant inicial creado.");
+    } else {
+        defaultTenantId = tenants[0].id;
+    }
+
+    // 3. Sucursal Principal vinculada al Tenant
     const [branches] = await connection.query('SELECT * FROM branches');
     let defaultBranchId = 1;
     if (branches.length === 0) {
         const [res] = await connection.query("INSERT INTO branches (name, address) VALUES ('Sede Principal', 'Oficina Central')");
         defaultBranchId = res.insertId;
-        console.log("✅ Sede Principal creada.");
     } else {
         defaultBranchId = branches[0].id;
     }
 
-    // 3. Usuario Admin
+    // 4. Usuario Admin vinculado al Tenant
     const adminEmail = 'admin@business.com';
     const [users] = await connection.query('SELECT * FROM users WHERE email = ?', [adminEmail]);
     if (users.length === 0) {
       const hashedPassword = await bcrypt.hash('admin123', 10);
       await connection.query(
-        'INSERT INTO users (username, email, password, role, branch_id) VALUES (?, ?, ?, ?, ?)',
-        ['admin', adminEmail, hashedPassword, 'admin', defaultBranchId]
+        'INSERT INTO users (tenant_id, username, email, password, role, branch_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [defaultTenantId, 'admin', adminEmail, hashedPassword, 'admin', defaultBranchId]
       );
       console.log('✅ Usuario Admin creado (admin@business.com / admin123)');
     }
