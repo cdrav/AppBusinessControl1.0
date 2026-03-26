@@ -20,7 +20,13 @@ async function loadUsers() {
 
         tbody.innerHTML = '';
         users.forEach(user => {
-            const roleBadge = user.role === 'admin' ? '<span class="badge bg-primary">Admin</span>' : '<span class="badge bg-secondary">Cajero</span>';
+            let roleBadge = '<span class="badge bg-secondary">Cajero</span>';
+            if (user.role === 'admin') {
+                roleBadge = '<span class="badge bg-primary">Admin</span>';
+            } else if (user.role === 'cobrador') {
+                roleBadge = '<span class="badge bg-warning text-dark">Cobrador</span>';
+            }
+            
             const branchName = user.branch_name ? `<span class="text-dark"><i class="bi bi-shop me-1"></i>${user.branch_name}</span>` : '<span class="text-muted fst-italic">Sin asignar</span>';
             
             const row = `

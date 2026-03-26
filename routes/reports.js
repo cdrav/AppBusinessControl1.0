@@ -163,6 +163,19 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             LIMIT 5
         `, [req.user.tenant_id]);
 
+        // NUEVO: Rendimiento de Cobradores (Hoy)
+        const [collectorPerformance] = await db.query(`
+            SELECT 
+                u.username as collector_name,
+                COUNT(cp.id) as collections_count,
+                COALESCE(SUM(cp.amount), 0) as amount_collected
+            FROM credit_payments cp
+            JOIN users u ON cp.collector_id = u.id
+            WHERE cp.tenant_id = ? AND DATE(cp.payment_date) = CURDATE()
+            GROUP BY cp.collector_id
+            ORDER BY amount_collected DESC
+        `, [req.user.tenant_id]);
+
         res.json({
             totalRevenue: revenue[0].total,
             cashRevenue: cashRevenue[0].total,
@@ -179,7 +192,8 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             recentActivity: recentSales,
             staleProducts, // Productos sin ventas en 30 días
             inactiveClients, // Clientes sin compras en 60 días
-            topDelinquentClients // Clientes con mayor deuda pendiente
+            topDelinquentClients, // Clientes con mayor deuda pendiente
+            collectorPerformance // Datos de monitoreo de cobradores
         });
 
     } catch (error) {

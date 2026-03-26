@@ -76,6 +76,12 @@ function setupUserSession(branchId) {
                 window.location.href = `dashboard.html?branch_id=${payload.branch_id}`;
                 return; // Detener la ejecución para que la redirección ocurra
             }
+
+            // Si es un COBRADOR, redirigir directamente a la gestión de cobros
+            if (payload.role === 'cobrador') {
+                window.location.href = 'cobros.html';
+                return;
+            }
         }
 
         // Si estamos en una vista de sede, cambiar el título y mostrar un botón para volver
@@ -421,6 +427,32 @@ function initTopProductsChart() {
                 y: { grid: { display: false } }
             }
         }
+    });
+}
+
+function updateCollectorMonitoring(performance) {
+    const container = document.getElementById('collectorMonitoringList');
+    const card = document.getElementById('collectorMonitoringCard');
+    if (!container || !card) return;
+
+    if (!performance || performance.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+
+    card.style.display = 'block';
+    container.innerHTML = '';
+    const formatCOP = (val) => parseFloat(val || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
+
+    performance.forEach(item => {
+        const row = `
+            <tr>
+                <td class="fw-bold">${item.collector_name}</td>
+                <td class="text-center"><span class="badge bg-light text-dark">${item.collections_count} visitas</span></td>
+                <td class="text-end text-success fw-bold">${formatCOP(item.amount_collected)}</td>
+            </tr>
+        `;
+        container.insertAdjacentHTML('beforeend', row);
     });
 }
 

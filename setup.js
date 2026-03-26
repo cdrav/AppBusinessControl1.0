@@ -77,6 +77,7 @@ async function setup() {
       )`,
       `CREATE TABLE IF NOT EXISTS clients (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255),
         phone VARCHAR(50),
@@ -157,6 +158,7 @@ async function setup() {
       )`,
       `CREATE TABLE IF NOT EXISTS coupons (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         code VARCHAR(50) NOT NULL UNIQUE,
         discount_type ENUM('percent', 'fixed') NOT NULL,
         value DECIMAL(10, 2) NOT NULL,
@@ -166,15 +168,18 @@ async function setup() {
       )`,
       `CREATE TABLE IF NOT EXISTS suppliers (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         name VARCHAR(255) NOT NULL,
         contact_name VARCHAR(255),
         phone VARCHAR(50),
         email VARCHAR(100),
         address TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE IF NOT EXISTS branches (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         name VARCHAR(255) NOT NULL,
         address VARCHAR(255),
         phone VARCHAR(50),
@@ -192,6 +197,7 @@ async function setup() {
       )`,
       `CREATE TABLE IF NOT EXISTS expenses (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         description VARCHAR(255) NOT NULL,
         amount DECIMAL(15, 2) NOT NULL,
         category VARCHAR(100),
@@ -200,10 +206,12 @@ async function setup() {
         expense_date DATE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL,
-        FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
+        FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE IF NOT EXISTS inventory_transfers (
         id INT AUTO_INCREMENT PRIMARY KEY, 
+        tenant_id INT,
         product_id INT, 
         from_branch_id INT, 
         to_branch_id INT, 

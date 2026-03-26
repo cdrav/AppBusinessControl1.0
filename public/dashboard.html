@@ -110,6 +110,12 @@
                     <span class="fw-bold">Gestión de Cobros</span>
                 </a>
                     </div>
+            <div class="col-6 col-md-4">
+                <button onclick="applyOverdueInterests()" class="quick-action-card border-danger border-opacity-25 admin-only" style="background: none; width: 100%;">
+                    <div class="quick-action-icon text-danger"><i class="bi bi-percent"></i></div>
+                    <span class="fw-bold">Aplicar Intereses</span>
+                </button>
+            </div>
                     <div class="col-6 col-md-4">
                         <a href="#" class="quick-action-card" data-bs-toggle="modal" data-bs-target="#cashSummaryModal">
                             <div class="quick-action-icon"><i class="bi bi-cash-coin"></i></div>
@@ -170,7 +176,7 @@
 
         <!-- Stats Row -->
         <div class="row g-3 mb-4 fade-in delay-1">
-              <div class="col-md-6 col-lg-4 col-xl-2">
+              <div class="col-md-6 col-lg-4 col-xl-3">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-primary">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -178,24 +184,21 @@
                       <h3 class="mb-0" id="totalRevenue">$0</h3>
                     </div>
                   </div>
-                  <div class="mt-3">
-                    <span class="badge bg-success bg-opacity-10 text-success">+12.5%</span>
-                  </div>
                 </div>
               </div>
-              <div class="col-md-6 col-lg-4 col-xl-2">
-                <div class="stat-card h-100 text-start p-4 border-start border-4 border-warning">
+              <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="stat-card h-100 text-start p-4 border-start border-4 border-warning" style="background-color: #fffbeb;">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <p class="text-muted mb-1 text-nowrap">Cartera Pendiente</p>
-                      <h3 class="mb-0" id="totalCredits">$0</h3>
+                      <h3 class="mb-0 text-warning" id="totalCredits">$0</h3>
                     </div>
                     <div class="bg-warning bg-opacity-10 text-warning rounded p-2">
                       <i class="bi bi-wallet2 fs-4"></i>
                     </div>
                   </div>
-                  <div class="mt-3">
-                    <small class="text-muted">Por cobrar</small>
+                  <div class="mt-2">
+                    <small class="text-muted"><i class="bi bi-clock-history me-1"></i>Por cobrar hoy</small>
                   </div>
                 </div>
               </div>
@@ -203,16 +206,9 @@
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-success">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
-                      <p class="text-muted mb-1">Ventas</p>
+                      <p class="text-muted mb-1">Ventas Hoy</p>
                       <h3 class="mb-0" id="totalSales" data-counter="0">0</h3>
                     </div>
-                    <div class="bg-success bg-opacity-10 text-success rounded p-2">
-                      <i class="bi bi-cart-check fs-5"></i>
-                    </div>
-                  </div>
-                  <div class="mt-3">
-                    <span class="badge bg-success bg-opacity-10 text-success">+5</span>
-                    <small class="text-muted ms-2">nuevas hoy</small>
                   </div>
                 </div>
               </div>
@@ -226,15 +222,12 @@
                   </div>
                 </div>
               </div>
-              <div class="col-md-6 col-lg-4 col-xl-3">
+              <div class="col-md-6 col-lg-4 col-xl-2">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-danger">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <p class="text-muted mb-1">Gastos Totales</p>
                       <h3 class="mb-0" id="totalExpenses">$0</h3>
-                    </div>
-                    <div class="bg-danger bg-opacity-10 text-danger rounded p-2">
-                      <i class="bi bi-wallet2 fs-4"></i>
                     </div>
                   </div>
                 </div>
@@ -242,7 +235,7 @@
         </div>
 
         <div class="row g-4 mb-4">
-          <div class="col-lg-8 fade-in" style="animation-delay: 0.2s">
+          <div class="col-lg-7 fade-in" style="animation-delay: 0.2s">
             <div class="card h-100 p-4 border-0 shadow-sm">
               <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="mb-0 fw-bold text-dark">Resumen de Ingresos</h5>
@@ -253,14 +246,14 @@
             </div>
           </div>
 
-          <div class="col-lg-4 fade-in" style="animation-delay: 0.25s">
+          <div class="col-lg-5 fade-in" style="animation-delay: 0.25s">
             <div class="card h-100 p-4 border-0 shadow-sm">
-              <h5 class="mb-4 fw-bold text-dark">Ventas: Efectivo vs Crédito</h5>
-              <div class="chart-container" style="position: relative; height: 250px;">
+              <h5 class="mb-4 fw-bold text-dark"><i class="bi bi-pie-chart me-2 text-primary"></i>Métodos de Venta</h5>
+              <div class="chart-container" style="position: relative; height: 280px;">
                 <canvas id="cashVsCreditChart"></canvas>
               </div>
               <div class="mt-3 small text-center text-muted">
-                Análisis de liquidez vs. deuda activa
+                Diferencia entre cobros de contado y ventas financiadas.
               </div>
             </div>
           </div>
@@ -299,6 +292,30 @@
                       <canvas id="topProductsChart"></canvas>
                   </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Collector Monitoring Card -->
+          <div class="col-lg-12 fade-in" id="collectorMonitoringCard" style="display: none;">
+            <div class="card p-4 border-0 shadow-sm border-start border-4 border-primary">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-person-badge me-2 text-primary"></i>Monitoreo de Cobradores (Hoy)</h5>
+                    <span class="badge bg-primary bg-opacity-10 text-primary">Recaudo en vivo</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr class="text-muted small">
+                                <th>Cobrador</th>
+                                <th class="text-center">Cobros Realizados</th>
+                                <th class="text-end">Monto Recaudado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collectorMonitoringList">
+                            <!-- JS fills this -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
           </div>
 
