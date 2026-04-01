@@ -32,7 +32,17 @@ router.post('/login', async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(401).json({ message: 'Credenciales inválidas.' });
 
-    const token = jwt.sign({ id: user.id, username: user.username, role: user.role, branch_id: user.branch_id }, process.env.JWT_SECRET || 'secreto_super_seguro', { expiresIn: '8h' });
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        username: user.username, 
+        role: user.role, 
+        branch_id: user.branch_id,
+        tenant_id: user.tenant_id // Agregado para multi-tenancy
+      }, 
+      process.env.JWT_SECRET || 'secreto_super_seguro', 
+      { expiresIn: '8h' }
+    );
     res.json({ message: 'Bienvenido', token });
   } catch (err) { res.status(500).json({ message: 'Error interno.' }); }
 });

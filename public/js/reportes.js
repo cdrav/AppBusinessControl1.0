@@ -3,10 +3,12 @@ let salesChart = null;
 let distributionChart = null;
 let clientsChart = null;
 let hourlyChart = null;
-const API_URL = ''; // Ruta relativa para producción
+import { apiFetch } from './api.js';
+import { protectRoute } from './auth.js';
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
+  protectRoute();
   initializeCharts();
   setDefaultDates();
   
@@ -205,22 +207,13 @@ async function fetchAndDisplayStats() {
     if (!startDate || !endDate) return;
 
     try {
-        const response = await fetch(`${API_URL}/api/generate`, {
+        const data = await apiFetch('/api/generate', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token') 
-            },
             body: JSON.stringify({ startDate, endDate, type: 'complete' })
         });
 
-        if (response.status === 401 || response.status === 403) {
-            window.location.href = 'login.html';
-            return;
-        }
-        if (!response.ok) throw new Error('No se pudieron cargar las estadísticas.');
+        if (!data) return;
 
-        const data = await response.json();
         const stats = data.totals; // Mapeo de totales
 
         // Update stat cards

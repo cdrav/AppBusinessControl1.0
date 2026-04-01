@@ -1,5 +1,5 @@
 // Variables globales
-const API_URL = ''; // Ruta relativa para producción
+import { apiFetch } from './api.js';
 let products = [];
 let clients = [];
 let currentCoupon = null; // Almacenar cupón activo
@@ -111,11 +111,8 @@ async function handleBarcodeScan() {
     scanMessage.innerHTML = `<span class="text-muted">Buscando...</span>`;
 
     try {
-        const response = await fetch(`${API_URL}/inventory/barcode/${barcode}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-
-        if (!response.ok) {
+        const response = await apiFetch(`/inventory/barcode/${barcode}`);
+        if (!response) {
             if (response.status === 404) {
                 scanMessage.innerHTML = `<span class="text-danger fw-bold">Producto no encontrado.</span>`;
             } else {
@@ -124,7 +121,7 @@ async function handleBarcodeScan() {
             return;
         }
 
-        const product = await response.json();
+        const product = response;
         scanMessage.innerHTML = `<span class="text-success fw-bold">Agregado: ${product.product_name}</span>`;
         addProductToSale(product);
 
@@ -141,11 +138,9 @@ async function handleBarcodeScan() {
 // Cargar clientes
 async function loadClients() {
   try {
-    const response = await fetch(`${API_URL}/clients`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-    });
-    if (response.ok) {
-      clients = await response.json();
+    const data = await apiFetch('/clients');
+    if (data) {
+      clients = data;
       const select = document.getElementById('clientId');
       clients.forEach(client => {
         select.innerHTML += `<option value="${client.id}">${client.name}</option>`;
@@ -162,11 +157,9 @@ async function loadProducts() {
   const branchId = urlParams.get('branch_id');
   const endpoint = branchId ? `${API_URL}/inventory/for-sale?branch_id=${branchId}` : `${API_URL}/inventory/for-sale`;
   try {
-    const response = await fetch(endpoint, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-    });
-    if (response.ok) {
-      products = await response.json();
+    const data = await apiFetch(endpoint);
+    if (data) {
+      products = data;
       updateProductSelects();
     }
   } catch (error) {
@@ -314,19 +307,12 @@ window.applyCoupon = async function() {
     if (!code) return;
 
     try {
-        const response = await fetch(`${API_URL}/coupons/validate/${code}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-
-        if (response.ok) {
-            currentCoupon = await response.json();
+        const data = await apiFetch(`/coupons/validate/${code}`);
+        if (data) {
+            currentCoupon = data;
             msgDiv.innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> Cupón aplicado: ${currentCoupon.discount_type === 'percent' ? currentCoupon.value + '%' : '$' + currentCoupon.value}</span>`;
             updateSummary();
         } else {
-            currentCoupon = null;
-            const err = await response.json();
-            msgDiv.innerHTML = `<span class="text-danger">${err.message}</span>`;
-            updateSummary();
         }
     } catch (error) {
         console.error(error);
@@ -398,6 +384,21 @@ document.querySelector('.remove-product').addEventListener('click', function() {
   }
 });
 
+// Event listener para checkbox de crédito
+document.addEventListener('DOMContentLoaded', function() {
+  // ... código existente ...
+  
+  // Agregar listener para mostrar/ocultar detalles de crédito
+  const isCreditCheckbox = document.getElementById('isCredit');
+  const creditDetails = document.getElementById('creditDetails');
+  
+  if (isCreditCheckbox && creditDetails) {
+    isCreditCheckbox.addEventListener('change', function() {
+      creditDetails.style.display = this.checked ? 'block' : 'none';
+    });
+  }
+});
+
 // Manejar envío del formulario
 document.getElementById('addSaleForm').addEventListener('submit', async function(event) {
   event.preventDefault();
@@ -446,6 +447,8 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     saleDate: document.getElementById('saleDate').value,
     couponCode: currentCoupon ? currentCoupon.code : null,
     notes: document.getElementById('saleNotes').value,
+    is_credit: document.getElementById('isCredit')?.checked || false,
+    initialPayment: document.getElementById('initialPayment')?.value || null,
     branchId: branchId // Enviar la sede si existe en la URL (solo funcionará si es admin en el backend)
   };
   
@@ -454,18 +457,12 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
   submitBtn.disabled = true;
   
   try {
-    const response = await fetch(`${API_URL}/sales`, {
+    const data = await apiFetch('/sales', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
       body: JSON.stringify(saleData),
     });
     
-    const data = await response.json();
-    
-    if (response.ok) {
+    if (data) {
       const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
       const change = Math.max(0, amountPaid - total);
       

@@ -1,4 +1,4 @@
-const API_URL = ''; // Ruta relativa para producción
+import { apiFetch } from './api.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('changePasswordForm').addEventListener('submit', handleChangePassword);
@@ -37,18 +37,11 @@ async function handleChangePassword(e) {
     msg.innerHTML = '';
 
     try {
-        const response = await fetch(`${API_URL}/profile/change-password`, {
+        const data = await apiFetch('/profile/change-password', {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
             body: JSON.stringify({ currentPassword, newPassword })
         });
-
-        const data = await response.json();
-
-        if (!response.ok) throw new Error(data.message);
+        if (!data) return;
 
         msg.innerHTML = '<div class="alert alert-success">¡Contraseña actualizada con éxito!</div>';
         document.getElementById('changePasswordForm').reset();

@@ -1,4 +1,4 @@
-const API_URL = ''; // Ruta relativa para producción
+import { apiFetch } from './api.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     loadCoupons();
@@ -11,16 +11,9 @@ async function loadCoupons() {
     const empty = document.getElementById('emptyState');
 
     try {
-        const response = await fetch(`${API_URL}/coupons`, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
+        const coupons = await apiFetch('/coupons');
+        if (!coupons) return;
 
-        if (response.status === 401 || response.status === 403) {
-            window.location.href = 'dashboard.html';
-            return;
-        }
-
-        const coupons = await response.json();
         loading.style.display = 'none';
         tbody.innerHTML = '';
 
@@ -91,16 +84,11 @@ async function handleAddCoupon(e) {
     msg.innerHTML = '';
 
     try {
-        const response = await fetch(`${API_URL}/coupons`, {
+        const dataResponse = await apiFetch('/coupons', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
             body: JSON.stringify(data)
         });
-
-        if (!response.ok) throw new Error('Error al crear cupón');
+        if (!dataResponse) return;
 
         msg.innerHTML = '<div class="alert alert-success">Cupón creado correctamente</div>';
         document.getElementById('addCouponForm').reset();
@@ -118,12 +106,9 @@ window.deleteCoupon = async function(id) {
     if (!confirm('¿Estás seguro de eliminar este cupón?')) return;
 
     try {
-        const response = await fetch(`${API_URL}/coupons/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        await apiFetch(`/coupons/${id}`, {
+            method: 'DELETE'
         });
-
-        if (!response.ok) throw new Error('Error al eliminar');
         
         loadCoupons();
 

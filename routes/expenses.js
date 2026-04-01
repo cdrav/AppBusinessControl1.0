@@ -37,8 +37,8 @@ router.post('/', authenticateToken, async (req, res) => {
 
     try {
         await db.query(
-            'INSERT INTO expenses (description, amount, category, supplier_id, branch_id, expense_date) VALUES (?, ?, ?, ?, ?, ?)',
-            [description, amount, category, supplier_id || null, branch_id || null, expense_date]
+            'INSERT INTO expenses (tenant_id, description, amount, category, supplier_id, branch_id, expense_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [req.user.tenant_id, description, amount, category, supplier_id || null, branch_id || null, expense_date]
         );
         res.status(201).json({ message: 'Gasto registrado con éxito.' });
     } catch (error) {
@@ -51,15 +51,15 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     const { description, amount, category, supplier_id, branch_id, expense_date } = req.body;
     await db.query(
-        'UPDATE expenses SET description=?, amount=?, category=?, supplier_id=?, branch_id=?, expense_date=? WHERE id=?',
-        [description, amount, category, supplier_id || null, branch_id || null, expense_date, req.params.id]
+        'UPDATE expenses SET description=?, amount=?, category=?, supplier_id=?, branch_id=?, expense_date=? WHERE id=? AND tenant_id=?',
+        [description, amount, category, supplier_id || null, branch_id || null, expense_date, req.params.id, req.user.tenant_id]
     );
     res.json({ message: 'Gasto actualizado correctamente.' });
 });
 
 // Eliminar un gasto
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    await db.query('DELETE FROM expenses WHERE id = ?', [req.params.id]);
+    await db.query('DELETE FROM expenses WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
     res.json({ message: 'Gasto eliminado.' });
 });
 

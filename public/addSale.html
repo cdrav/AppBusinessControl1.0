@@ -50,6 +50,24 @@
             <textarea class="form-control" id="saleNotes" rows="2" placeholder="Ej. Entregar después de las 5pm"></textarea>
         </div>
 
+        <!-- Opción de Venta a Crédito -->
+        <div class="mb-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="isCredit">
+                <label class="form-check-label" for="isCredit">
+                    <i class="bi bi-credit-card me-2"></i>Vender a crédito
+                </label>
+            </div>
+            <div id="creditDetails" style="display: none;" class="mt-3 p-3 bg-light rounded">
+                <label for="initialPayment" class="form-label">Pago Inicial (Opcional)</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light">$</span>
+                    <input type="number" class="form-control" id="initialPayment" min="0" step="0.01" placeholder="0">
+                </div>
+                <small class="text-muted">Si no especifica, se registrará como crédito total</small>
+            </div>
+        </div>
+
         <!-- Products Section -->
         <h5 class="fw-bold mb-3">Productos</h5>
         <div id="productsContainer" class="mb-4">

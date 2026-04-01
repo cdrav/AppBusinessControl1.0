@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
+const { recordLog } = require('../services/auditService');
 
 // Obtener inventario
 router.get('/', authenticateToken, async (req, res) => {
@@ -16,14 +17,15 @@ router.get('/', authenticateToken, async (req, res) => {
                     s.name as supplier_name,
                     COALESCE(bs.stock, 0) as stock 
                 FROM inventory i
-                LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ?
+                LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
                 LEFT JOIN suppliers s ON i.supplier_id = s.id
+                WHERE i.tenant_id = ?
                 ORDER BY i.product_name ASC
-            `, [branch_id]);
+            `, [branch_id, req.user.tenant_id, req.user.tenant_id]);
             res.json(results);
         } else {
             // Comportamiento original: inventario global para la vista principal de inventarios
-            const [results] = await db.query(`SELECT i.*, s.name as supplier_name FROM inventory i LEFT JOIN suppliers s ON i.supplier_id = s.id ORDER BY i.product_name ASC`);
+            const [results] = await db.query(`SELECT i.*, s.name as supplier_name FROM inventory i LEFT JOIN suppliers s ON i.supplier_id = s.id WHERE i.tenant_id = ? ORDER BY i.product_name ASC`, [req.user.tenant_id]);
             res.json(results);
         }
     } catch (error) {
@@ -54,9 +56,10 @@ router.get('/for-sale', authenticateToken, async (req, res) => {
                 i.id, i.product_name, i.price, i.barcode,
                 COALESCE(bs.stock, 0) as stock 
             FROM inventory i
-            LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ?
+            LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
+            WHERE i.tenant_id = ?
             ORDER BY i.product_name ASC
-        `, [branchId]);
+        `, [branchId, req.user.tenant_id, req.user.tenant_id]);
         res.json(products);
     } catch (error) {
         res.status(500).json({ message: 'Error al cargar inventario para la venta.' });
@@ -65,14 +68,14 @@ router.get('/for-sale', authenticateToken, async (req, res) => {
 
 // Buscar por código de barras
 router.get('/barcode/:code', authenticateToken, async (req, res) => {
-    const [results] = await db.query('SELECT * FROM inventory WHERE barcode = ?', [req.params.code]);
+    const [results] = await db.query('SELECT * FROM inventory WHERE barcode = ? AND tenant_id = ?', [req.params.code, req.user.tenant_id]);
     if (results.length === 0) return res.status(404).json({ message: 'Producto no encontrado' });
     res.json(results[0]);
 });
 
 // Exportar CSV
 router.get('/export', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    const [results] = await db.query('SELECT * FROM inventory ORDER BY id ASC');
+    const [results] = await db.query('SELECT * FROM inventory WHERE tenant_id = ? ORDER BY id ASC', [req.user.tenant_id]);
     let csv = 'ID,Codigo,Nombre,Stock,Precio,Costo,Categoria\n';
     results.forEach(row => { csv += `${row.id},"${row.barcode||''}", "${row.product_name}",${row.stock},${row.price},${row.cost||0},"${row.category||''}"\n`; });
     res.header('Content-Type', 'text/csv').attachment('inventario.csv').send(csv);
@@ -81,9 +84,20 @@ router.get('/export', authenticateToken, authorizeRole(['admin']), async (req, r
 // Crear producto
 router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     const { name, quantity, price, cost, category, supplier_id, description, barcode } = req.body;
-    const [result] = await db.query('INSERT INTO inventory (product_name, stock, price, cost, category, supplier_id, description, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [name, quantity, price, cost||0, category, supplier_id || null, description, barcode || null]);
+    const [result] = await db.query('INSERT INTO inventory (tenant_id, product_name, stock, price, cost, category, supplier_id, description, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [req.user.tenant_id, name, quantity, price, cost||0, category, supplier_id || null, description, barcode || null]);
     const branchId = req.user.branch_id || 1;
-    await db.query('INSERT INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, ?)', [branchId, result.insertId, quantity]);
+    await db.query('INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?)', [req.user.tenant_id, branchId, result.insertId, quantity]);
+    
+    await recordLog({
+        tenantId: req.user.tenant_id,
+        userId: req.user.id,
+        action: 'PRODUCT_CREATED',
+        entityType: 'product',
+        entityId: result.insertId,
+        details: { name, quantity, price },
+        ipAddress: req.ip
+    });
+
     res.status(201).json({ message: 'Producto agregado', productId: result.insertId });
 });
 
@@ -99,28 +113,51 @@ router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
     try {
         conn = await db.getConnection();
         await conn.beginTransaction();
-        await conn.query('UPDATE inventory SET product_name=?, price=?, cost=?, category=?, supplier_id=?, description=?, barcode=? WHERE id=?', [name, price, cost||0, category, supplier_id || null, description, barcode || null, id]);
+        const [updateRes] = await conn.query('UPDATE inventory SET product_name=?, price=?, cost=?, category=?, supplier_id=?, description=?, barcode=? WHERE id=? AND tenant_id=?', [name, price, cost||0, category, supplier_id || null, description, barcode || null, id, req.user.tenant_id]);
+        
+        if (updateRes.affectedRows === 0) throw new Error('Producto no encontrado o sin permisos');
         
         const [rows] = await conn.query('SELECT COALESCE(SUM(stock), 0) as total FROM branch_stocks WHERE product_id = ?', [id]);
         const diff = parseInt(quantity) - parseInt(rows[0].total);
-        if (diff !== 0) await conn.query('INSERT INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE stock = stock + ?', [branchId, id, diff, diff]);
+        if (diff !== 0) await conn.query('INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE stock = stock + ?', [req.user.tenant_id, branchId, id, diff, diff]);
         
-        await conn.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(stock), 0) FROM branch_stocks WHERE product_id = ?) WHERE id = ?', [id, id]);
+        await conn.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(stock), 0) FROM branch_stocks WHERE product_id = ? AND tenant_id = ?) WHERE id = ? AND tenant_id = ?', [id, req.user.tenant_id, id, req.user.tenant_id]);
         await conn.commit();
+
+        await recordLog({
+            tenantId: req.user.tenant_id,
+            userId: req.user.id,
+            action: 'PRODUCT_UPDATED',
+            entityType: 'product',
+            entityId: id,
+            details: { name, quantity, price },
+            ipAddress: req.ip
+        });
+
         res.json({ message: 'Producto actualizado' });
     } catch (e) { if(conn) await conn.rollback(); res.status(500).json({message: 'Error actualizando'}); } finally { if(conn) conn.release(); }
 });
 
 // Eliminar producto
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    await db.query('DELETE FROM inventory WHERE id = ?', [req.params.id]);
+    await db.query('DELETE FROM inventory WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
+
+    await recordLog({
+        tenantId: req.user.tenant_id,
+        userId: req.user.id,
+        action: 'PRODUCT_DELETED',
+        entityType: 'product',
+        entityId: req.params.id,
+        ipAddress: req.ip
+    });
+
     res.json({ message: 'Producto eliminado' });
 });
 
 // Obtener un producto
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
-        const [r] = await db.query('SELECT * FROM inventory WHERE id = ?', [req.params.id]);
+        const [r] = await db.query('SELECT * FROM inventory WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
         r.length ? res.json(r[0]) : res.status(404).json({message: 'No encontrado'});
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener producto' });
@@ -141,9 +178,19 @@ router.post('/sync-global', authenticateToken, authorizeRole(['admin']), async (
             SET stock = (
                 SELECT COALESCE(SUM(stock), 0)
                 FROM branch_stocks
-                WHERE product_id = i.id
+                WHERE product_id = i.id AND tenant_id = i.tenant_id
             )
-        `);
+            WHERE i.tenant_id = ?
+        `, [req.user.tenant_id]);
+
+        await recordLog({
+            tenantId: req.user.tenant_id,
+            userId: req.user.id,
+            action: 'INVENTORY_SYNC',
+            entityType: 'inventory',
+            ipAddress: req.ip
+        });
+
         res.json({ message: 'Inventario global sincronizado con sucursales.' });
     } catch (error) {
         console.error(error);
@@ -154,8 +201,24 @@ router.post('/sync-global', authenticateToken, authorizeRole(['admin']), async (
 // Ajuste manual de stock
 router.post('/stock', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     const { productId, branchId, newStock } = req.body;
-    await db.query(`INSERT INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE stock = ?`, [branchId, productId, newStock, newStock]);
-    await db.query(`UPDATE inventory i SET stock = (SELECT SUM(stock) FROM branch_stocks WHERE product_id = i.id) WHERE i.id = ?`, [productId]);
+    
+    // Validar pertenencia del producto
+    const [p] = await db.query('SELECT id FROM inventory WHERE id = ? AND tenant_id = ?', [productId, req.user.tenant_id]);
+    if (!p.length) return res.status(403).json({ message: 'Producto no pertenece a su empresa' });
+
+    await db.query(`INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE stock = ?`, [req.user.tenant_id, branchId, productId, newStock, newStock]);
+    await db.query(`UPDATE inventory i SET stock = (SELECT SUM(stock) FROM branch_stocks WHERE product_id = i.id AND tenant_id = i.tenant_id) WHERE i.id = ? AND i.tenant_id = ?`, [productId, req.user.tenant_id]);
+
+    await recordLog({
+        tenantId: req.user.tenant_id,
+        userId: req.user.id,
+        action: 'STOCK_ADJUSTMENT',
+        entityType: 'product',
+        entityId: productId,
+        details: { branchId, newStock },
+        ipAddress: req.ip
+    });
+
     res.json({ message: 'Stock actualizado' });
 });
 
@@ -169,16 +232,26 @@ router.post('/transfer', authenticateToken, authorizeRole(['admin']), async (req
     try {
         conn = await db.getConnection();
         await conn.beginTransaction();
-        const [src] = await conn.query('SELECT stock FROM branch_stocks WHERE product_id=? AND branch_id=? FOR UPDATE', [productId, fromBranchId]);
+        const [src] = await conn.query('SELECT stock FROM branch_stocks WHERE product_id=? AND branch_id=? AND tenant_id=? FOR UPDATE', [productId, fromBranchId, req.user.tenant_id]);
         if (!src.length || src[0].stock < qty) throw new Error('Stock insuficiente');
 
-        await conn.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id=? AND branch_id=?', [qty, productId, fromBranchId]);
-        await conn.query('INSERT INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE stock = stock + ?', [toBranchId, productId, qty, qty]);
+        await conn.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id=? AND branch_id=? AND tenant_id=?', [qty, productId, fromBranchId, req.user.tenant_id]);
+        await conn.query('INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE stock = stock + ?', [req.user.tenant_id, toBranchId, productId, qty, qty]);
         
-        await conn.query(`CREATE TABLE IF NOT EXISTS inventory_transfers (id INT AUTO_INCREMENT PRIMARY KEY, product_id INT, from_branch_id INT, to_branch_id INT, quantity INT, user_id INT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
-        await conn.query('INSERT INTO inventory_transfers (product_id, from_branch_id, to_branch_id, quantity, user_id) VALUES (?, ?, ?, ?, ?)', [productId, fromBranchId, toBranchId, qty, req.user.id]);
+        await conn.query('INSERT INTO inventory_transfers (tenant_id, product_id, from_branch_id, to_branch_id, quantity, user_id) VALUES (?, ?, ?, ?, ?, ?)', [req.user.tenant_id, productId, fromBranchId, toBranchId, qty, req.user.id]);
         
         await conn.commit();
+
+        await recordLog({
+            tenantId: req.user.tenant_id,
+            userId: req.user.id,
+            action: 'STOCK_TRANSFER',
+            entityType: 'product',
+            entityId: productId,
+            details: { fromBranchId, toBranchId, quantity: qty },
+            ipAddress: req.ip
+        });
+
         res.json({ message: 'Transferencia exitosa' });
     } catch (e) { if(conn) await conn.rollback(); res.status(400).json({ message: e.message }); } finally { if(conn) conn.release(); }
 });

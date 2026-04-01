@@ -122,8 +122,10 @@ async function setup() {
         remaining_balance DECIMAL(15, 2) NOT NULL,
         status ENUM('active', 'paid', 'default') DEFAULT 'active',
         next_payment_date DATE,
+        collected_by INT,
         FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
-        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+        FOREIGN KEY (collected_by) REFERENCES users(id) ON DELETE SET NULL
       )`,
       `CREATE TABLE IF NOT EXISTS credit_payments (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -139,12 +141,14 @@ async function setup() {
       )`,
       `CREATE TABLE IF NOT EXISTS sale_details (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
         sale_id INT,
         product_id INT,
         quantity INT NOT NULL,
         subtotal DECIMAL(15, 2) NOT NULL,
         FOREIGN KEY (sale_id) REFERENCES sales(id),
-        FOREIGN KEY (product_id) REFERENCES inventory(id)
+        FOREIGN KEY (product_id) REFERENCES inventory(id),
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
       )`,
       `CREATE TABLE IF NOT EXISTS settings (
         id INT PRIMARY KEY,
@@ -218,6 +222,19 @@ async function setup() {
         quantity INT, 
         user_id INT, 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS audit_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        tenant_id INT,
+        user_id INT,
+        action VARCHAR(100) NOT NULL,
+        entity_type VARCHAR(50),
+        entity_id INT,
+        details TEXT,
+        ip_address VARCHAR(45),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
       )`
     ];
 

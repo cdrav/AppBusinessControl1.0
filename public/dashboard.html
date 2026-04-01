@@ -8,9 +8,8 @@
   <meta name="description" content="Panel principal de control - Business Control por Cristian David Ruiz">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="css/toasts.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -79,6 +78,30 @@
         </div>
         <!-- Contenedor para tarjetas de sedes (Accesos Rápidos) -->
         <div id="branchCardsContainer" class="row mb-4" style="display: none;"></div>
+
+        <!-- Tarjeta de Ventas del Día -->
+        <div class="row mb-4 fade-in">
+            <div class="col-6 col-md-4 col-xl-3">
+                <div class="stat-card border-start border-4 border-primary h-100">
+                    <div class="card-body p-0">
+                        <div class="d-flex align-items-start">
+                            <div class="flex-grow-1">
+                                <p class="text-muted mb-1 small text-uppercase fw-bold">Ventas Hoy</p>
+                                <h3 class="mb-0 fw-bold" id="todaySalesCount">0</h3>
+                                <small class="text-success" id="todaySalesAmount">$0</small>
+                            </div>
+                            <div class="ms-2">
+                                <div class="icon-box bg-primary bg-opacity-10 text-primary rounded-circle p-2">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M7 18c-1.1 0-1.99.9-1.99 2L5 20c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2H7m3 9V7h2v10H8m3-2V9h2v8h-2m3-4v-4h2v4h-2z" fill="currentColor"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Quick Actions & Management Modules Row -->
         <div class="row g-4 mb-4">
@@ -176,7 +199,7 @@
 
         <!-- Stats Row -->
         <div class="row g-3 mb-4 fade-in delay-1">
-              <div class="col-md-6 col-lg-4 col-xl-3">
+              <div class="col-6 col-md-4 col-xl-3">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-primary">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -186,7 +209,7 @@
                   </div>
                 </div>
               </div>
-              <div class="col-md-6 col-lg-4 col-xl-3">
+              <div class="col-6 col-md-4 col-xl-3">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-warning" style="background-color: #fffbeb;">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -202,7 +225,7 @@
                   </div>
                 </div>
               </div>
-              <div class="col-md-6 col-lg-4 col-xl-2">
+              <div class="col-6 col-md-4 col-xl-2">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-success">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -212,7 +235,7 @@
                   </div>
                 </div>
               </div>
-              <div class="col-md-6 col-lg-4 col-xl-3">
+              <div class="col-6 col-md-4 col-xl-3">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-info">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -222,7 +245,7 @@
                   </div>
                 </div>
               </div>
-              <div class="col-md-6 col-lg-4 col-xl-2">
+              <div class="col-6 col-md-4 col-xl-2">
                 <div class="stat-card h-100 text-start p-4 border-start border-4 border-danger">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -235,6 +258,7 @@
         </div>
 
         <div class="row g-4 mb-4">
+          <!-- Fila de Gráficos Principales -->
           <div class="col-lg-7 fade-in" style="animation-delay: 0.2s">
             <div class="card h-100 p-4 border-0 shadow-sm">
               <div class="d-flex justify-content-between align-items-center mb-4">
@@ -267,11 +291,12 @@
               </div>
             </div>
           </div>
+        </div> <!-- Cierre de fila de gráficos -->
 
-          <!-- Stale & Top Products Row -->
-          <div class="row g-4 mb-4">
-            <div class="col-lg-5 fade-in rounded-xl" style="display: none;" id="staleProductsCard">
-              <div class="card h-100 p-4 border-0 shadow-sm">
+        <!-- Productos y Monitoreo -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-5 fade-in" style="display: none;" id="staleProductsCard">
+              <div class="card h-100 p-4 border-0 shadow-sm rounded-xl">
                   <h5 class="mb-3 fw-bold text-dark">
                       <i class="bi bi-hourglass-split text-danger me-2"></i>
                       Productos Lentos
@@ -282,8 +307,8 @@
                   </div>
               </div>
             </div>
-            <div class="col-lg-7 fade-in delay-4 rounded-xl" id="topProductsCard">
-              <div class="card h-100 p-4 border-0 shadow-sm">
+            <div class="col-lg-7 fade-in delay-4" id="topProductsCard">
+              <div class="card h-100 p-4 border-0 shadow-sm rounded-xl">
                   <h5 class="mb-3 fw-bold text-dark">
                       <i class="bi bi-trophy-fill text-warning me-2"></i>
                       Productos Más Vendidos
@@ -293,28 +318,31 @@
                   </div>
               </div>
             </div>
-          </div>
 
           <!-- Collector Monitoring Card -->
-          <div class="col-lg-12 fade-in" id="collectorMonitoringCard" style="display: none;">
+          <div class="col-12 fade-in" id="collectorMonitoringCard" style="display: none;">
             <div class="card p-4 border-0 shadow-sm border-start border-4 border-primary">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0"><i class="bi bi-person-badge me-2 text-primary"></i>Monitoreo de Cobradores (Hoy)</h5>
                     <span class="badge bg-primary bg-opacity-10 text-primary">Recaudo en vivo</span>
                 </div>
-                <div class="table-responsive">
+                <!-- Vista de tabla para desktop -->
+                <div class="table-responsive d-none d-md-block">
                     <table class="table align-middle mb-0">
                         <thead>
                             <tr class="text-muted small">
                                 <th>Cobrador</th>
-                                <th class="text-center">Cobros Realizados</th>
+                                <th class="text-center">Abonos</th>
+                                <th class="text-center">Estado</th>
                                 <th class="text-end">Monto Recaudado</th>
                             </tr>
                         </thead>
-                        <tbody id="collectorMonitoringList">
-                            <!-- JS fills this -->
-                        </tbody>
+                        <tbody id="collectorMonitoringTableBody"></tbody>
                     </table>
+                </div>
+                <!-- Vista de lista/tarjetas para móvil -->
+                <div id="collectorMonitoringListMobile" class="d-md-none row g-3">
+                    <!-- JS llenará esto con tarjetas -->
                 </div>
             </div>
           </div>
@@ -379,10 +407,16 @@
             </div>
           </div>
 
-        </div>
+        </div> <!-- Cierre de row principal de productos y monitoreo -->
+      </div> <!-- Cierre de container -->
+    </div> <!-- Cierre de content-container -->
+
+    <footer class="main-footer">
+      <div class="container">
+        <p class="mb-0">&copy; <span id="copyright-year">2026</span> Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
       </div>
-    </div>
-  </div>
+    </footer>
+  </div> <!-- Cierre de page-wrapper -->
 
   <!-- Cash Summary Modal -->
   <div class="modal fade" id="cashSummaryModal" tabindex="-1" aria-labelledby="cashSummaryModalLabel" aria-hidden="true">
@@ -423,16 +457,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/utils.js"></script>
-  <script src="js/dashboard.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
   <script>
     // Actualiza dinámicamente el año del copyright
     const yearSpan = document.getElementById('copyright-year');
     if (yearSpan) yearSpan.textContent = new Date().getFullYear();
   </script>
-  
-  <!-- Footer con Copyright -->
-  <footer class="main-footer">
-    <p class="mb-0">&copy; <span id="copyright-year">2026</span> Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
-  </footer>
 </body>
 </html>

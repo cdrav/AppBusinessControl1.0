@@ -1,5 +1,5 @@
 // Ventas Page JavaScript
-const API_URL = ''; // Ruta relativa para producción
+import { apiFetch } from './api.js';
 let allSales = [];
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -23,18 +23,10 @@ async function loadSales() {
   const table = document.getElementById('salesTable');
   
   try {
-    const response = await fetch(`${API_URL}/sales`, {
-      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-    });
-    
-    if (response.status === 401 || response.status === 403) {
-      window.location.href = 'login.html';
-      return;
-    }
+    const data = await apiFetch('/sales');
+    if (!data) return;
 
-    if (!response.ok) throw new Error('Error al cargar ventas');
-    
-    allSales = await response.json();
+    allSales = data;
     
     loadingState.style.display = 'none';
     
@@ -125,12 +117,10 @@ function updateStats(sales) {
 
 async function loadClientsForFilter() {
   try {
-    const response = await fetch(`${API_URL}/clients`, {
-      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-    });
-    const clients = await response.json();
+    const clients = await apiFetch('/clients');
+    if (!clients) return;
+
     const select = document.getElementById('filterClient');
-    
     clients.forEach(client => {
       const option = document.createElement('option');
       option.value = client.name; 
@@ -162,7 +152,7 @@ window.printTicket = function(id) {
   btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
   btn.disabled = true;
 
-  fetch(`${API_URL}/sales/${id}/ticket`, {
+  fetch(`/sales/${id}/ticket`, {
     headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
   })
   .then(res => {

@@ -1,5 +1,7 @@
 // Dashboard Logic
-const API_URL = ''; // Ruta relativa para producción
+import { apiFetch } from './api.js';
+import { getUserPayload, logout } from './auth.js';
+
 let revenueChart; // Variable global para el gráfico
 let topProductsChart; // Variable para el gráfico de productos top
 let comparisonChart; // Variable para el gráfico de comparación
@@ -14,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Solo cargar tarjetas de sedes si estamos en la vista global
     if (!branchId) loadBranchCards(); 
     loadDashboardStats('7days', branchId);
+    loadTodaySales(branchId); // Agregar esta línea
     initRevenueChart();
     initTopProductsChart();
     initCashVsCreditChart();
@@ -47,15 +50,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function setupUserSession(branchId) {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        window.location.href = 'login.html'; // Si no hay token, no debería estar aquí
+    const payload = getUserPayload();
+    if (!payload) {
+        window.location.href = 'login.html';
         return;
     }
 
-    // Decodificar el token para obtener la información del usuario
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
         document.getElementById('usernameDisplay').textContent = payload.username;
         document.getElementById('userRoleDisplay').textContent = payload.role.charAt(0).toUpperCase() + payload.role.slice(1);
         document.getElementById('userInitialDisplay').textContent = payload.username.charAt(0).toUpperCase();
@@ -89,10 +90,9 @@ function setupUserSession(branchId) {
             const pageTitle = document.querySelector('.welcome-card h2');
             const pageSubtitle = document.querySelector('.welcome-card p');
             
-            // Usamos el endpoint que ya existe para no crear uno nuevo
-            fetch('/api/branch-stats', { headers: { 'Authorization': `Bearer ${token}` } })
-                .then(res => res.ok ? res.json() : Promise.reject('Failed to load branches'))
+            apiFetch('/api/branch-stats')
                 .then(branches => {
+                    if (!branches) return;
                     const currentBranch = branches.find(b => b.id == branchId);
                     if (currentBranch) {
                         if(pageTitle) pageTitle.textContent = `Dashboard: ${currentBranch.name}`;
@@ -141,11 +141,11 @@ function setupUserSession(branchId) {
     // Funcionalidad de Cerrar Sesión
     const logoutButton = document.getElementById('logoutButton');
     if (logoutButton) {
-        logoutButton.addEventListener('click', function() {
-            localStorage.removeItem('token');
-            // Opcional: mostrar un mensaje de "Cerrando sesión..."
-            window.location.href = 'index.html';
-        });
+        // Usar la función centralizada de logout para limpiar sesión correctamente
+        logoutButton.onclick = (e) => {
+            e.preventDefault();
+            logout();
+        };
     }
 }
 
@@ -159,29 +159,45 @@ function updateDate() {
     }
 }
 
+async function loadTodaySales(branchId = null) {
+    try {
+        const endpoint = branchId ? 
+            `/api/dashboard-stats?period=today&branch_id=${branchId}` : 
+            '/api/dashboard-stats?period=today';
+        
+        const data = await apiFetch(endpoint);
+        if (!data) return;
+
+        // Actualizar los elementos específicos de la tarjeta de ventas hoy
+        const salesCount = document.getElementById('todaySalesCount');
+        const salesAmount = document.getElementById('todaySalesAmount');
+        
+        const formatCOP = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(val || 0));
+
+        if (salesCount) salesCount.textContent = data.totalSales || 0;
+        if (salesAmount) salesAmount.textContent = formatCOP(data.totalRevenue);
+        
+    } catch (error) {
+        console.error('Error loading today sales:', error);
+    }
+}
+
 async function loadBranchCards() {
     // Buscamos el contenedor. Asegúrate de haber agregado <div id="branchCardsContainer" class="row mb-4"></div> en tu HTML
     const container = document.getElementById('branchCardsContainer');
     if (!container) return; 
 
-    // Solo los admins ven esto
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    const payload = getUserPayload();
+    if (!payload) return;
     
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
         if (payload.role !== 'admin') {
             container.style.display = 'none';
             return;
         }
 
-        const response = await fetch(`${API_URL}/api/branch-stats`, {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        
-        if (!response.ok) return;
-
-        const branches = await response.json();
+        const branches = await apiFetch('/api/branch-stats');
+        if (!branches) return;
 
         // Si solo hay una sede (la principal) o ninguna, no mostramos este panel de acceso rápido
         if (branches.length <= 1) {
@@ -231,32 +247,24 @@ function createBranchCard(branch) {
 
 async function loadDashboardStats(period = '7days', branchId = null) {
     try {
-        let url = `${API_URL}/api/dashboard-stats?period=${period}`;
+        let url = `/api/dashboard-stats?period=${period}`;
         if (branchId) {
             url += `&branch_id=${branchId}`;
         }
 
-        const response = await fetch(url, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
+        const stats = await apiFetch(url);
+        if (!stats) return;
 
-        if (!response.ok) {
-            // Si el token es inválido, el servidor envía 401/403, redirigir al login
-            if (response.status === 401 || response.status === 403) {
-                window.location.href = 'login.html';
-            }
-            throw new Error('No se pudieron cargar las estadísticas.');
-        }
-        
-        const stats = await response.json();
-
-        const formatCOP = (val) => parseFloat(val || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
+        const formatCOP = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(val || 0));
 
         document.getElementById('totalRevenue').textContent = formatCOP(stats.totalRevenue);
         document.getElementById('totalExpenses').textContent = formatCOP(stats.totalExpenses);
         
-        if (document.getElementById('totalCredits')) {
-            document.getElementById('totalCredits').textContent = formatCOP(stats.totalCredits);
+        // Mostrar Cartera Pendiente (Dinero en la calle)
+        const carteraEl = document.getElementById('totalCredits');
+        if (carteraEl) {
+            carteraEl.textContent = formatCOP(stats.totalCredits);
+            carteraEl.parentElement.querySelector('.card-title').textContent = "Cartera Pendiente";
         }
 
         document.getElementById('totalSales').textContent = stats.totalSales;
@@ -293,6 +301,9 @@ async function loadDashboardStats(period = '7days', branchId = null) {
 
         // Actualizar lista de actividad reciente
         updateRecentActivity(stats.recentActivity); 
+
+        // Actualizar monitoreo de cobradores
+        updateCollectorMonitoring(stats.collectorPerformance);
 
         // Las siguientes tarjetas solo tienen sentido en la vista global
         if (!branchId) {
@@ -431,9 +442,10 @@ function initTopProductsChart() {
 }
 
 function updateCollectorMonitoring(performance) {
-    const container = document.getElementById('collectorMonitoringList');
+    const tableBody = document.getElementById('collectorMonitoringTableBody'); // Para la tabla de desktop
+    const mobileListContainer = document.getElementById('collectorMonitoringListMobile'); // Para las tarjetas de móvil
     const card = document.getElementById('collectorMonitoringCard');
-    if (!container || !card) return;
+    if (!tableBody || !mobileListContainer || !card) return;
 
     if (!performance || performance.length === 0) {
         card.style.display = 'none';
@@ -441,18 +453,44 @@ function updateCollectorMonitoring(performance) {
     }
 
     card.style.display = 'block';
-    container.innerHTML = '';
+    tableBody.innerHTML = '';
+    mobileListContainer.innerHTML = '';
     const formatCOP = (val) => parseFloat(val || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 });
 
     performance.forEach(item => {
-        const row = `
+        const statusBadge = item.closed_at 
+            ? `<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-lock-fill me-1"></i>Cerró ${new Date(item.closed_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>`
+            : `<span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="bi bi-bicycle me-1"></i>En Ruta</span>`;
+
+        // Render para la tabla de desktop
+        const tableRow = `
             <tr>
-                <td class="fw-bold">${item.collector_name}</td>
-                <td class="text-center"><span class="badge bg-light text-dark">${item.collections_count} visitas</span></td>
-                <td class="text-end text-success fw-bold">${formatCOP(item.amount_collected)}</td>
+                <td class="fw-bold text-dark">${item.collector_name}</td>
+                <td class="text-center"><span class="small text-muted">${item.collections_count} abonos</span></td>
+                <td class="text-center">${statusBadge}</td>
+                <td class="text-end text-primary fw-bold">${formatCOP(item.amount_collected)}</td>
             </tr>
         `;
-        container.insertAdjacentHTML('beforeend', row);
+        tableBody.insertAdjacentHTML('beforeend', tableRow);
+
+        // Render para la lista de tarjetas en móvil
+        const mobileCard = `
+            <div class="col-12">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0 fw-bold text-dark">${item.collector_name}</h6>
+                            <small class="text-muted">${item.collections_count} abonos</small>
+                        </div>
+                        <div class="text-end">
+                            ${statusBadge}
+                            <h5 class="mb-0 fw-bold text-primary">${formatCOP(item.amount_collected)}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        mobileListContainer.insertAdjacentHTML('beforeend', mobileCard);
     });
 }
 
@@ -928,22 +966,13 @@ async function fetchDailySummary(date, branchId = null) {
     }
 
     try {
-        const url = new URL(`${API_URL}/api/daily-summary`, window.location.origin);
-        url.searchParams.append('date', date);
+        let endpoint = `/api/daily-summary?date=${date}`;
         if (branchId) {
-            url.searchParams.append('branch_id', branchId);
+            endpoint += `&branch_id=${branchId}`;
         }
 
-        const response = await fetch(url, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'No se pudo cargar el resumen.');
-        }
-
-        const summary = await response.json();
+        const summary = await apiFetch(endpoint);
+        if (!summary) return;
 
         summaryContent.innerHTML = `
             <div class="row g-3">
@@ -1045,20 +1074,11 @@ async function sendSummaryByEmail() {
     emailBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
 
     try {
-        const response = await fetch(`${API_URL}/api/daily-summary/email`, {
+        const result = await apiFetch('/api/daily-summary/email', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
             body: JSON.stringify({ date: date })
         });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.message || 'Error al enviar el correo.');
-        }
+        if (!result) return;
 
         // Usamos alert para notificar, ya que no tenemos un sistema de "toasts" global
         showToast(result.message);

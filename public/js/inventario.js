@@ -1,8 +1,9 @@
 // Lógica para la página de inventario
-import { API_URL } from '../config.js';
-const INVENTORY_ENDPOINT = `${API_URL}/inventory`;
+import { apiFetch } from './api.js';
+import { getUserRole, protectRoute } from './auth.js';
+
 let allProducts = [];
-let userRole = 'cajero'; // Valor por defecto seguro
+let userRole = getUserRole();
 
 // Cargar inventario al inicio
 document.addEventListener('DOMContentLoaded', function() {
@@ -13,14 +14,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function setupUserSession() {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        window.location.href = 'login.html';
-        return;
-    }
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        userRole = payload.role;
+    protectRoute();
+    userRole = getUserRole();
 
         // Ocultar elementos exclusivos de admin (como el botón Agregar)
         if (userRole !== 'admin') {
@@ -29,9 +24,6 @@ function setupUserSession() {
                 el.style.display = 'none';
             });
         }
-    } catch (e) {
-        console.error('Error decodificando el token:', e);
-    }
 }
 
 function setupEventListeners() {
@@ -45,7 +37,7 @@ function setupEventListeners() {
 async function loadInventory() {
   const urlParams = new URLSearchParams(window.location.search);
   const branchId = urlParams.get('branch_id');
-  const endpoint = branchId ? `${INVENTORY_ENDPOINT}?branch_id=${branchId}` : INVENTORY_ENDPOINT;
+  const endpoint = branchId ? `/inventory?branch_id=${branchId}` : '/inventory';
 
   const loadingState = document.getElementById('loadingState');
 
@@ -59,25 +51,12 @@ async function loadInventory() {
   }
 
   try {
-    const response = await fetch(endpoint, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      window.location.href = 'login.html';
-      return;
+    const data = await apiFetch(endpoint);
+    if (data) {
+        allProducts = data;
+        loadingState.style.display = 'none';
+        renderInventory(allProducts);
     }
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || 'Error al cargar el inventario');
-    }
-
-    allProducts = await response.json();
-
-    loadingState.style.display = 'none';
-    renderInventory(allProducts);
-    
   } catch (error) {
     console.error('Error:', error.message);
     loadingState.innerHTML = '<div class="alert alert-danger">Error al cargar el inventario. Intente nuevamente.</div>';
@@ -127,10 +106,10 @@ function renderInventory(products) {
 function createProductCardElement(product, index, formatCurrency) {
     const stockLevel = product.stock < 5 ? 'low' : product.stock < 20 ? 'medium' : 'high';
     const stockBadgeClass = `stock-${stockLevel}`;
-    const stockText = product.stock < 5 ? 'Bajo' : product.stock < 20 ? 'Medio' : 'Alto';
+    const stockText = product.stock < 5 ? 'Bajo' : (product.stock < 20 ? 'Medio' : 'Alto');
 
     const col = document.createElement('div');
-    col.className = 'col-md-6 col-lg-4 fade-in';
+    col.className = 'col-12 col-sm-6 col-md-6 col-lg-4 fade-in'; // Ajustado para mejor responsividad
 
     const card = document.createElement('div');
     card.className = 'card h-100 border-0 shadow-sm';
@@ -223,11 +202,9 @@ async function deleteProduct(id) {
   if (!confirm('¿Estás seguro de eliminar este producto?')) return;
 
   try {
-    const response = await fetch(`${INVENTORY_ENDPOINT}/${id}`, {
+    await apiFetch(`/inventory/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
-    if (!response.ok) throw new Error('Error al eliminar el producto');
     loadInventory(); // Recargar todo desde el servidor para asegurar consistencia
     showToast('Producto eliminado correctamente');
   } catch (error) {

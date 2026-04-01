@@ -1,4 +1,4 @@
-import { API_URL } from '../config.js'; // Ruta corregida para estar dentro de js/
+import { apiFetch } from './api.js';
 
 // Manejar el envío del formulario para agregar clientes
 document.getElementById('addClientForm').addEventListener('submit', function (event) {
@@ -15,22 +15,12 @@ document.getElementById('addClientForm').addEventListener('submit', function (ev
     const address = document.getElementById('address').value;
   
     // Realizar una solicitud al backend para agregar el cliente
-    fetch(`${API_URL}/clients`, {
+    apiFetch('/clients', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + localStorage.getItem('token'), // Token de autenticación
-      },
       body: JSON.stringify({ name, email, phone, address }), // Enviar datos en JSON
     })
-    .then(async response => {
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.message || 'No se pudo agregar el cliente');
-        }
-        return data;
-    })
     .then(data => {
+        if (!data) return;
         showToast(data.message || 'Cliente agregado exitosamente');
         setTimeout(() => window.location.href = 'clientes.html', 1500); // Redirigir tras un momento
     })

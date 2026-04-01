@@ -11,7 +11,9 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
     try {
         const { period, branch_id } = req.query;
         let whereClauses = [];
-        let queryParams = [];
+        let queryParams = [req.user.tenant_id];
+
+        whereClauses.push("tenant_id = ?");
 
         // --- Construcción de filtros ---
         let groupBy = "GROUP BY DATE(sale_date)";
@@ -67,7 +69,7 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             FROM sale_details sd
             JOIN sales s ON sd.sale_id = s.id
             JOIN inventory i ON sd.product_id = i.id
-            ${salesWhereClause.replace('branch_id', 's.branch_id').replace('sale_date', 's.sale_date')}
+            ${salesWhereClause.replace(/tenant_id/g, 's.tenant_id').replace(/branch_id/g, 's.branch_id').replace(/sale_date/g, 's.sale_date')}
             GROUP BY i.id
             ORDER BY totalSold DESC
             LIMIT 5
@@ -102,19 +104,19 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
 
         if (branch_id) {
             // Datos específicos de la sede
-            [clients] = await db.query(`SELECT COUNT(DISTINCT client_id) as total FROM sales WHERE branch_id = ?`, [branch_id]);
-            [products] = await db.query('SELECT SUM(stock) as total FROM branch_stocks WHERE branch_id = ?', [branch_id]);
-            [lowStock] = await db.query('SELECT COUNT(*) as total FROM branch_stocks WHERE stock < 5 AND branch_id = ?', [branch_id]);
+            [clients] = await db.query(`SELECT COUNT(DISTINCT client_id) as total FROM sales WHERE branch_id = ? AND tenant_id = ?`, [branch_id, req.user.tenant_id]);
+            [products] = await db.query('SELECT SUM(stock) as total FROM branch_stocks WHERE branch_id = ? AND tenant_id = ?', [branch_id, req.user.tenant_id]);
+            [lowStock] = await db.query('SELECT COUNT(*) as total FROM branch_stocks WHERE stock < 5 AND branch_id = ? AND tenant_id = ?', [branch_id, req.user.tenant_id]);
         } else {
             // Datos globales
-            [clients] = await db.query('SELECT COUNT(*) as total FROM clients');
-            [products] = await db.query('SELECT SUM(stock) as total FROM inventory');
-            [lowStock] = await db.query('SELECT COUNT(*) as total FROM inventory WHERE stock < 5');
+            [clients] = await db.query('SELECT COUNT(*) as total FROM clients WHERE tenant_id = ?', [req.user.tenant_id]);
+            [products] = await db.query('SELECT SUM(stock) as total FROM inventory WHERE tenant_id = ?', [req.user.tenant_id]);
+            [lowStock] = await db.query('SELECT COUNT(*) as total FROM inventory WHERE stock < 5 AND tenant_id = ?', [req.user.tenant_id]);
         }
         
         // Actividad Reciente (últimas 5 acciones globales)
-        let recentActivityWhere = [];
-        let recentActivityParams = [];
+        let recentActivityWhere = ["s.tenant_id = ?"];
+        let recentActivityParams = [req.user.tenant_id];
         if (branch_id) {
             recentActivityWhere.push("s.branch_id = ?");
             recentActivityParams.push(branch_id);
@@ -130,22 +132,24 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         const [staleProducts] = await db.query(`
             SELECT i.id, i.product_name, MAX(s.sale_date) as last_sale_date
             FROM inventory i
-            LEFT JOIN sale_details sd ON i.id = sd.product_id
+            LEFT JOIN sale_details sd ON i.id = sd.product_id AND sd.tenant_id = i.tenant_id
             LEFT JOIN sales s ON sd.sale_id = s.id
-            GROUP BY i.id
+            WHERE i.tenant_id = ?
+            GROUP BY i.id, i.product_name
             HAVING last_sale_date < DATE_SUB(NOW(), INTERVAL 30 DAY) OR last_sale_date IS NULL
             LIMIT 5
-        `);
+        `, [req.user.tenant_id]);
 
         // Clientes inactivos (sin compras en 60 días) - Global
         const [inactiveClients] = await db.query(`
             SELECT c.name, c.email, c.phone, MAX(s.sale_date) as last_purchase
             FROM clients c
             JOIN sales s ON c.id = s.client_id
-            GROUP BY c.id
+            WHERE c.tenant_id = ?
+            GROUP BY c.id, c.name, c.email, c.phone
             HAVING last_purchase < DATE_SUB(NOW(), INTERVAL 60 DAY)
             LIMIT 5
-        `);
+        `, [req.user.tenant_id]);
         
         // NUEVO: Top Clientes Morosos (con saldo pendiente)
         const [topDelinquentClients] = await db.query(`
@@ -168,11 +172,12 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             SELECT 
                 u.username as collector_name,
                 COUNT(cp.id) as collections_count,
-                COALESCE(SUM(cp.amount), 0) as amount_collected
-            FROM credit_payments cp
-            JOIN users u ON cp.collector_id = u.id
-            WHERE cp.tenant_id = ? AND DATE(cp.payment_date) = CURDATE()
-            GROUP BY cp.collector_id
+                COALESCE(SUM(cp.amount), 0) as amount_collected,
+                (SELECT MAX(created_at) FROM audit_logs WHERE user_id = u.id AND action = 'ROUTE_CLOSURE' AND DATE(created_at) = CURDATE()) as closed_at
+            FROM users u
+            LEFT JOIN credit_payments cp ON cp.collector_id = u.id AND DATE(cp.payment_date) = CURDATE()
+            WHERE u.tenant_id = ? AND u.role = 'cobrador'
+            GROUP BY u.id
             ORDER BY amount_collected DESC
         `, [req.user.tenant_id]);
 
@@ -242,7 +247,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
     
     try {
         let dateFilter = "";
-        const params = [];
+        const params = [req.user.tenant_id];
         
         if (startDate && endDate) {
             dateFilter = "AND sale_date BETWEEN ? AND ?";
@@ -256,7 +261,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
             const [sales] = await db.query(`
                 SELECT DATE(sale_date) as date, SUM(total_price) as total, COUNT(*) as count 
                 FROM sales 
-                WHERE 1=1 ${dateFilter} 
+                WHERE tenant_id = ? ${dateFilter} 
                 GROUP BY DATE(sale_date) 
                 ORDER BY date ASC
             `, params);
@@ -270,7 +275,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
                 FROM sale_details sd
                 JOIN sales s ON sd.sale_id = s.id
                 JOIN inventory i ON sd.product_id = i.id
-                WHERE 1=1 ${dateFilter.replace('sale_date', 's.sale_date')}
+                WHERE i.tenant_id = ? ${dateFilter.replace('sale_date', 's.sale_date')}
                 GROUP BY i.category
             `, params);
             reportData.categoryChart = categories;
@@ -282,7 +287,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
                 SELECT c.name, COUNT(s.id) as purchases, SUM(s.total_price) as total
                 FROM sales s
                 JOIN clients c ON s.client_id = c.id
-                WHERE 1=1 ${dateFilter}
+                WHERE s.tenant_id = ? ${dateFilter}
                 GROUP BY c.id
                 ORDER BY total DESC
                 LIMIT 5
@@ -295,7 +300,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
             const [hours] = await db.query(`
                 SELECT HOUR(sale_date) as hour, COUNT(*) as count
                 FROM sales
-                WHERE 1=1 ${dateFilter}
+                WHERE tenant_id = ? ${dateFilter}
                 GROUP BY HOUR(sale_date)
                 ORDER BY hour ASC
             `, params);
@@ -309,11 +314,11 @@ router.post('/generate', authenticateToken, async (req, res) => {
                 COUNT(*) as salesCount,
                 COUNT(DISTINCT client_id) as activeClients
             FROM sales 
-            WHERE 1=1 ${dateFilter}
+            WHERE tenant_id = ? ${dateFilter}
         `, params);
         
         // Total de productos (stock actual, no depende de fechas de venta)
-        const [products] = await db.query('SELECT SUM(stock) as total FROM inventory');
+        const [products] = await db.query('SELECT SUM(stock) as total FROM inventory WHERE tenant_id = ?', [req.user.tenant_id]);
         
         reportData.totals = { ...totals[0], totalProducts: products[0].total };
 
@@ -341,7 +346,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         else if (type === 'complete') filename = `reporte-completo-${startDate}.pdf`;
         
         // 1. Obtener Configuración de la Empresa
-        const [settings] = await db.query('SELECT * FROM settings WHERE id = 1');
+        const [settings] = await db.query('SELECT * FROM settings WHERE tenant_id = ?', [req.user.tenant_id]);
         const config = settings[0] || { company_name: 'Business Control', company_address: '', company_phone: '', company_email: '' };
 
         // 2. Configurar Documento PDF
@@ -355,12 +360,14 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         const formatCurrency = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 
         // Función centralizada para controlar saltos de página
-        const checkAddPage = (currentY, neededHeight) => {
-            if (currentY + neededHeight > 730) { // Margen de seguridad antes del footer
-                doc.addPage(); // Esto disparará el evento 'pageAdded' que dibuja el header principal
-                return doc.y; // Retorna la nueva posición Y después del header principal
+        const checkAddPage = (neededHeight) => {
+            if (doc.y + neededHeight > 700) { // Margen inferior de seguridad
+                doc.addPage();
+                // Al llamar a addPage, el evento 'pageAdded' ya dibujó el header 
+                // y posicionó doc.y al final del mismo.
+                return true;
             }
-            return currentY;
+            return false;
         };
         
         const generateFooter = (docInstance) => {
@@ -409,7 +416,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             if (startDate && endDate) {
                 doc.fontSize(10).font('Helvetica').text(`Periodo: ${startDate} al ${endDate}`, { align: 'center' });
             } else {
-                doc.fontSize(10).font('Helvetica').text(`Generado el: ${new Date().toLocaleDateString()}`, { align: 'center' });
+                doc.fontSize(10).font('Helvetica').text(`Generado el: ${new Date().toLocaleDateString('es-CO')}`, { align: 'center' });
             }
             
             // Línea separadora
@@ -498,11 +505,10 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                     const totalStr = formatCurrency(sale.total_price);
                     
                     // Calcular altura dinámica
-                    const rowHeight = Math.max(doc.heightOfString(clientStr, { width: 190 }), 18);
+                    const rowHeight = Math.max(doc.heightOfString(clientStr, { width: 190 }), 20);
 
-                    const newY = checkAddPage(y, rowHeight + 5);
-                    if (newY !== y) {
-                        y = newY;
+                    if (checkAddPage(rowHeight + 10)) {
+                        y = doc.y + 10; // Reiniciar Y al final del header de la nueva pagina
                         drawSalesTableHeader(y);
                         y += 25;
                     }
@@ -561,9 +567,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 const productStr = (item.product_name || 'Producto Borrado').substring(0, 35);
                 const rowHeight = Math.max(doc.heightOfString(productStr, { width: 240 }), 18);
 
-                const newY = checkAddPage(y, rowHeight + 5);
-                if (newY !== y) {
-                    y = newY;
+                if (checkAddPage(rowHeight + 10)) {
+                    y = doc.y + 10;
                     drawProfitsHeader(y);
                     y += 25;
                 }
@@ -590,7 +595,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             // NUEVO: Sección de Gastos en el PDF
             let totalExpenses = 0;
             if (expensesList.length > 0) {
-                y = checkAddPage(y, 60);
+                if (checkAddPage(60)) y = doc.y;
+                
                 y += 20;
                 doc.fontSize(12).font('Helvetica-Bold').fillColor('#000').text('GASTOS OPERATIVOS', 50, y);
                 y += 20;
@@ -610,9 +616,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                     const descStr = exp.description.substring(0, 50);
                     const rowHeight = Math.max(doc.heightOfString(descStr, { width: 290 }), 18);
 
-                    const newY = checkAddPage(y, rowHeight + 5);
-                    if (newY !== y) {
-                        y = newY;
+                    if (checkAddPage(rowHeight + 10)) {
+                        y = doc.y + 10;
                         drawExpensesHeader(y);
                         y += 25;
                     }
@@ -626,7 +631,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 });
             }
 
-            y = checkAddPage(y, 80);
+            if (checkAddPage(80)) y = doc.y;
             y += 20;
 
             doc.font('Helvetica-Bold').fillColor('#000');
@@ -666,9 +671,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 const nameStr = p.product_name.substring(0, 40);
                 const rowHeight = Math.max(doc.heightOfString(nameStr, { width: 260 }), 18);
 
-                const newY = checkAddPage(y, rowHeight + 5);
-                if (newY !== y) {
-                    y = newY;
+                if (checkAddPage(rowHeight + 10)) {
+                    y = doc.y;
                     drawInventoryHeader(y);
                     y += 25;
                 }
@@ -688,7 +692,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             });
 
             // Totales manuales
-            y = checkAddPage(y, 50);
+            if (checkAddPage(50)) y = doc.y;
             y += 20;
 
             doc.font('Helvetica-Bold');
@@ -721,9 +725,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                     const nameStr = p.product_name;
                     const rowHeight = Math.max(doc.heightOfString(nameStr, { width: 340 }), 18);
 
-                    const newY = checkAddPage(y, rowHeight + 5);
-                    if (newY !== y) {
-                        y = newY;
+                if (checkAddPage(rowHeight + 10)) {
+                    y = doc.y;
                         drawLowStockHeader(y);
                         y += 25;
                     }
@@ -743,11 +746,10 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         if (type === 'clients') {
             const [clients] = await db.query('SELECT * FROM clients ORDER BY name ASC');
             
-            let y = doc.y;
+            let y = doc.y + 20;
             
             clients.forEach((c, i) => {
-                const newY = checkAddPage(y, 60);
-                if (newY !== y) y = newY;
+                if (checkAddPage(70)) y = doc.y;
                 
                 // Tarjeta de cliente
                 doc.rect(50, y, 495, 50).stroke('#e0e0e0');
@@ -823,13 +825,11 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.text(String(inventoryStats[0].lowStockCount), 300, y + 25, { width: 200 });
 
             // --- 3. DIBUJAR DESGLOSES ---
-            // Usar control manual de Y para evitar páginas en blanco por moveDown
-            let currentY = y + 60; // Espacio después de la caja de inventario
-
-            // La función checkAddPage ya está definida arriba y es accesible aquí
+            let currentY = doc.y + 30;
 
             // Tabla Top 5 Productos
-            currentY = checkAddPage(currentY, 120); // Verificar espacio para título + tabla pequeña
+            if (checkAddPage(120)) currentY = doc.y;
+
             doc.fontSize(12).font('Helvetica-Bold').text('Top 5 Productos Vendidos', 50, currentY);
             currentY += 20;
 
@@ -847,9 +847,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 const revenueText = formatCurrency(p.totalRevenue);
                 const rowHeight = Math.max(doc.heightOfString(productText, { width: 290 }), doc.heightOfString(soldText, { width: 80 }), doc.heightOfString(revenueText, { width: 90 }));
 
-                const newY = checkAddPage(currentY, rowHeight + 5);
-                if (newY !== currentY) {
-                    currentY = newY;
+                if (checkAddPage(rowHeight + 10)) {
+                    currentY = doc.y;
                     doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
                     doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
                     doc.text('Producto', 60, currentY + 6, { width: 280 });
@@ -869,7 +868,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             currentY += 20; // Espacio entre tablas
 
             // Tabla Top 5 Clientes
-            currentY = checkAddPage(currentY, 120);
+            if (checkAddPage(120)) currentY = doc.y;
             doc.fontSize(12).font('Helvetica-Bold').text('Top 5 Clientes', 50, currentY);
             currentY += 20;
 
@@ -887,9 +886,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 const totalText = formatCurrency(c.total);
                 const rowHeight = Math.max(doc.heightOfString(clientText, { width: 290 }), doc.heightOfString(purchasesText, { width: 80 }), doc.heightOfString(totalText, { width: 90 }));
 
-                const newY = checkAddPage(currentY, rowHeight + 5);
-                if (newY !== currentY) {
-                    currentY = newY;
+                if (checkAddPage(rowHeight + 10)) {
+                    currentY = doc.y;
                     doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
                     doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
                     doc.text('Cliente', 60, currentY + 6, { width: 280 });
@@ -908,7 +906,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             currentY += 20;
 
             // Tabla Desglose Diario
-            currentY = checkAddPage(currentY, 60);
+            if (checkAddPage(100)) currentY = doc.y;
             doc.fontSize(12).font('Helvetica-Bold').text('Desglose de Ventas por Día', 50, currentY);
             currentY += 20;
             
@@ -926,9 +924,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 const totalText = formatCurrency(s.total);
                 const rowHeight = Math.max(doc.heightOfString(dateStr, { width: 290 }), doc.heightOfString(countText, { width: 80 }), doc.heightOfString(totalText, { width: 90 }));
 
-                const newY = checkAddPage(currentY, rowHeight + 5);
-                if (newY !== currentY) {
-                    currentY = newY;
+                if (checkAddPage(rowHeight + 10)) {
+                    currentY = doc.y;
                     doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
                     doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
                     doc.text('Fecha', 60, currentY + 6, { width: 280 });
@@ -946,7 +943,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             // --- 4. INVENTARIO DISPONIBLE (NUEVO) ---
             const [fullInventory] = await db.query('SELECT product_name, stock, price FROM inventory ORDER BY product_name ASC');
             
-            currentY = checkAddPage(currentY, 90);
+            if (checkAddPage(120)) currentY = doc.y;
             doc.fontSize(12).font('Helvetica-Bold').text('Inventario Disponible', 50, currentY);
             currentY += 20;
 
@@ -964,9 +961,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
                 const stockText = String(p.stock);
                 const rowHeight = Math.max(doc.heightOfString(productText, { width: 290 }), doc.heightOfString(priceText, { width: 80 }), doc.heightOfString(stockText, { width: 90 }));
                 
-                const newY = checkAddPage(currentY, rowHeight + 5);
-                if (newY !== currentY) {
-                    currentY = newY;
+                if (checkAddPage(rowHeight + 10)) {
+                    currentY = doc.y;
                     doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
                     doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
                     doc.text('Producto', 60, currentY + 6, { width: 280 });

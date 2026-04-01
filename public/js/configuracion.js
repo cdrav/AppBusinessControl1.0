@@ -1,4 +1,4 @@
-const API_URL = ''; // Ruta relativa para producción
+import { apiFetch } from './api.js';
 let restoreFile = null;
 let restoreKey = null;
 
@@ -50,16 +50,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadSettings() {
     try {
-        const response = await fetch(`${API_URL}/settings`, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
-        
-        if (response.status === 401 || response.status === 403) {
-            window.location.href = 'dashboard.html';
-            return;
-        }
-
-        const settings = await response.json();
+        const settings = await apiFetch('/settings');
+        if (!settings) return;
         
         document.getElementById('companyName').value = settings.company_name || '';
         document.getElementById('companyAddress').value = settings.company_address || '';
@@ -102,17 +94,11 @@ async function saveSettings(e) {
     msg.innerHTML = '';
 
     try {
-        const response = await fetch(`${API_URL}/settings`, {
+        const result = await apiFetch('/settings', {
             method: 'PUT',
-            headers: {
-                // NO establecer 'Content-Type', el navegador lo hace automáticamente para FormData
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
             body: formData
         });
-
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Error al guardar');
+        if (!result) return;
         
         msg.innerHTML = `<div class="alert alert-success">${result.message}</div>`;
         loadSettings(); // Recargar para mostrar el nuevo logo
@@ -129,10 +115,8 @@ async function loadBranches() {
     if (!tbody) return;
 
     try {
-        const response = await fetch(`${API_URL}/branches`, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
-        const branches = await response.json();
+        const branches = await apiFetch('/branches');
+        if (!branches) return;
         
         tbody.innerHTML = branches.map(b => `
             <tr>
@@ -159,16 +143,12 @@ async function handleAddBranch(e) {
     const phone = document.getElementById('branchPhone').value;
 
     try {
-        const response = await fetch(`${API_URL}/branches`, {
+        const response = await apiFetch('/branches', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
             body: JSON.stringify({ name, address, phone })
         });
 
-        if (response.ok) {
+        if (response) {
             showToast('Sucursal creada correctamente');
             document.getElementById('addBranchForm').reset();
             loadBranches();
@@ -195,17 +175,11 @@ function handleBranchActions(e) {
 async function deleteBranch(id) {
     if (!confirm('¿Eliminar esta sucursal?')) return;
     try {
-        const response = await fetch(`${API_URL}/branches/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        await apiFetch(`/branches/${id}`, {
+            method: 'DELETE'
         });
-        if (response.ok) {
-            showToast('Sucursal eliminada');
-            loadBranches();
-        } else {
-            const data = await response.json();
-            showToast(data.message || 'Error al eliminar', true);
-        }
+        showToast('Sucursal eliminada');
+        loadBranches();
     } catch (error) {
         showToast('Error de conexión', true);
     }
@@ -213,7 +187,7 @@ async function deleteBranch(id) {
 
 async function downloadBackup() {
     try {
-        const response = await fetch(`${API_URL}/api/backup`, {
+        const response = await fetch(`/api/backup`, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
         
@@ -278,7 +252,7 @@ function executeRestore() {
 
     // Usamos XMLHttpRequest para tener eventos de progreso de subida
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_URL}/api/restore`, true);
+    xhr.open('POST', `/api/restore`, true);
     xhr.setRequestHeader('Authorization', 'Bearer ' + localStorage.getItem('token'));
 
     // Evento de progreso

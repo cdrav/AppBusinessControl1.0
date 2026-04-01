@@ -1,6 +1,6 @@
 // Clientes Page JavaScript
-import { API_URL } from '../config.js';
 import { getUserRole, protectRoute } from './auth.js';
+import { apiFetch } from './api.js';
 
 let clients = [];
 const userRole = getUserRole();
@@ -27,19 +27,9 @@ function setupEventListeners() {
 // Load clients from API
 async function loadClients() {
   try {
-    const response = await fetch(`${API_URL}/clients`, {
-      headers: {
-        'Authorization': 'Bearer ' + localStorage.getItem('token'),
-      },
-    });
-
-    if (response.status === 401 || response.status === 403) {
-      window.location.href = 'login.html';
-      return;
-    }
-
-    if (response.ok) {
-      clients = await response.json();
+    const data = await apiFetch('/clients');
+    if (data) {
+      clients = data;
       renderClients(clients);
       updateStats(clients); // Actualizar tarjetas de estadísticas
       if (clients.length === 0) {

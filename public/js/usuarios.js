@@ -1,4 +1,4 @@
-const API_URL = ''; 
+import { apiFetch } from './api.js';
 let userModal;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,11 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadUsers() {
     const tbody = document.getElementById('usersTableBody');
     try {
-        const res = await fetch(`${API_URL}/users`, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
-        if (!res.ok) throw new Error('Error cargando usuarios');
-        const users = await res.json();
+        const users = await apiFetch('/users');
+        if (!users) return;
 
         tbody.innerHTML = '';
         users.forEach(user => {
@@ -54,10 +51,9 @@ async function loadUsers() {
 async function loadBranches() {
     const select = document.getElementById('branchId');
     try {
-        const res = await fetch(`${API_URL}/branches`, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
-        const branches = await res.json();
+        const branches = await apiFetch('/branches');
+        if (!branches) return;
+        
         select.innerHTML = '<option value="">-- Seleccionar Sede --</option>';
         branches.forEach(b => {
             select.innerHTML += `<option value="${b.id}">${b.name}</option>`;
@@ -107,20 +103,14 @@ async function handleUserSubmit(e) {
     if (isEdit && !data.password) delete data.password;
 
     try {
-        const url = isEdit ? `${API_URL}/users/${id}` : `${API_URL}/users`;
+        const endpoint = isEdit ? `/users/${id}` : `/users`;
         const method = isEdit ? 'PUT' : 'POST';
 
-        const res = await fetch(url, {
+        const result = await apiFetch(endpoint, {
             method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
             body: JSON.stringify(data)
         });
-
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.message);
+        if (!result) return;
 
         showToast(result.message);
         userModal.hide();
@@ -133,12 +123,11 @@ async function handleUserSubmit(e) {
 async function deleteUser(id) {
     if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
     try {
-        const res = await fetch(`${API_URL}/users/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        const result = await apiFetch(`/users/${id}`, {
+            method: 'DELETE'
         });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.message);
+        if (!result) return;
+        
         showToast(result.message);
         loadUsers();
     } catch (error) {

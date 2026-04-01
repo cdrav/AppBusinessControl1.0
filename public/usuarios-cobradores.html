@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Usuarios - Business Control</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .role-badge {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.375rem;
+    }
+    .role-admin { background-color: #dc3545; }
+    .role-cajero { background-color: #198754; }
+    .role-cobrador { background-color: #6f42c1; }
+    .role-supervisor { background-color: #fd7e14; }
+    .stats-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      transition: transform 0.2s;
+    }
+    .stats-card:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrapper">
+    <div class="content-container">
+      <div class="container">
+        <!-- Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 fade-in">
+          <div>
+            <h2 class="fw-bold text-dark mb-1"><i class="bi bi-people-fill text-primary me-2"></i>Gestión de Usuarios</h2>
+            <p class="text-muted mb-0">Administra usuarios y asigna roles específicos</p>
+          </div>
+          <a href="dashboard.html" class="btn btn-outline-secondary mt-3 mt-md-0 rounded-pill px-4">
+            <i class="bi bi-arrow-left me-1"></i> Volver al Dashboard
+          </a>
+        </div>
+
+        <!-- Tabs de navegación -->
+        <ul class="nav nav-tabs mb-4" id="userTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab" aria-controls="users" aria-selected="true">
+              <i class="bi bi-people me-2"></i>Usuarios
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="cobradores-tab" data-bs-toggle="tab" data-bs-target="#cobradores" type="button" role="tab" aria-controls="cobradores" aria-selected="false">
+              <i class="bi bi-wallet2 me-2"></i>Cobradores
+            </button>
+          </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="userTabContent">
+          <!-- Tab de Usuarios -->
+          <div class="tab-pane fade show active" id="users" role="tabpanel" aria-labelledby="users-tab">
+            <div class="card border-0 shadow-sm mb-4">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h5 class="mb-0">Lista de Usuarios</h5>
+                  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                    <i class="bi bi-plus-circle me-2"></i>Nuevo Usuario
+                  </button>
+                </div>
+                
+                <!-- Filtros -->
+                <div class="row mb-3">
+                  <div class="col-md-4">
+                    <select id="roleFilter" class="form-select">
+                      <option value="">Todos los roles</option>
+                      <option value="admin">Administradores</option>
+                      <option value="cajero">Cajeros</option>
+                      <option value="cobrador">Cobradores</option>
+                      <option value="supervisor">Supervisores</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <select id="branchFilter" class="form-select">
+                      <option value="">Todas las sedes</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <input type="text" id="searchUser" class="form-control" placeholder="Buscar usuario...">
+                  </div>
+                </div>
+
+                <!-- Tabla de Usuarios -->
+                <div class="table-responsive">
+                  <table class="table table-hover">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th>Sede</th>
+                        <th>Clientes</th>
+                        <th>Ventas</th>
+                        <th>Creado</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                      <!-- Los usuarios se cargarán dinámicamente -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab de Cobradores -->
+          <div class="tab-pane fade" id="cobradores" role="tabpanel" aria-labelledby="cobradores-tab">
+            <div class="row g-4 mb-4">
+              <!-- Estadísticas de Cobradores -->
+              <div class="col-lg-4">
+                <div class="card stats-card text-white">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <div>
+                        <h6 class="mb-0">Total Cobradores</h6>
+                        <h3 id="totalCobradores">0</h3>
+                      </div>
+                      <div class="fs-2">
+                        <i class="bi bi-people-fill"></i>
+                      </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <h6 class="mb-0">Cartera Total</h6>
+                        <h3 id="totalCartera">$0</h3>
+                      </div>
+                      <div class="fs-2">
+                        <i class="bi bi-cash-stack"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Lista de Cobradores -->
+              <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                  <div class="card-body">
+                    <h5 class="mb-3">Lista de Cobradores</h5>
+                    <div class="table-responsive">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Email</th>
+                            <th>Sede</th>
+                            <th>Total Cobros</th>
+                            <th>Cartera Actual</th>
+                            <th>Fecha Creación</th>
+                            <th>Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody id="cobradoresTableBody">
+                          <!-- Los cobradores se cargarán dinámicamente -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para crear/editar usuario -->
+  <div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="createUserModalLabel">Nuevo Usuario</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="createUserForm">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="username" class="form-label">Usuario</label>
+                <input type="text" class="form-control" id="username" required>
+              </div>
+              <div class="col-md-6">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" required>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="password" class="form-label">Contraseña</label>
+                <input type="password" class="form-control" id="password" required>
+              </div>
+              <div class="col-md-6">
+                <label for="role" class="form-label">Rol</label>
+                <select class="form-select" id="role" required>
+                  <option value="cajero">Cajero</option>
+                  <option value="cobrador">Cobrador</option>
+                  <option value="supervisor">Supervisor</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-12">
+                <label for="branch_id" class="form-label">Sede</label>
+                <select class="form-select" id="branch_id">
+                  <option value="">Seleccionar sede</option>
+                </select>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="saveUser()">Guardar Usuario</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    let currentEditingUser = null;
+
+    // Cargar usuarios al inicio
+    document.addEventListener('DOMContentLoaded', function() {
+      loadUsers();
+      loadCobradores();
+      loadBranches();
+      setupEventListeners();
+    });
+
+    // Configurar event listeners
+    function setupEventListeners() {
+      // Tab switching
+      document.getElementById('users-tab').addEventListener('shown.bs.tab', loadUsers);
+      document.getElementById('cobradores-tab').addEventListener('shown.bs.tab', loadCobradores);
+
+      // Filtros
+      document.getElementById('roleFilter').addEventListener('change', loadUsers);
+      document.getElementById('branchFilter').addEventListener('change', loadUsers);
+      document.getElementById('searchUser').addEventListener('input', debounce(loadUsers, 500));
+
+      // Modal events
+      document.getElementById('createUserModal').addEventListener('shown.bs.modal', function() {
+        if (!currentEditingUser) {
+          document.getElementById('createUserModalLabel').textContent = 'Nuevo Usuario';
+          document.getElementById('createUserForm').reset();
+        }
+      });
+    }
+
+    // Cargar usuarios
+    async function loadUsers() {
+      try {
+        const token = localStorage.getItem('token');
+        const roleFilter = document.getElementById('roleFilter').value;
+        const branchFilter = document.getElementById('branchFilter').value;
+        const searchUser = document.getElementById('searchUser').value;
+
+        let url = '/users';
+        const params = new URLSearchParams();
+
+        if (roleFilter) {
+          params.append('role', roleFilter);
+          url = '/users/role/' + roleFilter;
+        }
+
+        if (branchFilter) {
+          params.append('branch_id', branchFilter);
+        }
+
+        if (searchUser) {
+          params.append('search', searchUser);
+        }
+
+        if (params.toString()) {
+          url += '?' + params.toString();
+        }
+
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const users = await response.json();
+          displayUsers(users);
+        } else {
+          showToast('Error al cargar usuarios', true);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showToast('Error al cargar usuarios', true);
+      }
+    }
+
+    // Cargar cobradores
+    async function loadCobradores() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/users/cobradores', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const cobradores = await response.json();
+          displayCobradores(cobradores);
+          updateCobradoresStats(cobradores);
+        } else {
+          showToast('Error al cargar cobradores', true);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showToast('Error al cargar cobradores', true);
+      }
+    }
+
+    // Cargar sedes
+    async function loadBranches() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/branch-stats', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const branches = await response.json();
+          const branchSelect = document.getElementById('branch_id');
+          
+          branchSelect.innerHTML = '<option value="">Seleccionar sede</option>';
+          branches.forEach(branch => {
+            branchSelect.innerHTML += `<option value="${branch.id}">${branch.name}</option>`;
+          });
+        } else {
+          showToast('Error al cargar sedes', true);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    // Mostrar usuarios en tabla
+    function displayUsers(users) {
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = '';
+
+      users.forEach(user => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${user.id}</td>
+          <td>${user.username}</td>
+          <td>${user.email}</td>
+          <td><span class="role-badge role-${user.role} text-white">${user.role}</span></td>
+          <td>${user.branch_name || 'N/A'}</td>
+          <td>${user.total_clients || 0}</td>
+          <td>${user.total_sales || 0}</td>
+          <td>${new Date(user.created_at).toLocaleDateString()}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editUser(${user.id})">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Mostrar cobradores en tabla
+    function displayCobradores(cobradores) {
+      const tbody = document.getElementById('cobradoresTableBody');
+      tbody.innerHTML = '';
+
+      cobradores.forEach(cobrador => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${cobrador.id}</td>
+          <td>${cobrador.username}</td>
+          <td>${cobrador.email}</td>
+          <td>${cobrador.branch_name || 'N/A'}</td>
+          <td>${cobrador.total_cobros || 0}</td>
+          <td>$${parseFloat(cobrador.pending_amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</td>
+          <td>${new Date(cobrador.created_at).toLocaleDateString()}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="verCartera(${cobrador.id})">
+              <i class="bi bi-eye"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Actualizar estadísticas de cobradores
+    function updateCobradoresStats(cobradores) {
+      const totalCobradores = cobradores.length;
+      const totalCartera = cobradores.reduce((sum, c) => sum + parseFloat(c.pending_amount || 0), 0);
+
+      document.getElementById('totalCobradores').textContent = totalCobradores;
+      document.getElementById('totalCartera').textContent = `$${totalCartera.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}`;
+    }
+
+    // Guardar usuario
+    async function saveUser() {
+      try {
+        const token = localStorage.getItem('token');
+        const formData = {
+          username: document.getElementById('username').value,
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value,
+          role: document.getElementById('role').value,
+          branch_id: document.getElementById('branch_id').value || null
+        };
+
+        const url = currentEditingUser ? `/users/${currentEditingUser.id}` : '/users';
+        const method = currentEditingUser ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+          showToast(currentEditingUser ? 'Usuario actualizado' : 'Usuario creado', false);
+          bootstrap.Modal.getInstance(document.getElementById('createUserModal')).hide();
+          loadUsers();
+        } else {
+          showToast('Error al guardar usuario', true);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showToast('Error al guardar usuario', true);
+      }
+    }
+
+    // Editar usuario
+    function editUser(userId) {
+      currentEditingUser = { id: userId };
+      // Aquí podrías cargar los datos del usuario para editar
+      document.getElementById('createUserModalLabel').textContent = 'Editar Usuario';
+      // Cargar datos del usuario en el formulario
+    }
+
+    // Eliminar usuario
+    async function deleteUser(userId) {
+      if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/users/${userId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          showToast('Usuario eliminado', false);
+          loadUsers();
+        } else {
+          showToast('Error al eliminar usuario', true);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showToast('Error al eliminar usuario', true);
+      }
+    }
+
+    // Ver cartera de cobrador
+    function verCartera(cobradorId) {
+      // Aquí podrías mostrar un modal con los detalles de la cartera del cobrador
+      console.log('Ver cartera del cobrador:', cobradorId);
+    }
+
+    // Función de debounce para el buscador
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+  </script>
+</body>
+</html>
