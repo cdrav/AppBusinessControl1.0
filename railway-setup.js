@@ -5,19 +5,38 @@ async function setupRailwayDatabase() {
   try {
     console.log('🚀 Configurando base de datos para Railway...');
     
-    // Conectar a Railway MySQL
+    // Conectar sin especificar base de datos primero
     const db = await mysql.createConnection({
-      host: process.env.DB_HOST || 'railway',
+      host: process.env.DB_HOST || 'yamabiko.proxy.rlwy.net',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      port: process.env.DB_PORT || 15388,
+      ssl: { rejectUnauthorized: false }
+    });
+    
+    console.log('✅ Conectado a Railway MySQL (sin BD)');
+    
+    // Crear base de datos si no existe
+    await db.execute(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME || 'railway'}\``);
+    console.log('✅ Base de datos creada o verificada');
+    
+    // Cerrar conexión inicial
+    await db.end();
+    
+    // Conectar ahora con la base de datos
+    const dbWithSchema = await mysql.createConnection({
+      host: process.env.DB_HOST || 'yamabiko.proxy.rlwy.net',
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD || '',
       database: process.env.DB_NAME || 'railway',
-      port: process.env.DB_PORT || 3306
+      port: process.env.DB_PORT || 15388,
+      ssl: { rejectUnauthorized: false }
     });
     
-    console.log('✅ Conectado a Railway MySQL');
+    console.log('✅ Conectado a la base de datos');
     
     // Verificar si existe la tabla users
-    const [tables] = await db.execute("SHOW TABLES LIKE 'users'");
+    const [tables] = await dbWithSchema.execute("SHOW TABLES LIKE 'users'");
     
     if (tables.length === 0) {
       console.log('📋 Creando tablas...');
@@ -88,11 +107,11 @@ async function setupRailwayDatabase() {
         )
       `;
       
-      await db.execute(createUsersSQL);
-      await db.execute(createClientsSQL);
-      await db.execute(createInventorySQL);
-      await db.execute(createSalesSQL);
-      await db.execute(createSaleDetailsSQL);
+      await dbWithSchema.execute(createUsersSQL);
+      await dbWithSchema.execute(createClientsSQL);
+      await dbWithSchema.execute(createInventorySQL);
+      await dbWithSchema.execute(createSalesSQL);
+      await dbWithSchema.execute(createSaleDetailsSQL);
       
       console.log('✅ Tablas creadas exitosamente');
       
@@ -100,7 +119,7 @@ async function setupRailwayDatabase() {
       const bcrypt = require('bcrypt');
       const adminPassword = await bcrypt.hash('admin123', 10);
       
-      await db.execute(
+      await dbWithSchema.execute(
         'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
         ['admin', 'admin@businesscontrol.com', adminPassword, 'admin']
       );
@@ -111,12 +130,12 @@ async function setupRailwayDatabase() {
       console.log('✅ Las tablas ya existen');
     }
     
-    await db.end();
+    await dbWithSchema.end();
     console.log('🎉 Base de datos lista para Railway');
     
   } catch (error) {
     console.error('❌ Error configurando Railway DB:', error.message);
-    process.exit(1);
+    // No hacer exit(1) para que el servidor pueda continuar
   }
 }
 
