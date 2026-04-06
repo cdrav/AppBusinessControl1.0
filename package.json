@@ -17,7 +17,7 @@
     "check": "node scripts/error-detector.js",
     "quick": "node scripts/quick-test.js",
     "setup:db": "node railway-setup.js",
-    "railway:setup": "npm run setup:db && npm start"
+    "railway:setup": "node railway-setup.js && node server.js"
   },
   "author": "",
   "license": "ISC",
