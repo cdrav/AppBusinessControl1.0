@@ -15,7 +15,9 @@
     "test:services": "npm test -- tests/services/",
     "health": "node scripts/health-check.js",
     "check": "node scripts/error-detector.js",
-    "quick": "node scripts/quick-test.js"
+    "quick": "node scripts/quick-test.js",
+    "setup:db": "node railway-setup.js",
+    "railway:setup": "npm run setup:db && npm start"
   },
   "author": "",
   "license": "ISC",
