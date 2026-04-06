@@ -7,39 +7,38 @@
   <meta name="author" content="Cristian David Ruiz">
   <meta name="description" content="Panel principal de control - Business Control por Cristian David Ruiz">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/business-control-unified.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/toasts.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="page-wrapper">
     <div class="content-container">
-      <div class="container">
-        <!-- Header -->
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-5 fade-in gap-3">
-          <div class="d-flex align-items-center w-100 w-md-auto justify-content-center justify-content-md-start">
-            <div>
-              <h2 class="mb-0 fw-bold">Business Control</h2>
-              <p class="text-muted mb-0">Panel de Administración</p>
+      <div class="container-custom">
+        <!-- Header Unificado -->
+        <header class="page-header fade-in">
+          <div class="header-content">
+            <div class="header-title">
+              <h1><i class="bi bi-speedometer2 text-primary me-2"></i>Business Control</h1>
+              <p>Panel de Administración</p>
             </div>
-          </div>
-          <div class="d-flex align-items-center gap-3">
-            <div class="text-end d-none d-md-block" id="userInfoContainer" style="opacity: 0; transition: opacity 0.3s;">
-              <span id="usernameDisplay" class="d-block fw-bold text-dark"></span>
-              <small id="userRoleDisplay" class="text-muted"></small>
-            </div>
-            <a href="perfil.html" class="text-decoration-none">
-                <div id="userInitialDisplay" class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center shadow-sm user-avatar-nav user-avatar-nav-size">
-                  
+            <div class="header-actions">
+              <div class="user-info">
+                <div class="user-details">
+                  <p class="user-name" id="usernameDisplay">Cargando...</p>
+                  <p class="user-role" id="userRoleDisplay">Cargando...</p>
                 </div>
-            </a>
-            <button id="logoutButton" type="button" class="btn btn-danger btn-sm ms-2 text-white d-flex align-items-center gap-2 px-3">
-              <i class="bi bi-box-arrow-right"></i>
-              <span>Cerrar Sesión</span>
-            </button>
+                <a href="perfil.html" class="user-avatar" id="userAvatar">
+                  <span id="userInitialDisplay">?</span>
+                </a>
+              </div>
+              <button id="logoutButton" class="btn btn-danger btn-sm">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
           </div>
-        </div>
+        </header>
 
         <!-- Welcome Banner -->
         <div class="fade-in-up mb-4">
@@ -453,6 +452,22 @@
         </div>
       </div>
     </div>
+    
+    <!-- Footer Unificado -->
+    <footer class="main-footer">
+      <div class="footer-content">
+        <div class="footer-links">
+          <a href="dashboard.html">Inicio</a>
+          <a href="configuracion.html">Configuración</a>
+          <a href="reportes.html">Reportes</a>
+          <a href="perfil.html">Mi Perfil</a>
+        </div>
+        <div class="footer-text">
+          <p>&copy; <span id="copyright-year">2024</span> Business Control. Desarrollado por Cristian David Ruiz.</p>
+          <p class="small text-muted mt-1">Todos los derechos reservados.</p>
+        </div>
+      </div>
+    </footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
