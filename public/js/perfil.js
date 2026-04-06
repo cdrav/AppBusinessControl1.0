@@ -54,6 +54,9 @@ async function handleChangePassword(e) {
     }
 }
 
+// Hacer accesible desde onclick en HTML
+window.togglePassword = togglePassword;
+
 function togglePassword(fieldId) {
     const input = document.getElementById(fieldId);
     const icon = input.nextElementSibling.querySelector('i');

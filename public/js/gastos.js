@@ -87,9 +87,7 @@ async function loadExpenses() {
 async function loadSuppliers() {
     const select = document.getElementById('expenseSupplier');
     try {
-        const res = await fetch(`${API_URL}/suppliers`, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
+        const res = await apiFetch('/suppliers');
         const suppliers = await res.json();
         suppliers.forEach(s => {
             select.innerHTML += `<option value="${s.id}">${s.name}</option>`;

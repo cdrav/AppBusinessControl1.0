@@ -1,5 +1,5 @@
 // Login Page JavaScript
-const API_URL = ''; // Ruta relativa para producción
+import { apiFetch, API_URL } from './api.js';
 
 document.addEventListener('DOMContentLoaded', function() {
   if (localStorage.getItem('token')) {

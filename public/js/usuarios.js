@@ -72,6 +72,12 @@ function openUserModal() {
     userModal.show();
 }
 
+// Hacer funciones accesibles globalmente
+window.openUserModal = openUserModal;
+window.openEditModal = openEditModal;
+window.deleteUser = deleteUser;
+window.togglePasswordVisibility = togglePasswordVisibility;
+
 function openEditModal(user) {
     document.getElementById('userId').value = user.id;
     document.getElementById('username').value = user.username;

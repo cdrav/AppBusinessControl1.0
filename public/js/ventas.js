@@ -1,5 +1,13 @@
-// Ventas Page JavaScript
-import { apiFetch } from './api.js';
+/**
+ * Business Control - Sistema de Gestión Empresarial
+ * Desarrollado por Cristian David Ruiz
+ * © 2026 Todos los derechos reservados
+ * 
+ * Este archivo es parte del sistema Business Control
+ * y está protegido por derechos de autor
+ */
+
+import { apiFetch, API_URL } from './api.js';
 let allSales = [];
 
 document.addEventListener('DOMContentLoaded', function() {

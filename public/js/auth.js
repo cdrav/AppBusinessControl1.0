@@ -1,11 +1,12 @@
 /**
- * Proporciona funciones de utilidad para la autenticación y gestión de sesiones de usuario.
+ * Business Control - Sistema de Gestión Empresarial
+ * Desarrollado por Cristian David Ruiz
+ * © 2026 Todos los derechos reservados
+ * 
+ * Este archivo es parte del sistema Business Control
+ * y está protegido por derechos de autor
  */
 
-/**
- * Obtiene los datos del usuario (payload) decodificando el token JWT almacenado.
- * @returns {object|null} El payload del token o null si no hay token o es inválido.
- */
 export function getUserPayload() {
     const token = localStorage.getItem('token');
     if (!token) {

@@ -1,7 +1,14 @@
 /**
- * Servicio centralizado para peticiones API
+ * Business Control - Sistema de Gestión Empresarial
+ * Desarrollado por Cristian David Ruiz
+ * 2026 Todos los derechos reservados
+ * 
+ * Este archivo es parte del sistema Business Control
+ * y está protegido por derechos de autor
  */
+
 const API_BASE = ''; // Se deja vacío para usar rutas absolutas/relativas definidas en el servidor
+export const API_URL = API_BASE;
 
 export async function apiFetch(endpoint, options = {}) {
     const token = localStorage.getItem('token');

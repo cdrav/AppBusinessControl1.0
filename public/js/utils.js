@@ -1,4 +1,12 @@
-// Crear un contenedor para las notificaciones si no existe
+/**
+ * Business Control - Sistema de Gestión Empresarial
+ * Desarrollado por Cristian David Ruiz
+ * © 2026 Todos los derechos reservados
+ * 
+ * Este archivo es parte del sistema Business Control
+ * y está protegido por derechos de autor
+ */
+
 if (!document.getElementById('notification-container')) {
   const container = document.createElement('div');
   container.id = 'notification-container';

@@ -7,14 +7,13 @@
   <meta name="author" content="Cristian David Ruiz">
   <meta name="description" content="Gestión de clientes - Business Control por Cristian David Ruiz">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/business-control-unified.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/footer-elegant.css">
 </head>
 <body>
   <div class="page-wrapper">
     <div class="content-container">
-      <div class="container">
+      <div class="container-custom">
         <!-- Header -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 fade-in">
           <div>
@@ -30,7 +29,6 @@
             </a>
           </div>
         </div>
-
         <!-- Stats Cards (Añadido para uniformidad) -->
         <div class="row g-4 mb-4 fade-in" style="animation-delay: 0.1s">
           <div class="col-md-3">
@@ -66,11 +64,9 @@
             </div>
           </div>
         </div>
-
         <!-- Clients Section -->
         <div class="card border-0 shadow-sm p-4 mb-4 fade-in rounded-xl">
           <h5 class="fw-bold mb-4 text-dark">Lista de Clientes</h5>
-          
           <!-- Search Form -->
           <form id="searchForm" class="d-flex gap-2 mb-4">
             <input type="text" id="searchInput" class="form-control" placeholder="Buscar por nombre, email, teléfono o dirección...">
@@ -78,10 +74,8 @@
               <i class="bi bi-search me-2"></i>Buscar
             </button>
           </form>
-
           <!-- Message Container -->
           <div id="message"></div>
-
           <!-- Clients Grid (Reemplaza la tabla) -->
           <div id="clientsGrid" class="row g-4">
             <!-- El contenido será generado por JS -->
@@ -90,7 +84,6 @@
       </div>
     </div>
   </div>
-
   <!-- Client History Modal -->
   <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -126,7 +119,6 @@
       </div>
     </div>
   </div>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <!-- utils.js es necesario para las notificaciones (showToast) y otras funciones comunes -->
   <script src="js/utils.js"></script> 
@@ -136,9 +128,8 @@
     const yearSpan = document.getElementById('copyright-year');
     if (yearSpan) yearSpan.textContent = new Date().getFullYear();
   </script>
-  
   <!-- Footer con Copyright -->
-  <footer class="main-footer clients-footer">
+  <footer class="main-footer">
     <p class="mb-0">&copy; <span id="copyright-year">2026</span> Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p>
   </footer>
 </body>

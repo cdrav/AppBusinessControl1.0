@@ -1,30 +1,36 @@
-// Lógica para la página de inventario
-import { apiFetch } from './api.js';
-import { getUserRole, protectRoute } from './auth.js';
+/**
+ * Business Control - Sistema de Gestión Empresarial
+ * Desarrollado por Cristian David Ruiz
+ * © 2026 Todos los derechos reservados
+ * 
+ * Este archivo es parte del sistema Business Control
+ * y está protegido por derechos de autor
+ */
+
+import { apiFetch, API_URL } from './api.js';
+import { initAuth, hasRole } from './auth-unified.js';
 
 let allProducts = [];
-let userRole = getUserRole();
+let userRole = null;
 
 // Cargar inventario al inicio
 document.addEventListener('DOMContentLoaded', function() {
-  setupUserSession();
-  loadInventory();
-  setupEventListeners();
-  injectStockModal(); // Crear el modal dinámicamente
+  initAuth('Inventario', function(payload) {
+    userRole = payload.role;
+    
+    // Ocultar elementos exclusivos de admin
+    if (!hasRole(['admin'])) {
+        const adminElements = document.querySelectorAll('.admin-only');
+        adminElements.forEach(el => {
+            el.style.display = 'none';
+        });
+    }
+    
+    loadInventory();
+    setupEventListeners();
+    injectStockModal(); // Crear el modal dinámicamente
+  });
 });
-
-function setupUserSession() {
-    protectRoute();
-    userRole = getUserRole();
-
-        // Ocultar elementos exclusivos de admin (como el botón Agregar)
-        if (userRole !== 'admin') {
-            const adminElements = document.querySelectorAll('.admin-only');
-            adminElements.forEach(el => {
-                el.style.display = 'none';
-            });
-        }
-}
 
 function setupEventListeners() {
   const searchInput = document.getElementById('searchInput');
@@ -46,7 +52,6 @@ async function loadInventory() {
       const pageTitle = document.querySelector('.container-fluid h1');
       if (pageTitle) {
           pageTitle.textContent = 'Inventario por Sede';
-          // Opcional: añadir un subtítulo o un breadcrumb
       }
   }
 
@@ -217,6 +222,7 @@ function editProduct(id) {
   window.location.href = `editInventory.html?id=${id}`;
 }
 
+window.exportInventory = exportInventory;
 async function exportInventory() {
   try {
     const response = await fetch(`${API_URL}/inventory/export`, {

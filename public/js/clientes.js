@@ -1,6 +1,14 @@
-// Clientes Page JavaScript
+/**
+ * Business Control - Sistema de Gestión Empresarial
+ * Desarrollado por Cristian David Ruiz
+ * © 2026 Todos los derechos reservados
+ * 
+ * Este archivo es parte del sistema Business Control
+ * y está protegido por derechos de autor
+ */
+
 import { getUserRole, protectRoute } from './auth.js';
-import { apiFetch } from './api.js';
+import { apiFetch, API_URL } from './api.js';
 
 let clients = [];
 const userRole = getUserRole();
@@ -256,3 +264,6 @@ function escapeHTML(str) {
   div.appendChild(document.createTextNode(str));
   return div.innerHTML;
 }
+
+// Exportar funciones para onclick handlers
+window.deleteClient = deleteClient;

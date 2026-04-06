@@ -38,7 +38,6 @@
             </div>
           </div>
         </header>
-
         <!-- Stats Cards -->
         <div class="row g-4 mb-4 fade-in" style="animation-delay: 0.1s">
           <div class="col-md-3">
@@ -86,7 +85,6 @@
             </div>
           </div>
         </div>
-
         <!-- Filter Section -->
         <div class="card border-0 shadow-sm p-4 mb-4 fade-in rounded-xl delay-2">
           <div class="row g-3">
@@ -107,7 +105,6 @@
             </div>
           </div>
         </div>
-
         <!-- Table Container -->
         <div class="card border-0 shadow-sm p-4 mb-4 fade-in rounded-xl delay-3">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
@@ -119,10 +116,8 @@
               Nueva Venta
             </a>
           </div>
-          
           <!-- Loading State -->
           <div id="loadingState" class="loading-skeleton"></div>
-          
           <!-- Empty State -->
           <div id="emptyState" class="empty-state" style="display: none;">
             <i class="bi bi-cart-x"></i>
@@ -133,7 +128,6 @@
               Registrar Primera Venta
             </a>
           </div>
-          
           <!-- Table -->
           <div class="table-responsive">
             <table class="table" id="salesTable" style="display: none;">
@@ -157,7 +151,6 @@
       </div>
     </div>
   </div>
-
   <!-- Modal de Detalles de Venta -->
   <div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-labelledby="saleDetailsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -175,7 +168,6 @@
       </div>
     </div>
   </div>
-
   <!-- Modal para Enviar Ticket por Correo -->
   <div class="modal fade" id="emailTicketModal" tabindex="-1" aria-labelledby="emailTicketModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -203,7 +195,6 @@
       </div>
     </div>
   </div>
-
   <!-- Modal para Confirmar Eliminación con Contraseña -->
   <div class="modal fade" id="passwordConfirmModal" tabindex="-1" aria-labelledby="passwordConfirmModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -226,7 +217,6 @@
       </div>
     </div>
   </div>
-
   <!-- Footer Unificado -->
   <footer class="main-footer">
     <div class="footer-content">
@@ -242,10 +232,9 @@
       </div>
     </div>
   </footer>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/utils.js"></script> 
-  <script src="js/ventas.js"></script>
+  <script type="module" src="js/ventas.js"></script>
   <script>
     // Actualiza dinámicamente el año del copyright
     const yearSpan = document.getElementById('copyright-year');

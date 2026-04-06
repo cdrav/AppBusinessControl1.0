@@ -24,8 +24,19 @@ router.get('/', authenticateToken, async (req, res) => {
             `, [branch_id, req.user.tenant_id, req.user.tenant_id]);
             res.json(results);
         } else {
-            // Comportamiento original: inventario global para la vista principal de inventarios
-            const [results] = await db.query(`SELECT i.*, s.name as supplier_name FROM inventory i LEFT JOIN suppliers s ON i.supplier_id = s.id WHERE i.tenant_id = ? ORDER BY i.product_name ASC`, [req.user.tenant_id]);
+            // Inventario con stock de la sucursal del usuario (o stock global si no hay registro en branch_stocks)
+            const userBranchId = req.user.branch_id || 1;
+            const [results] = await db.query(`
+                SELECT 
+                    i.id, i.product_name, i.price, i.cost, i.category, i.barcode, i.description, i.supplier_id,
+                    s.name as supplier_name,
+                    COALESCE(bs.stock, i.stock, 0) as stock 
+                FROM inventory i
+                LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
+                LEFT JOIN suppliers s ON i.supplier_id = s.id
+                WHERE i.tenant_id = ?
+                ORDER BY i.product_name ASC
+            `, [userBranchId, req.user.tenant_id, req.user.tenant_id]);
             res.json(results);
         }
     } catch (error) {
@@ -54,10 +65,10 @@ router.get('/for-sale', authenticateToken, async (req, res) => {
         const [products] = await db.query(`
             SELECT 
                 i.id, i.product_name, i.price, i.barcode,
-                COALESCE(bs.stock, 0) as stock 
+                COALESCE(bs.stock, i.stock, 0) as stock 
             FROM inventory i
             LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
-            WHERE i.tenant_id = ?
+            WHERE i.tenant_id = ? AND (COALESCE(bs.stock, i.stock, 0) > 0 OR i.stock > 0)
             ORDER BY i.product_name ASC
         `, [branchId, req.user.tenant_id, req.user.tenant_id]);
         res.json(products);

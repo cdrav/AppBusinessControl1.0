@@ -1,5 +1,4 @@
-import { apiFetch } from './api.js';
-import { API_URL } from '../config.js';
+import { apiFetch, API_URL } from './api.js';
 
 const cobrosList = document.getElementById('cobrosList');
 const loader = document.getElementById('loader');

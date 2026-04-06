@@ -1,3 +1,12 @@
+/**
+ * Business Control - Sistema de Gestión Empresarial
+ * Desarrollado por Cristian David Ruiz
+ * © 2026 Todos los derechos reservados
+ * 
+ * Este archivo es parte del sistema Business Control
+ * y está protegido por derechos de autor
+ */
+
 const API_URL = ''; 
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -11,7 +20,7 @@ async function loadSuppliers() {
     const empty = document.getElementById('emptyState');
 
     try {
-        const response = await fetch(`${API_URL}/suppliers`, {
+        const response = await apiFetch(`${API_URL}/suppliers`, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
 

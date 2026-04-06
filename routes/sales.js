@@ -53,7 +53,7 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         const finalPrice = Math.max(0, total - discount);
-        const [sale] = await conn.query('INSERT INTO sales (tenant_id, client_id, branch_id, total_price, discount, coupon_code, sale_date, notes, is_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [req.user.tenant_id, clientId, branchId, finalPrice, discount, couponCode, saleDate, notes, isCredit || false]);
+        const [sale] = await conn.query('INSERT INTO sales (tenant_id, client_id, branch_id, total_price, discount, coupon_code, sale_date, notes, is_credit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())', [req.user.tenant_id, clientId, branchId, finalPrice, discount, couponCode, saleDate || new Date(), notes, isCredit || false]);
         
         if (isCredit) {
             const debt = finalPrice - (initialPayment || 0);
@@ -260,9 +260,10 @@ router.get('/:id/details', authenticateToken, async (req, res) => {
 
 // Eliminar Venta (Admin)
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    const { password } = req.body;
+    const { password } = req.body || {};
+    if (!password) return res.status(400).json({ message: 'Contraseña requerida para eliminar ventas.' });
     const [u] = await db.query('SELECT password FROM users WHERE id=?', [req.user.id]);
-    if (!await bcrypt.compare(password, u[0].password)) return res.status(403).json({ message: 'Contraseña incorrecta' });
+    if (!u.length || !await bcrypt.compare(password, u[0].password)) return res.status(403).json({ message: 'Contraseña incorrecta' });
 
     let conn;
     try {

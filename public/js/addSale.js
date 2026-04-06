@@ -1,5 +1,5 @@
 // Variables globales
-import { apiFetch } from './api.js';
+import { apiFetch, API_URL } from './api.js';
 let products = [];
 let clients = [];
 let currentCoupon = null; // Almacenar cupón activo
@@ -142,9 +142,12 @@ async function loadClients() {
     if (data) {
       clients = data;
       const select = document.getElementById('clientId');
-      clients.forEach(client => {
-        select.innerHTML += `<option value="${client.id}">${client.name}</option>`;
-      });
+      if (select) {
+        select.innerHTML = '<option value="">Selecciona un cliente</option>';
+        clients.forEach(client => {
+          select.innerHTML += `<option value="${client.id}">${client.name}</option>`;
+        });
+      }
     }
   } catch (error) {
     console.error('Error al cargar clientes:', error);
@@ -194,6 +197,7 @@ function updateProductSelects() {
 }
 
 // Agregar campo de producto
+window.addProductField = addProductField;
 function addProductField() {
   const container = document.getElementById('productsContainer');
   const productCount = container.children.length;
@@ -202,12 +206,12 @@ function addProductField() {
   productItem.className = 'product-item';
   productItem.innerHTML = `
     <div class="product-info">
-      <select class="form-control product-select" required style="width: 250px;">
+      <select class="form-control product-select" required>
         <option value="">Selecciona un producto</option>
       </select>
     </div>
     <div class="d-flex align-items-center gap-3">
-      <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required style="width: 130px;">
+      <input type="number" class="form-control quantity-input" placeholder="Cantidad" min="1" required>
       <span class="product-price">$0</span>
       <button type="button" class="btn btn-danger btn-sm remove-product">
         <i class="bi bi-trash"></i>

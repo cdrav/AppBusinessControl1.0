@@ -3,7 +3,7 @@ let salesChart = null;
 let distributionChart = null;
 let clientsChart = null;
 let hourlyChart = null;
-import { apiFetch } from './api.js';
+import { apiFetch, API_URL } from './api.js';
 import { protectRoute } from './auth.js';
 
 // Initialize page

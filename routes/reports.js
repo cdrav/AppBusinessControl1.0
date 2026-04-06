@@ -94,7 +94,7 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
             SELECT ${selectDate.replace('sale_date', 'expense_date')}, SUM(amount) as total 
             FROM expenses 
             ${expensesWhereClause}
-            ${groupBy.replace('sale_date', 'expense_date')}
+            ${groupBy.replaceAll('sale_date', 'expense_date')}
             ORDER BY date ASC
         `, queryParams);
 
@@ -349,651 +349,325 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         const [settings] = await db.query('SELECT * FROM settings WHERE tenant_id = ?', [req.user.tenant_id]);
         const config = settings[0] || { company_name: 'Business Control', company_address: '', company_phone: '', company_email: '' };
 
-        // 2. Configurar Documento PDF
+        // 2. Obtener datos según tipo de reporte
+        const params = [req.user.tenant_id];
+        let dateFilter = '';
+        if (startDate && endDate) {
+            dateFilter = 'AND sale_date BETWEEN ? AND ?';
+            params.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+        }
+
+        let salesData = [], expensesData = [], inventoryData = [], clientsData = [];
+
+        if (['sales', 'profits', 'complete'].includes(type)) {
+            const [rows] = await db.query(`
+                SELECT s.id, s.sale_date, s.total_price, s.is_credit, c.name as client_name
+                FROM sales s LEFT JOIN clients c ON s.client_id = c.id
+                WHERE s.tenant_id = ? ${dateFilter}
+                ORDER BY s.sale_date DESC
+            `, params);
+            salesData = rows;
+        }
+
+        if (['profits', 'complete'].includes(type)) {
+            const expParams = [req.user.tenant_id];
+            let expDateFilter = '';
+            if (startDate && endDate) {
+                expDateFilter = 'AND expense_date BETWEEN ? AND ?';
+                expParams.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+            }
+            const [rows] = await db.query(`
+                SELECT description, amount, category, expense_date
+                FROM expenses WHERE tenant_id = ? ${expDateFilter}
+                ORDER BY expense_date DESC
+            `, expParams);
+            expensesData = rows;
+        }
+
+        if (['inventory', 'complete'].includes(type)) {
+            const [rows] = await db.query(`
+                SELECT product_name, stock, price, cost, category
+                FROM inventory WHERE tenant_id = ? ORDER BY product_name ASC
+            `, [req.user.tenant_id]);
+            inventoryData = rows;
+        }
+
+        if (['clients', 'complete'].includes(type)) {
+            const cliParams = startDate && endDate
+                ? [`${startDate} 00:00:00`, `${endDate} 23:59:59`, req.user.tenant_id]
+                : [req.user.tenant_id];
+            const cliDateJoin = startDate && endDate ? 'AND s.sale_date BETWEEN ? AND ?' : '';
+            const [rows] = await db.query(`
+                SELECT c.name, c.email, c.phone,
+                       COUNT(s.id) as total_purchases,
+                       COALESCE(SUM(s.total_price), 0) as total_spent
+                FROM clients c
+                LEFT JOIN sales s ON c.id = s.client_id ${cliDateJoin}
+                WHERE c.tenant_id = ?
+                GROUP BY c.id ORDER BY total_spent DESC
+            `, cliParams);
+            clientsData = rows;
+        }
+
+        // 3. Configurar Documento PDF
         const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
-        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
         doc.pipe(res);
 
-        // --- FUNCIONES AUXILIARES DE DISEÑO ---
-        const formatCurrency = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+        // --- FUNCIONES AUXILIARES ---
+        const formatCurrency = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount || 0);
 
-        // Función centralizada para controlar saltos de página
+        let title = 'Reporte General';
+        if (type === 'sales') title = 'Reporte de Ventas';
+        else if (type === 'profits') title = 'Reporte de Ganancias';
+        else if (type === 'inventory') title = 'Reporte de Inventario';
+        else if (type === 'clients') title = 'Reporte de Clientes';
+        else if (type === 'complete') title = 'Reporte Completo';
+        const period = startDate && endDate ? `${startDate}  al  ${endDate}` : 'Todos los registros';
+
+        const drawHeader = () => {
+            doc.fillColor('#000');
+            if (config.company_logo) {
+                const logoPath = path.join(__dirname, '../public', config.company_logo);
+                if (fs.existsSync(logoPath)) {
+                    try { doc.image(logoPath, 50, 45, { width: 60 }); } catch (e) { /* logo no válido */ }
+                }
+            }
+            const textX = config.company_logo ? 120 : 50;
+            doc.fontSize(18).font('Helvetica-Bold').text(config.company_name, textX, 50, { lineBreak: false });
+            doc.fontSize(9).font('Helvetica').text(config.company_address || '', textX, 75, { lineBreak: false });
+            doc.fontSize(9).text(`Tel: ${config.company_phone || 'N/A'} | Email: ${config.company_email || 'N/A'}`, textX, 88, { lineBreak: false });
+            doc.y = 115;
+            doc.fontSize(14).font('Helvetica-Bold').text(title, 50, doc.y, { align: 'center', width: 495, lineBreak: false });
+            doc.y += 20;
+            doc.fontSize(9).font('Helvetica').fillColor('#666').text(`Período: ${period}`, 50, doc.y, { align: 'center', width: 495, lineBreak: false });
+            doc.fillColor('#000');
+            doc.y += 15;
+            doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#cccccc').stroke();
+            doc.y += 15;
+        };
+
+        const generateFooter = (docRef, currentPage, totalPages) => {
+            docRef.fontSize(8).fillColor('#666666');
+            docRef.moveTo(50, docRef.page.height - 50).lineTo(545, docRef.page.height - 50).strokeColor('#cccccc').stroke();
+            docRef.text(`Generado el ${new Date().toLocaleString('es-CO')}`, 50, docRef.page.height - 40, { lineBreak: false });
+            docRef.text(`Página ${currentPage} de ${totalPages}`, 0, docRef.page.height - 40, { align: 'center', width: 595, lineBreak: false });
+            docRef.text('© Business Control System', 0, docRef.page.height - 40, { align: 'right', width: 545, lineBreak: false });
+        };
+
         const checkAddPage = (neededHeight) => {
-            if (doc.y + neededHeight > 700) { // Margen inferior de seguridad
+            if (doc.y + neededHeight > 700) {
                 doc.addPage();
-                // Al llamar a addPage, el evento 'pageAdded' ya dibujó el header 
-                // y posicionó doc.y al final del mismo.
                 return true;
             }
             return false;
         };
-        
-        const generateFooter = (docInstance) => {
-            const pageNumber = docInstance.bufferedPageRange().start + docInstance.bufferedPageRange().count -1;
-            const totalPages = docInstance.bufferedPageRange().count;
 
-            docInstance.fontSize(8).fillColor('#666666');
-            
-            // Línea separadora footer
-            docInstance.moveTo(50, docInstance.page.height - 50).lineTo(545, docInstance.page.height - 50).strokeColor('#cccccc').stroke();
-            
-            docInstance.text(`Generado el ${new Date().toLocaleString('es-CO')}`, 50, docInstance.page.height - 40);
-            docInstance.text(`Página ${pageNumber + 1} de ${totalPages}`, 0, docInstance.page.height - 40, { align: 'center' });
-            docInstance.text('© Business Control System', 0, docInstance.page.height - 40, { align: 'right' });
+        // Función para dibujar encabezado de tabla
+        const drawTableHeader = (columns) => {
+            const y = doc.y;
+            doc.rect(50, y, 495, 20).fill('#f0f4f8');
+            doc.fillColor('#333').fontSize(8).font('Helvetica-Bold');
+            columns.forEach(col => {
+                doc.text(col.label, col.x + 5, y + 5, { lineBreak: false, width: col.width || 80 });
+            });
+            doc.y = y + 25;
+            doc.font('Helvetica').fontSize(8).fillColor('#000');
         };
 
-        const drawHeader = () => {
-            doc.fillColor('#000'); // Asegurar color negro al inicio
-            // Logo
-            if (config.company_logo) {
-                const logoPath = path.join(__dirname, '../public', config.company_logo);
-                if (fs.existsSync(logoPath)) {
-                    try {
-                        doc.image(logoPath, 50, 45, { width: 60 });
-                    } catch (e) { console.error("Error cargando logo", e); }
-                }
-            }
+        // Evento: dibujar header en cada nueva página
+        doc.on('pageAdded', () => { drawHeader(); });
 
-            // Información de la Empresa (Alineada a la derecha del logo o izquierda si no hay logo)
-            const textX = config.company_logo ? 120 : 50;
-            doc.fontSize(18).font('Helvetica-Bold').text(config.company_name, textX, 50);
-            doc.fontSize(9).font('Helvetica').text(config.company_address, textX, 75);
-            doc.text(`Tel: ${config.company_phone} | Email: ${config.company_email}`, textX, 88);
-            
-            // Título del Reporte (Centrado)
-            doc.moveDown(3);
-            let title = 'REPORTE DE NEGOCIO';
-            if (type === 'sales') title = 'REPORTE DE VENTAS';
-            if (type === 'profits') title = 'REPORTE DE GANANCIAS';
-            if (type === 'inventory') title = 'INVENTARIO VALORIZADO';
-            if (type === 'low-stock') title = 'ALERTA DE STOCK BAJO';
-            if (type === 'clients') title = 'DIRECTORIO DE CLIENTES';
-            if (type === 'complete') title = 'REPORTE GERENCIAL COMPLETO';
-            
-            doc.fontSize(14).font('Helvetica-Bold').text(title, { align: 'center' });
-            if (startDate && endDate) {
-                doc.fontSize(10).font('Helvetica').text(`Periodo: ${startDate} al ${endDate}`, { align: 'center' });
-            } else {
-                doc.fontSize(10).font('Helvetica').text(`Generado el: ${new Date().toLocaleDateString('es-CO')}`, { align: 'center' });
-            }
-            
-            // Línea separadora
-            doc.moveDown(0.5);
-            doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#cccccc').stroke();
-            doc.moveDown(1.5);
-        };
-
-        // --- LÓGICA DE PAGINACIÓN POR EVENTOS (LA CORRECTA) ---
-        doc.on('pageAdded', () => {
-            drawHeader();
-        });
-
-        // Dibujar el encabezado en la primera página
+        // Dibujar header en la primera página
         drawHeader();
 
-
-        // --- PREPARACIÓN DE DATOS ---
-        let dateFilter = "";
-        const params = [];
-        if (startDate && endDate) {
-            dateFilter = "AND sale_date BETWEEN ? AND ?";
-            params.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
-        }
-        
-        // ==========================================
-        // REPORTE DE VENTAS (Sales)
-        // ==========================================
-        if (type === 'sales') {
-            const [totals] = await db.query(`
-                SELECT 
-                    COALESCE(SUM(total_price), 0) as revenue, 
-                    COUNT(*) as salesCount,
-                    AVG(total_price) as avgTicket,
-                    COALESCE(SUM(discount), 0) as totalDiscount
-                FROM sales WHERE 1=1 ${dateFilter}
-            `, params);
-            
-            const startY = doc.y;
-            doc.rect(50, startY, 495, 50).fill('#f8f9fa').stroke('#e9ecef');
+        // ============================================================
+        // SECCIÓN DE VENTAS
+        // ============================================================
+        if (['sales', 'profits', 'complete'].includes(type) && salesData.length > 0) {
+            checkAddPage(60);
+            doc.fontSize(12).font('Helvetica-Bold').fillColor('#2563eb').text('Detalle de Ventas', 50, doc.y, { lineBreak: false });
             doc.fillColor('#000');
-            
-            doc.fontSize(10).font('Helvetica-Bold').text('INGRESOS TOTALES', 70, startY + 12);
-            doc.fontSize(14).text(formatCurrency(totals[0].revenue), 70, startY + 28);
-            
-            doc.fontSize(10).font('Helvetica-Bold').text('TRANSACCIONES', 300, startY + 12);
-            doc.fontSize(14).text(totals[0].salesCount, 300, startY + 28);
-            
-            doc.moveDown(4);
-        }
+            doc.y += 18;
 
-        // ==========================================
-        // DETALLE DE VENTAS (Folio por Folio)
-        // Se incluye en 'sales' y ahora también en 'complete'
-        // ==========================================
-        if (type === 'sales') {
-            // Listado detallado de ventas (Folio por Folio) - Restaurado del original
-            const [salesList] = await db.query(`
-                SELECT s.id, c.name AS client_name, s.total_price, s.sale_date
-                FROM sales s LEFT JOIN clients c ON s.client_id = c.id
-                WHERE 1=1 ${dateFilter} ORDER BY s.sale_date ASC
-            `, params);
+            const totalSalesAmount = salesData.reduce((sum, s) => sum + parseFloat(s.total_price || 0), 0);
+            doc.fontSize(9).font('Helvetica').text(`Total: ${salesData.length} ventas  |  Monto: ${formatCurrency(totalSalesAmount)}`, 50, doc.y, { lineBreak: false });
+            doc.y += 18;
 
-            if (salesList.length === 0) {
-                doc.text('No hay ventas registradas en este período.');
-            } else {
-                // Encabezado de tabla Ventas
-                const drawSalesTableHeader = (y) => {
-                    doc.rect(50, y, 495, 20).fill('#4F46E5');
-                    doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-                    doc.text('FOLIO', 60, y + 6);
-                    doc.text('FECHA', 120, y + 6);
-                    doc.text('CLIENTE', 250, y + 6);
-                    doc.text('TOTAL', 450, y + 6, { align: 'right', width: 80 });
-                    doc.fillColor('#000'); // Resetear a negro
-                };
+            const sCols = [
+                { label: 'ID', x: 50, width: 40 },
+                { label: 'Fecha', x: 100, width: 80 },
+                { label: 'Cliente', x: 200, width: 160 },
+                { label: 'Monto', x: 380, width: 80 },
+                { label: 'Tipo', x: 470, width: 70 }
+            ];
+            drawTableHeader(sCols);
 
-                let tableTop = doc.y;
-                drawSalesTableHeader(tableTop);
-                let y = tableTop + 25;
-                doc.fillColor('#000').font('Helvetica');
-
-                salesList.forEach((sale, i) => {
-                    const dateStr = new Date(sale.sale_date).toLocaleDateString('es-CO');
-                    const clientStr = (sale.client_name || 'General').substring(0, 25);
-                    const totalStr = formatCurrency(sale.total_price);
-                    
-                    // Calcular altura dinámica
-                    const rowHeight = Math.max(doc.heightOfString(clientStr, { width: 190 }), 20);
-
-                    if (checkAddPage(rowHeight + 10)) {
-                        y = doc.y + 10; // Reiniciar Y al final del header de la nueva pagina
-                        drawSalesTableHeader(y);
-                        y += 25;
-                    }
-
-                    if (i % 2 === 0) doc.rect(50, y - 5, 495, rowHeight + 5).fill('#f9f9f9');
-                    doc.fillColor('#000').font('Helvetica');
-                    
-                    doc.text(`#${sale.id}`, 60, y);
-                    doc.text(dateStr, 120, y);
-                    doc.text(clientStr, 250, y, { width: 190 });
-                    doc.text(totalStr, 450, y, { align: 'right', width: 80 });
-                    y += rowHeight + 5;
-                });
+            for (let idx = 0; idx < salesData.length; idx++) {
+                const sale = salesData[idx];
+                if (checkAddPage(22)) { drawTableHeader(sCols); }
+                const rowY = doc.y;
+                if (idx % 2 === 0) { doc.rect(50, rowY, 495, 18).fill('#fafbfc'); doc.fillColor('#000'); }
+                const d = new Date(sale.sale_date).toLocaleDateString('es-CO');
+                doc.text(`#${sale.id}`, 55, rowY + 4, { lineBreak: false });
+                doc.text(d, 105, rowY + 4, { lineBreak: false });
+                doc.text((sale.client_name || 'Sin cliente').substring(0, 28), 205, rowY + 4, { lineBreak: false });
+                doc.text(formatCurrency(sale.total_price), 385, rowY + 4, { lineBreak: false });
+                doc.text(sale.is_credit ? 'Crédito' : 'Contado', 475, rowY + 4, { lineBreak: false });
+                doc.y = rowY + 20;
             }
+            doc.y += 10;
         }
 
-        // ==========================================
-        // REPORTE DE GANANCIAS (Profits)
-        // ==========================================
-        if (type === 'profits') {
-            const [details] = await db.query(`
-                SELECT 
-                    s.sale_date, i.product_name, sd.quantity, sd.subtotal as sale_price,
-                    (IFNULL(i.cost, 0) * sd.quantity) as total_cost
-                FROM sale_details sd
-                JOIN sales s ON sd.sale_id = s.id
-                LEFT JOIN inventory i ON sd.product_id = i.id
-                WHERE 1=1 ${dateFilter.replace('sale_date', 's.sale_date')} 
-                ORDER BY s.sale_date ASC
-            `, params);
-            
-            // NUEVO: Obtener gastos del periodo
-            const [expensesList] = await db.query(`
-                SELECT description, amount, expense_date 
-                FROM expenses 
-                WHERE 1=1 ${dateFilter.replace('sale_date', 'expense_date')}
-                ORDER BY expense_date ASC
-            `, params);
+        // ============================================================
+        // SECCIÓN DE GASTOS
+        // ============================================================
+        if (['profits', 'complete'].includes(type) && expensesData.length > 0) {
+            checkAddPage(60);
+            doc.fontSize(12).font('Helvetica-Bold').fillColor('#dc3545').text('Detalle de Gastos', 50, doc.y, { lineBreak: false });
+            doc.fillColor('#000');
+            doc.y += 18;
 
-            const drawProfitsHeader = (posY) => {
-                doc.rect(50, posY, 495, 20).fill('#10B981'); // Verde
-                doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-                doc.text('PRODUCTO', 55, posY + 6);
-                doc.text('VENTA', 300, posY + 6, { width: 60, align: 'right' });
-                doc.text('COSTO', 370, posY + 6, { width: 60, align: 'right' });
-                doc.text('GANANCIA', 440, posY + 6, { width: 60, align: 'right' });
-            };
+            const totalExpAmount = expensesData.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+            doc.fontSize(9).font('Helvetica').text(`Total: ${expensesData.length} gastos  |  Monto: ${formatCurrency(totalExpAmount)}`, 50, doc.y, { lineBreak: false });
+            doc.y += 18;
 
-            let y = doc.y;
-            drawProfitsHeader(y);
-            y += 25;
+            const eCols = [
+                { label: 'Descripción', x: 50, width: 180 },
+                { label: 'Monto', x: 250, width: 80 },
+                { label: 'Categoría', x: 340, width: 100 },
+                { label: 'Fecha', x: 450, width: 90 }
+            ];
+            drawTableHeader(eCols);
 
-            let totalRevenue = 0, totalCost = 0;
-
-            details.forEach((item, i) => {
-                const productStr = (item.product_name || 'Producto Borrado').substring(0, 35);
-                const rowHeight = Math.max(doc.heightOfString(productStr, { width: 240 }), 18);
-
-                if (checkAddPage(rowHeight + 10)) {
-                    y = doc.y + 10;
-                    drawProfitsHeader(y);
-                    y += 25;
-                }
-
-                if (i % 2 === 0) doc.rect(50, y - 5, 495, rowHeight + 5).fill('#f9f9f9');
-                doc.fillColor('#000').font('Helvetica');
-
-                const saleVal = parseFloat(item.sale_price);
-                const costVal = parseFloat(item.total_cost || 0);
-                const profitVal = saleVal - costVal;
-
-                doc.text(productStr, 55, y, { width: 240 });
-                doc.text(formatCurrency(saleVal), 300, y, { width: 60, align: 'right' });
-                doc.text(formatCurrency(costVal), 370, y, { width: 60, align: 'right' });
-                
-                doc.fillColor(profitVal < 0 ? 'red' : 'green'); // Color condicional
-                doc.text(formatCurrency(profitVal), 440, y, { width: 60, align: 'right' });
-
-                totalRevenue += saleVal;
-                totalCost += costVal;
-                y += rowHeight + 5;
-            });
-            
-            // NUEVO: Sección de Gastos en el PDF
-            let totalExpenses = 0;
-            if (expensesList.length > 0) {
-                if (checkAddPage(60)) y = doc.y;
-                
-                y += 20;
-                doc.fontSize(12).font('Helvetica-Bold').fillColor('#000').text('GASTOS OPERATIVOS', 50, y);
-                y += 20;
-
-                const drawExpensesHeader = (posY) => {
-                    doc.rect(50, posY, 495, 20).fill('#EF4444'); // Rojo para gastos
-                    doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-                    doc.text('DESCRIPCIÓN', 55, posY + 6);
-                    doc.text('FECHA', 350, posY + 6);
-                    doc.text('MONTO', 450, posY + 6, { width: 80, align: 'right' });
-                };
-                drawExpensesHeader(y);
-                
-                y += 25;
-                
-                expensesList.forEach((exp) => {
-                    const descStr = exp.description.substring(0, 50);
-                    const rowHeight = Math.max(doc.heightOfString(descStr, { width: 290 }), 18);
-
-                    if (checkAddPage(rowHeight + 10)) {
-                        y = doc.y + 10;
-                        drawExpensesHeader(y);
-                        y += 25;
-                    }
-                    
-                    doc.fillColor('#000').font('Helvetica');
-                    doc.text(descStr, 55, y, { width: 290 });
-                    doc.text(new Date(exp.expense_date).toLocaleDateString('es-CO'), 350, y);
-                    doc.text(formatCurrency(exp.amount), 450, y, { width: 80, align: 'right' });
-                    totalExpenses += parseFloat(exp.amount);
-                    y += rowHeight + 5;
-                });
+            for (let idx = 0; idx < expensesData.length; idx++) {
+                const exp = expensesData[idx];
+                if (checkAddPage(22)) { drawTableHeader(eCols); }
+                const rowY = doc.y;
+                if (idx % 2 === 0) { doc.rect(50, rowY, 495, 18).fill('#fafbfc'); doc.fillColor('#000'); }
+                const d = exp.expense_date ? new Date(exp.expense_date).toLocaleDateString('es-CO') : 'N/A';
+                doc.text((exp.description || '').substring(0, 30), 55, rowY + 4, { lineBreak: false });
+                doc.text(formatCurrency(exp.amount), 255, rowY + 4, { lineBreak: false });
+                doc.text((exp.category || 'N/A').substring(0, 15), 345, rowY + 4, { lineBreak: false });
+                doc.text(d, 455, rowY + 4, { lineBreak: false });
+                doc.y = rowY + 20;
             }
 
-            if (checkAddPage(80)) y = doc.y;
-            y += 20;
-
-            doc.font('Helvetica-Bold').fillColor('#000');
-            doc.text(`Total Ventas: ${formatCurrency(totalRevenue)}`, 50, y, { align: 'right' });
-            y += 15;
-            doc.text(`Costo de Mercancía: -${formatCurrency(totalCost)}`, 50, y, { align: 'right' });
-            y += 15;
-            doc.text(`Gastos Operativos: -${formatCurrency(totalExpenses)}`, 50, y, { align: 'right' });
-            y += 20;
-            
-            const netProfit = totalRevenue - totalCost - totalExpenses;
-            doc.fontSize(14).fillColor(netProfit >= 0 ? 'green' : 'red').text(`Utilidad Neta Real: ${formatCurrency(netProfit)}`, 50, y, { align: 'right' });
-        }
-
-        // ==========================================
-        // REPORTE DE INVENTARIO VALORIZADO
-        // ==========================================
-        if (type === 'inventory') {
-            const [products] = await db.query('SELECT * FROM inventory ORDER BY product_name ASC');
-            
-            const drawInventoryHeader = (posY) => {
-                doc.rect(50, posY, 495, 20).fill('#F59E0B'); // Naranja
-                doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-                doc.text('PRODUCTO', 55, posY + 6);
-                doc.text('STOCK', 320, posY + 6, { width: 40, align: 'center' });
-                doc.text('PRECIO', 370, posY + 6, { width: 70, align: 'right' });
-                doc.text('VALOR TOTAL', 450, posY + 6, { width: 80, align: 'right' });
-            };
-
-            let y = doc.y;
-            drawInventoryHeader(y);
-            y += 25;
-
-            let totalValue = 0, totalItems = 0;
-
-            products.forEach((p, i) => {
-                const nameStr = p.product_name.substring(0, 40);
-                const rowHeight = Math.max(doc.heightOfString(nameStr, { width: 260 }), 18);
-
-                if (checkAddPage(rowHeight + 10)) {
-                    y = doc.y;
-                    drawInventoryHeader(y);
-                    y += 25;
-                }
-
-                if (i % 2 === 0) doc.rect(50, y - 5, 495, rowHeight + 5).fill('#f9f9f9');
-                doc.fillColor('#000').font('Helvetica');
-
-                const val = p.stock * p.price;
-                totalValue += val;
-                totalItems += p.stock;
-
-                doc.text(nameStr, 55, y, { width: 260 });
-                doc.text(p.stock, 320, y, { width: 40, align: 'center' });
-                doc.text(formatCurrency(p.price), 370, y, { width: 70, align: 'right' });
-                doc.text(formatCurrency(val), 450, y, { width: 80, align: 'right' });
-                y += rowHeight + 5;
-            });
-
-            // Totales manuales
-            if (checkAddPage(50)) y = doc.y;
-            y += 20;
-
-            doc.font('Helvetica-Bold');
-            doc.text(`Total Unidades: ${totalItems}`, 50, y, { align: 'right' });
-            y += 15;
-            doc.fontSize(12).text(`Valor del Inventario: ${formatCurrency(totalValue)}`, 50, y, { align: 'right' });
-        }
-
-        // ==========================================
-        // REPORTE DE STOCK BAJO
-        // ==========================================
-        if (type === 'low-stock') {
-            const [products] = await db.query('SELECT * FROM inventory WHERE stock < 5 ORDER BY stock ASC');
-            
-            if (products.length === 0) {
-                doc.fontSize(12).text('¡Excelente! No hay productos con stock crítico.', { align: 'center' });
-            } else {
-                const drawLowStockHeader = (posY) => {
-                    doc.rect(50, posY, 495, 20).fill('#EF4444'); // Rojo
-                    doc.fillColor('#fff').fontSize(9).font('Helvetica-Bold');
-                    doc.text('PRODUCTO', 55, posY + 6);
-                    doc.text('STOCK ACTUAL', 400, posY + 6, { align: 'right' });
-                };
-
-                let y = doc.y;
-                drawLowStockHeader(y);
-                y += 25;
-
-                products.forEach((p, i) => {
-                    const nameStr = p.product_name;
-                    const rowHeight = Math.max(doc.heightOfString(nameStr, { width: 340 }), 18);
-
-                if (checkAddPage(rowHeight + 10)) {
-                    y = doc.y;
-                        drawLowStockHeader(y);
-                        y += 25;
-                    }
-
-                    if (i % 2 === 0) doc.rect(50, y - 5, 495, rowHeight + 5).fill('#f9f9f9');
-                    doc.fillColor('#000').font('Helvetica');
-                    doc.text(nameStr, 55, y, { width: 340 });
-                    doc.text(p.stock.toString(), 400, y, { align: 'right' });
-                    y += rowHeight + 5;
-                });
-            }
-        }
-
-        // ==========================================
-        // DIRECTORIO DE CLIENTES
-        // ==========================================
-        if (type === 'clients') {
-            const [clients] = await db.query('SELECT * FROM clients ORDER BY name ASC');
-            
-            let y = doc.y + 20;
-            
-            clients.forEach((c, i) => {
-                if (checkAddPage(70)) y = doc.y;
-                
-                // Tarjeta de cliente
-                doc.rect(50, y, 495, 50).stroke('#e0e0e0');
-                doc.font('Helvetica-Bold').fontSize(10).text(c.name, 60, y + 10);
-                doc.font('Helvetica').fontSize(9).fillColor('#555');
-                doc.text(`Tel: ${c.phone || 'N/A'}  |  Email: ${c.email || 'N/A'}`, 60, y + 25);
-                doc.text(`Dirección: ${c.address || 'N/A'}`, 60, y + 38);
-                
+            // Resumen de ganancias
+            if (type === 'profits' || type === 'complete') {
+                doc.y += 10;
+                checkAddPage(70);
+                const totalSales = salesData.reduce((sum, s) => sum + parseFloat(s.total_price || 0), 0);
+                doc.rect(50, doc.y, 495, 55).fill('#f8f9fa').stroke('#dee2e6');
+                const boxY = doc.y;
+                doc.fillColor('#000').fontSize(10).font('Helvetica-Bold');
+                doc.text(`Ingresos por ventas: ${formatCurrency(totalSales)}`, 65, boxY + 8, { lineBreak: false });
+                doc.fillColor('#dc3545').text(`Gastos totales: ${formatCurrency(totalExpAmount)}`, 65, boxY + 22, { lineBreak: false });
+                const profit = totalSales - totalExpAmount;
+                doc.fillColor(profit >= 0 ? '#28a745' : '#dc3545').fontSize(11);
+                doc.text(`Ganancia Neta: ${formatCurrency(profit)}`, 65, boxY + 38, { lineBreak: false });
                 doc.fillColor('#000');
-                y += 60;
-            });
+                doc.y = boxY + 65;
+            }
+            doc.y += 10;
         }
 
-        // ==========================================
-        // DESGLOSE DIARIO (Solo para tipo 'complete')
-        // ==========================================
-        if (type === 'complete') { // Lógica completamente nueva para el reporte gerencial
-            // --- 1. RECOPILAR TODOS LOS DATOS ---
-            const [totals] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as revenue, COUNT(*) as salesCount, AVG(total_price) as avgTicket FROM sales WHERE 1=1 ${dateFilter}`, params);
-            const [costs] = await db.query(`SELECT COALESCE(SUM(i.cost * sd.quantity), 0) as totalCost FROM sale_details sd JOIN sales s ON sd.sale_id = s.id JOIN inventory i ON sd.product_id = i.id WHERE 1=1 ${dateFilter.replace('sale_date', 's.sale_date')}`, params);
-            const [items] = await db.query(`SELECT COALESCE(SUM(sd.quantity), 0) as totalItems FROM sale_details sd JOIN sales s ON sd.sale_id = s.id WHERE 1=1 ${dateFilter.replace('sale_date', 's.sale_date')}`, params);
-            const [inventoryStats] = await db.query(`SELECT COUNT(*) as lowStockCount, SUM(stock * price) as totalValue FROM inventory`);
-            const [topProducts] = await db.query(`SELECT i.product_name, SUM(sd.quantity) as totalSold, SUM(sd.subtotal) as totalRevenue FROM sale_details sd JOIN sales s ON sd.sale_id = s.id JOIN inventory i ON sd.product_id = i.id WHERE 1=1 ${dateFilter.replace('sale_date', 's.sale_date')} GROUP BY i.id ORDER BY totalSold DESC LIMIT 5`, params);
-            const [topClients] = await db.query(`SELECT c.name, COUNT(s.id) as purchases, SUM(s.total_price) as total FROM sales s JOIN clients c ON s.client_id = c.id WHERE 1=1 ${dateFilter} GROUP BY c.id ORDER BY total DESC LIMIT 5`, params);
-            const [salesByDay] = await db.query(`SELECT DATE(sale_date) as date, SUM(total_price) as total, COUNT(*) as count FROM sales WHERE 1=1 ${dateFilter} GROUP BY DATE(sale_date) ORDER BY date ASC`, params);
-
-            // --- 2. DIBUJAR RESUMEN EJECUTIVO (PÁGINA 1) ---
-            doc.fontSize(12).font('Helvetica-Bold').text('Resumen Ejecutivo del Periodo');
-            doc.moveDown(0.5);
-
-            const revenue = totals[0].revenue;
-            const cogs = costs[0].totalCost;
-            const grossProfit = revenue - cogs;
-            const margin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
-
-            // Caja de Rentabilidad
-            let y = doc.y;
-            doc.rect(50, y, 495, 60).fill('#f8f9fa').stroke('#e9ecef');
+        // ============================================================
+        // SECCIÓN DE INVENTARIO
+        // ============================================================
+        if (['inventory', 'complete'].includes(type) && inventoryData.length > 0) {
+            checkAddPage(60);
+            doc.fontSize(12).font('Helvetica-Bold').fillColor('#28a745').text('Inventario', 50, doc.y, { lineBreak: false });
             doc.fillColor('#000');
-            doc.fontSize(10).font('Helvetica-Bold');
-            doc.text('INGRESOS', 70, y + 10, { width: 150 });
-            doc.text('COSTOS', 230, y + 10, { width: 140 });
-            doc.text('GANANCIA BRUTA', 380, y + 10, { width: 150 });
-            doc.fontSize(14).font('Helvetica');
-            doc.text(formatCurrency(revenue), 70, y + 25, { width: 150 });
-            doc.text(formatCurrency(cogs), 230, y + 25, { width: 140 });
-            doc.text(formatCurrency(grossProfit), 380, y + 25, { width: 150 });
-            doc.fontSize(10).font('Helvetica-Bold').fillColor(margin < 0 ? 'red' : 'green');
-            doc.text(`${margin.toFixed(1)}% Margen`, 380, y + 45, { width: 150 });
-            y += 70;
+            doc.y += 18;
 
-            // Caja de Operaciones
-            doc.rect(50, y, 495, 50).fill('#f8f9fa').stroke('#e9ecef');
-            doc.fillColor('#000');
-            doc.fontSize(10).font('Helvetica-Bold');
-            doc.text('TRANSACCIONES', 70, y + 10, { width: 150 });
-            doc.text('TICKET PROMEDIO', 230, y + 10, { width: 140 });
-            doc.text('UNIDADES VENDIDAS', 380, y + 10, { width: 150 });
-            doc.fontSize(14).font('Helvetica');
-            doc.text(String(totals[0].salesCount), 70, y + 25, { width: 150 });
-            doc.text(formatCurrency(totals[0].avgTicket || 0), 230, y + 25, { width: 140 });
-            doc.text(String(items[0].totalItems), 380, y + 25, { width: 150 });
-            y += 60;
+            const totalValue = inventoryData.reduce((sum, p) => sum + (parseFloat(p.price || 0) * (p.stock || 0)), 0);
+            const totalItems = inventoryData.reduce((sum, p) => sum + (p.stock || 0), 0);
+            doc.fontSize(9).font('Helvetica').text(`Productos: ${inventoryData.length}  |  Unidades: ${totalItems}  |  Valor: ${formatCurrency(totalValue)}`, 50, doc.y, { lineBreak: false });
+            doc.y += 18;
 
-            // Caja de Inventario (Snapshot)
-            doc.rect(50, y, 495, 50).fill('#f8f9fa').stroke('#e9ecef');
-            doc.fillColor('#000');
-            doc.fontSize(10).font('Helvetica-Bold');
-            doc.text('VALOR INVENTARIO', 70, y + 10, { width: 200 });
-            doc.text('PRODUCTOS CON STOCK BAJO', 300, y + 10, { width: 200 });
-            doc.fontSize(14).font('Helvetica');
-            doc.text(formatCurrency(inventoryStats[0].totalValue || 0), 70, y + 25, { width: 200 });
-            doc.text(String(inventoryStats[0].lowStockCount), 300, y + 25, { width: 200 });
+            const iCols = [
+                { label: 'Producto', x: 50, width: 150 },
+                { label: 'Categoría', x: 210, width: 90 },
+                { label: 'Stock', x: 310, width: 50 },
+                { label: 'Precio', x: 370, width: 75 },
+                { label: 'Valor Total', x: 455, width: 85 }
+            ];
+            drawTableHeader(iCols);
 
-            // --- 3. DIBUJAR DESGLOSES ---
-            let currentY = doc.y + 30;
-
-            // Tabla Top 5 Productos
-            if (checkAddPage(120)) currentY = doc.y;
-
-            doc.fontSize(12).font('Helvetica-Bold').text('Top 5 Productos Vendidos', 50, currentY);
-            currentY += 20;
-
-            doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
-            doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-            doc.text('Producto', 60, currentY + 6, { width: 280 });
-            doc.text('Unidades', 350, currentY + 6, {width: 80, align: 'center'});
-            doc.text('Ingreso', 440, currentY + 6, {width: 90, align: 'right'});
-            currentY += 25;
-            
-            doc.font('Helvetica');
-            topProducts.forEach((p, i) => {
-                const productText = p.product_name.substring(0, 40);
-                const soldText = String(p.totalSold);
-                const revenueText = formatCurrency(p.totalRevenue);
-                const rowHeight = Math.max(doc.heightOfString(productText, { width: 290 }), doc.heightOfString(soldText, { width: 80 }), doc.heightOfString(revenueText, { width: 90 }));
-
-                if (checkAddPage(rowHeight + 10)) {
-                    currentY = doc.y;
-                    doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
-                    doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-                    doc.text('Producto', 60, currentY + 6, { width: 280 });
-                    doc.text('Unidades', 350, currentY + 6, {width: 80, align: 'center'});
-                    doc.text('Ingreso', 440, currentY + 6, {width: 90, align: 'right'});
-                    currentY += 25;
-                    doc.font('Helvetica').fillColor('#000'); // Restablecer fuente
-                }
-
-                doc.font('Helvetica').fillColor('#000');
-                doc.text(productText, 60, currentY, { width: 290 });
-                doc.text(soldText, 350, currentY, {width: 80, align: 'center'});
-                doc.text(revenueText, 440, currentY, {width: 90, align: 'right'});
-                currentY += rowHeight + 5;
-            });
-            
-            currentY += 20; // Espacio entre tablas
-
-            // Tabla Top 5 Clientes
-            if (checkAddPage(120)) currentY = doc.y;
-            doc.fontSize(12).font('Helvetica-Bold').text('Top 5 Clientes', 50, currentY);
-            currentY += 20;
-
-            doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
-            doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-            doc.text('Cliente', 60, currentY + 6, { width: 280 });
-            doc.text('Compras', 350, currentY + 6, {width: 80, align: 'center'});
-            doc.text('Total Gastado', 440, currentY + 6, {width: 90, align: 'right'});
-            currentY += 25;
-            
-            doc.font('Helvetica');
-            topClients.forEach((c, i) => {
-                const clientText = c.name.substring(0, 30);
-                const purchasesText = String(c.purchases);
-                const totalText = formatCurrency(c.total);
-                const rowHeight = Math.max(doc.heightOfString(clientText, { width: 290 }), doc.heightOfString(purchasesText, { width: 80 }), doc.heightOfString(totalText, { width: 90 }));
-
-                if (checkAddPage(rowHeight + 10)) {
-                    currentY = doc.y;
-                    doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
-                    doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-                    doc.text('Cliente', 60, currentY + 6, { width: 280 });
-                    doc.text('Compras', 350, currentY + 6, {width: 80, align: 'center'});
-                    doc.text('Total Gastado', 440, currentY + 6, {width: 90, align: 'right'});
-                    currentY += 25;
-                    doc.font('Helvetica').fillColor('#000'); // Restablecer fuente
-                }
-                doc.font('Helvetica').fillColor('#000');
-                doc.text(clientText, 60, currentY, { width: 290 });
-                doc.text(purchasesText, 350, currentY, {width: 80, align: 'center'});
-                doc.text(totalText, 440, currentY, {width: 90, align: 'right'});
-                currentY += rowHeight + 5;
-            });
-            
-            currentY += 20;
-
-            // Tabla Desglose Diario
-            if (checkAddPage(100)) currentY = doc.y;
-            doc.fontSize(12).font('Helvetica-Bold').text('Desglose de Ventas por Día', 50, currentY);
-            currentY += 20;
-            
-            doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
-            doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-            doc.text('Fecha', 60, currentY + 6, { width: 280 });
-            doc.text('Transacciones', 350, currentY + 6, {width: 80, align: 'center'});
-            doc.text('Total Vendido', 440, currentY + 6, {width: 90, align: 'right'});
-            currentY += 25;
-            
-            doc.font('Helvetica');
-            salesByDay.forEach((s, i) => {
-                const dateStr = new Date(s.date).toLocaleDateString('es-CO', { timeZone: 'UTC' });
-                const countText = String(s.count);
-                const totalText = formatCurrency(s.total);
-                const rowHeight = Math.max(doc.heightOfString(dateStr, { width: 290 }), doc.heightOfString(countText, { width: 80 }), doc.heightOfString(totalText, { width: 90 }));
-
-                if (checkAddPage(rowHeight + 10)) {
-                    currentY = doc.y;
-                    doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
-                    doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-                    doc.text('Fecha', 60, currentY + 6, { width: 280 });
-                    doc.text('Transacciones', 350, currentY + 6, {width: 80, align: 'center'});
-                    doc.text('Total Vendido', 440, currentY + 6, {width: 90, align: 'right'});
-                    currentY += 25;
-                    doc.font('Helvetica').fillColor('#000'); // Restablecer fuente
-                }
-                doc.text(dateStr, 60, currentY, { width: 290 });
-                doc.text(String(s.count), 350, currentY, {width: 80, align: 'center'});
-                doc.text(formatCurrency(s.total), 440, currentY, {width: 90, align: 'right'});
-                currentY += rowHeight + 5;
-            });
-
-            // --- 4. INVENTARIO DISPONIBLE (NUEVO) ---
-            const [fullInventory] = await db.query('SELECT product_name, stock, price FROM inventory ORDER BY product_name ASC');
-            
-            if (checkAddPage(120)) currentY = doc.y;
-            doc.fontSize(12).font('Helvetica-Bold').text('Inventario Disponible', 50, currentY);
-            currentY += 20;
-
-            doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
-            doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-            doc.text('Producto', 60, currentY + 6, { width: 280 });
-            doc.text('Precio', 350, currentY + 6, {width: 80, align: 'right'});
-            doc.text('Stock', 440, currentY + 6, {width: 90, align: 'center'});
-            currentY += 25;
-
-            doc.font('Helvetica');
-            fullInventory.forEach((p, i) => {
-                const productText = p.product_name.substring(0, 50);
-                const priceText = formatCurrency(p.price);
-                const stockText = String(p.stock);
-                const rowHeight = Math.max(doc.heightOfString(productText, { width: 290 }), doc.heightOfString(priceText, { width: 80 }), doc.heightOfString(stockText, { width: 90 }));
-                
-                if (checkAddPage(rowHeight + 10)) {
-                    currentY = doc.y;
-                    doc.rect(50, currentY, 495, 20).fill('#f0f0f0');
-                    doc.fillColor('#000').fontSize(9).font('Helvetica-Bold');
-                    doc.text('Producto', 60, currentY + 6, { width: 280 });
-                    doc.text('Precio', 350, currentY + 6, {width: 80, align: 'right'});
-                    doc.text('Stock', 440, currentY + 6, {width: 90, align: 'center'});
-                    currentY += 25;
-                    doc.font('Helvetica').fillColor('#000'); // Restablecer fuente
-                }
-                
-                doc.font('Helvetica').fillColor('#000'); // <--- CORRECCIÓN: Restablecer fuente
-                doc.text(productText, 60, currentY, { width: 290 });
-                doc.text(priceText, 350, currentY, {width: 80, align: 'right'});
-                doc.text(stockText, 440, currentY, {width: 90, align: 'center'});
-                currentY += rowHeight + 5;
-            });
+            for (let idx = 0; idx < inventoryData.length; idx++) {
+                const p = inventoryData[idx];
+                if (checkAddPage(22)) { drawTableHeader(iCols); }
+                const rowY = doc.y;
+                if (idx % 2 === 0) { doc.rect(50, rowY, 495, 18).fill('#fafbfc'); doc.fillColor('#000'); }
+                if (p.stock <= 5) { doc.fillColor('#dc3545'); }
+                doc.text((p.product_name || '').substring(0, 22), 55, rowY + 4, { lineBreak: false });
+                doc.text((p.category || 'N/A').substring(0, 14), 215, rowY + 4, { lineBreak: false });
+                doc.text(String(p.stock || 0), 315, rowY + 4, { lineBreak: false });
+                doc.text(formatCurrency(p.price), 375, rowY + 4, { lineBreak: false });
+                doc.text(formatCurrency((p.price || 0) * (p.stock || 0)), 460, rowY + 4, { lineBreak: false });
+                doc.fillColor('#000');
+                doc.y = rowY + 20;
+            }
+            doc.y += 10;
         }
 
-        // --- PIE DE PÁGINA (Copyright y Paginación) ---
-        // El listener se encarga de los headers, ahora el footer al final
+        // ============================================================
+        // SECCIÓN DE CLIENTES
+        // ============================================================
+        if (['clients', 'complete'].includes(type) && clientsData.length > 0) {
+            checkAddPage(60);
+            doc.fontSize(12).font('Helvetica-Bold').fillColor('#ffc107').text('Clientes', 50, doc.y, { lineBreak: false });
+            doc.fillColor('#000');
+            doc.y += 18;
+
+            doc.fontSize(9).font('Helvetica').text(`Total de clientes: ${clientsData.length}`, 50, doc.y, { lineBreak: false });
+            doc.y += 18;
+
+            const cCols = [
+                { label: 'Nombre', x: 50, width: 120 },
+                { label: 'Email', x: 175, width: 130 },
+                { label: 'Teléfono', x: 315, width: 85 },
+                { label: 'Compras', x: 410, width: 45 },
+                { label: 'Total Gastado', x: 460, width: 80 }
+            ];
+            drawTableHeader(cCols);
+
+            for (let idx = 0; idx < clientsData.length; idx++) {
+                const c = clientsData[idx];
+                if (checkAddPage(22)) { drawTableHeader(cCols); }
+                const rowY = doc.y;
+                if (idx % 2 === 0) { doc.rect(50, rowY, 495, 18).fill('#fafbfc'); doc.fillColor('#000'); }
+                doc.text((c.name || '').substring(0, 18), 55, rowY + 4, { lineBreak: false });
+                doc.text((c.email || 'N/A').substring(0, 22), 180, rowY + 4, { lineBreak: false });
+                doc.text((c.phone || 'N/A').substring(0, 13), 320, rowY + 4, { lineBreak: false });
+                doc.text(String(c.total_purchases || 0), 415, rowY + 4, { lineBreak: false });
+                doc.text(formatCurrency(c.total_spent), 465, rowY + 4, { lineBreak: false });
+                doc.y = rowY + 20;
+            }
+            doc.y += 10;
+        }
+
+        // ============================================================
+        // FOOTER: Remover listener antes del loop para evitar páginas en blanco
+        // ============================================================
+        doc.removeAllListeners('pageAdded');
+
         const range = doc.bufferedPageRange();
+        const totalPages = range.count;
         for (let i = range.start; i < range.start + range.count; i++) {
             doc.switchToPage(i);
-            // Re-usamos la función generateFooter para consistencia
-            generateFooter(doc);
+            generateFooter(doc, i + 1, totalPages);
         }
 
         doc.end();
 
     } catch (error) {
-        console.error(error);
-        res.status(500).send('Error generando PDF');
+        console.error('Error generando reporte PDF:', error);
+        if (!res.headersSent) {
+            res.status(500).send('Error generando PDF');
+        }
     }
 });
 

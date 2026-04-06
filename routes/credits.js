@@ -117,7 +117,7 @@ router.post('/payment', authenticateToken, async (req, res) => {
         await conn.beginTransaction();
     
     // Validar que el monto no sea mayor que el saldo restante
-    const [credit] = await db.query(
+    const [credit] = await conn.query(
       'SELECT remaining_balance FROM credits WHERE id = ? AND tenant_id = ?', 
       [creditId, req.user.tenant_id]
     );
@@ -133,7 +133,7 @@ router.post('/payment', authenticateToken, async (req, res) => {
     const newBalance = credit[0].remaining_balance - amount;
     const status = newBalance <= 0 ? 'paid' : 'active';
     
-    await db.query(`
+    await conn.query(`
       UPDATE credits 
       SET remaining_balance = ?, 
           status = ?,
@@ -145,13 +145,13 @@ router.post('/payment', authenticateToken, async (req, res) => {
     `, [newBalance, status, newBalance, nextPaymentDate || null, creditId, req.user.tenant_id]);
     
     // Registrar el pago en historial
-    const [pRes] = await db.query(`
+    const [pRes] = await conn.query(`
       INSERT INTO credit_payments (tenant_id, credit_id, amount, payment_date, notes, collector_id)
       VALUES (?, ?, ?, NOW(), ?, ?)
     `, [req.user.tenant_id, creditId, amount, notes, req.user.id]);
 
     // Obtener info para WhatsApp
-    const [info] = await db.query(`
+    const [info] = await conn.query(`
         SELECT cl.name, cl.phone FROM clients cl 
         JOIN credits c ON c.client_id = cl.id 
         WHERE c.id = ?`, [creditId]);

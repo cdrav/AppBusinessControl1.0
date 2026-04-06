@@ -6,19 +6,14 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { ROLES } = require('../config/roles');
 
 // Obtener todos los usuarios (solo admin)
-router.get('/', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, res) => {
+router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
   try {
     const [users] = await db.query(`
       SELECT u.id, u.username, u.email, u.role, u.created_at,
-             COUNT(DISTINCT c.id) as total_clients,
-             COUNT(DISTINCT s.id) as total_sales,
              b.name as branch_name
       FROM users u
-      LEFT JOIN clients c ON c.created_by = u.id AND c.tenant_id = u.tenant_id
-      LEFT JOIN sales s ON s.created_by = u.id AND s.tenant_id = u.tenant_id
       LEFT JOIN branches b ON u.branch_id = b.id
       WHERE u.tenant_id = ?
-      GROUP BY u.id, b.name
       ORDER BY u.created_at DESC
     `, [req.user.tenant_id]);
     
@@ -108,7 +103,7 @@ router.put('/:id', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, 
       return res.status(400).json({ message: 'No hay campos para actualizar' });
     }
     
-    updateValues.push(userId);
+    updateValues.push(userId, req.user.tenant_id);
     
     const [result] = await db.query(
       `UPDATE users SET ${updateFields.join(', ')} WHERE id = ? AND tenant_id = ?`,

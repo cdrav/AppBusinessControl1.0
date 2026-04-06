@@ -1,5 +1,5 @@
 // Leer el ID del cliente desde la URL
-import { API_URL } from '../config.js';
+import { apiFetch, API_URL } from './api.js';
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get('id');
 
