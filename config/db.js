@@ -14,10 +14,9 @@ const dbConfig = {
   multipleStatements: true,
   // SSL para conexiones externas (Railway)
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  // Timeout más largo para Railway
+  // Timeout válido para MySQL2
   acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true
+  idleTimeout: 300000
 };
 
 const db = mysql.createPool(dbConfig);
