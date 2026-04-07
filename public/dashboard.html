@@ -446,10 +446,41 @@
               <label for="summaryDate" class="form-label small fw-medium">Seleccionar Fecha:</label>
               <input type="date" id="summaryDate" class="form-control">
           </div>
-          <div id="summaryContent" class="text-center p-4 bg-light rounded-3 mt-3">
+          <div id="summaryContent" class="p-3 bg-light rounded-3 mt-3">
               <!-- Content will be loaded here by JavaScript -->
-              <div class="spinner-border text-primary" role="status">
-                  <span class="visually-hidden">Cargando...</span>
+              <div class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                      <span class="visually-hidden">Cargando...</span>
+                  </div>
+              </div>
+          </div>
+          <!-- Datos del resumen (inicialmente ocultos) -->
+          <div id="summaryData" class="d-none mt-3">
+              <div class="row g-2">
+                  <div class="col-6">
+                      <div class="p-3 bg-white rounded-3 shadow-sm">
+                          <p class="text-muted small mb-1">Ventas Contado</p>
+                          <h5 class="fw-bold text-success mb-0" id="totalCash">$0</h5>
+                      </div>
+                  </div>
+                  <div class="col-6">
+                      <div class="p-3 bg-white rounded-3 shadow-sm">
+                          <p class="text-muted small mb-1">Ventas Crédito</p>
+                          <h5 class="fw-bold text-warning mb-0" id="totalCredit">$0</h5>
+                      </div>
+                  </div>
+                  <div class="col-6">
+                      <div class="p-3 bg-white rounded-3 shadow-sm">
+                          <p class="text-muted small mb-1">Gastos</p>
+                          <h5 class="fw-bold text-danger mb-0" id="totalExpenses">$0</h5>
+                      </div>
+                  </div>
+                  <div class="col-6">
+                      <div class="p-3 bg-primary bg-opacity-10 rounded-3 border border-primary">
+                          <p class="text-primary small mb-1 fw-bold">Efectivo Neto</p>
+                          <h5 class="fw-bold text-primary mb-0" id="netCash">$0</h5>
+                      </div>
+                  </div>
               </div>
           </div>
         </div>

@@ -348,6 +348,15 @@ window.sendSummaryByEmail = async function() {
 };
 
 async function fetchDailySummary(date, branchId = null) {
+    console.log('[fetchDailySummary] Cargando datos para fecha:', date);
+    
+    // Mostrar spinner, ocultar datos
+    const summaryContent = document.getElementById('summaryContent');
+    const summaryData = document.getElementById('summaryData');
+    
+    if (summaryContent) summaryContent.classList.remove('d-none');
+    if (summaryData) summaryData.classList.add('d-none');
+    
     try {
         let url = `/api/daily-summary?date=${date}`;
         if (branchId) {
@@ -355,11 +364,15 @@ async function fetchDailySummary(date, branchId = null) {
         }
 
         const data = await apiFetch(url);
-        if (!data) return;
+        console.log('[fetchDailySummary] Datos recibidos:', data);
+        
+        if (!data) {
+            throw new Error('No se recibieron datos del servidor');
+        }
 
         const formatCOP = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(val || 0));
 
-        // Actualizar modal (con verificación de existencia)
+        // Actualizar valores
         const summaryDateEl = document.getElementById('summaryDate');
         const totalCashEl = document.getElementById('totalCash');
         const totalCreditEl = document.getElementById('totalCredit');
@@ -367,16 +380,19 @@ async function fetchDailySummary(date, branchId = null) {
         const netCashEl = document.getElementById('netCash');
         
         if (summaryDateEl) summaryDateEl.value = date;
-        if (totalCashEl) totalCashEl.textContent = formatCOP(data.totalCash);
-        if (totalCreditEl) totalCreditEl.textContent = formatCOP(data.totalCredit);
-        if (totalExpensesEl) totalExpensesEl.textContent = formatCOP(data.totalExpenses);
-        if (netCashEl) netCashEl.textContent = formatCOP(data.netCash);
+        if (totalCashEl) totalCashEl.textContent = formatCOP(data.totalCash || 0);
+        if (totalCreditEl) totalCreditEl.textContent = formatCOP(data.totalCredit || 0);
+        if (totalExpensesEl) totalExpensesEl.textContent = formatCOP(data.totalExpenses || 0);
+        if (netCashEl) netCashEl.textContent = formatCOP(data.netCash || 0);
+
+        // Ocultar spinner, mostrar datos
+        if (summaryContent) summaryContent.classList.add('d-none');
+        if (summaryData) summaryData.classList.remove('d-none');
 
     } catch (error) {
-        console.error('Error fetching daily summary:', error);
-        const modalBody = document.getElementById('summaryModalBody');
-        if (modalBody) {
-            modalBody.innerHTML = '<div class="alert alert-danger">Error al cargar el resumen diario</div>';
+        console.error('[fetchDailySummary] Error:', error);
+        if (summaryContent) {
+            summaryContent.innerHTML = `<div class="alert alert-danger">Error al cargar el resumen: ${error.message}</div>`;
         }
     }
 }
