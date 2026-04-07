@@ -5,7 +5,7 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const { authenticateToken } = require('../middleware/auth');
-const { sendDailySummaryEmail } = require('../services/emailService');
+const { sendDailySummaryEmail, isEmailConfigured } = require('../services/emailService');
 
 // Estadísticas del Dashboard
 router.get('/dashboard-stats', authenticateToken, async (req, res) => {
@@ -745,8 +745,10 @@ router.post('/send-daily-summary', authenticateToken, async (req, res) => {
         }
 
         // Verificar configuración de email
-        if (!process.env.EMAIL_USER) {
-            return res.status(500).json({ message: 'Configuración de correo no disponible' });
+        if (!isEmailConfigured()) {
+            return res.status(503).json({ 
+                message: 'Servicio de correo no configurado. Configure las variables EMAIL_USER y EMAIL_PASS en Railway.' 
+            });
         }
 
         const result = await sendDailySummaryEmail(date);
