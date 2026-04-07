@@ -312,6 +312,7 @@ async function ensureDatabaseSchema() {
     { table: 'inventory', column: 'cost', sql: 'ALTER TABLE inventory ADD COLUMN cost DECIMAL(10,2) DEFAULT 0' },
     { table: 'inventory', column: 'barcode', sql: 'ALTER TABLE inventory ADD COLUMN barcode VARCHAR(100)' },
     { table: 'inventory', column: 'supplier_id', sql: 'ALTER TABLE inventory ADD COLUMN supplier_id INT DEFAULT NULL' },
+    { table: 'sale_details', column: 'tenant_id', sql: 'ALTER TABLE sale_details ADD COLUMN tenant_id INT DEFAULT NULL' },
   ];
 
   for (const alt of alterations) {
@@ -342,6 +343,14 @@ async function ensureDatabaseSchema() {
       console.log('  ✅ Configuración por defecto creada');
     }
   } catch (err) { console.log('  ⚠️ Settings seed:', err.message); }
+
+  // Fix: Asegurar que todos los usuarios tengan tenant_id y branch_id
+  try {
+    const [updated] = await db.query('UPDATE users SET tenant_id = 1 WHERE tenant_id IS NULL');
+    if (updated.affectedRows > 0) console.log(`  ✅ ${updated.affectedRows} usuario(s) actualizado(s) con tenant_id = 1`);
+    const [updated2] = await db.query('UPDATE users SET branch_id = 1 WHERE branch_id IS NULL');
+    if (updated2.affectedRows > 0) console.log(`  ✅ ${updated2.affectedRows} usuario(s) actualizado(s) con branch_id = 1`);
+  } catch (err) { console.log('  ⚠️ Users fix:', err.message); }
 }
 
 // Iniciar servidor

@@ -17,7 +17,7 @@ router.post('/register', async (req, res) => {
     const role = userCount[0].count === 0 ? 'admin' : 'cajero';
     const passwordHash = await bcrypt.hash(password, 10);
 
-    await db.query('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, email, passwordHash, role]);
+    await db.query('INSERT INTO users (username, email, password, role, tenant_id, branch_id) VALUES (?, ?, ?, ?, 1, 1)', [username, email, passwordHash, role]);
     res.status(201).json({ message: 'Cuenta creada exitosamente.' });
   } catch (err) { res.status(500).json({ message: 'Error interno.' }); }
 });
@@ -56,8 +56,8 @@ router.post('/login', async (req, res) => {
         id: user.id, 
         username: user.username, 
         role: user.role, 
-        branch_id: user.branch_id || null,
-        tenant_id: user.tenant_id || null
+        branch_id: user.branch_id || 1,
+        tenant_id: user.tenant_id || 1
       }, 
       process.env.JWT_SECRET || 'secreto_super_seguro', 
       { expiresIn: '8h' }
