@@ -48,8 +48,27 @@ app.use(cors({
 // Sanitización global de inputs
 app.use(sanitizeBody);
 
-// Servir archivos estáticos
-app.use(express.static(path.join(__dirname, 'public')));
+// Servir archivos estáticos - Asegurar path correcto para Railway
+const publicPath = path.join(__dirname, 'public');
+console.log(`📁 Serving static files from: ${publicPath}`);
+app.use(express.static(publicPath));
+
+// Debug endpoint para verificar archivos (solo en desarrollo)
+app.get('/debug/files', (req, res) => {
+  const fs = require('fs');
+  try {
+    const files = fs.readdirSync(publicPath);
+    const jsFiles = fs.readdirSync(path.join(publicPath, 'js'));
+    res.json({
+      publicPath,
+      rootFiles: files,
+      jsFiles: jsFiles,
+      __dirname: __dirname
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, publicPath, __dirname });
+  }
+});
 
 // Logging middleware
 app.use((req, res, next) => {
