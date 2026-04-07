@@ -233,11 +233,31 @@ router.get('/daily-summary', authenticateToken, async (req, res) => {
     }
 
     try {
+        // Total ventas (todas)
         const [summary] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as totalRevenue, COUNT(*) as totalSales FROM sales ${whereClause}`, params);
+        
+        // Ventas de contado (is_credit = 0)
+        const [cashSales] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as totalCash FROM sales ${whereClause} AND is_credit = 0`, params);
+        
+        // Ventas a crédito (is_credit = 1)
+        const [creditSales] = await db.query(`SELECT COALESCE(SUM(total_price), 0) as totalCredit FROM sales ${whereClause} AND is_credit = 1`, params);
+        
+        // Gastos
         const [dailyExpenses] = await db.query(`SELECT COALESCE(SUM(amount), 0) as totalExpenses FROM expenses ${expenseWhereClause}`, expenseParams);
         
-        res.json({ ...summary[0], ...dailyExpenses[0] });
+        // Calcular efectivo neto: Ventas contado - Gastos
+        const netCash = parseFloat(cashSales[0].totalCash || 0) - parseFloat(dailyExpenses[0].totalExpenses || 0);
+        
+        res.json({ 
+            totalRevenue: summary[0].totalRevenue,
+            totalSales: summary[0].totalSales,
+            totalCash: cashSales[0].totalCash,
+            totalCredit: creditSales[0].totalCredit,
+            totalExpenses: dailyExpenses[0].totalExpenses,
+            netCash: netCash
+        });
     } catch (error) {
+        console.error('Error en daily-summary:', error);
         res.status(500).json({ message: 'Error al obtener resumen diario' });
     }
 });

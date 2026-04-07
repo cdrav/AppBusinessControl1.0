@@ -319,14 +319,24 @@ window.applyOverdueInterests = async function() {
 };
 
 window.printDailySummary = function() {
-    const content = document.getElementById('summaryModalBody');
-    if (!content) return;
+    const summaryData = document.getElementById('summaryData');
+    const date = document.getElementById('summaryDate')?.value || new Date().toISOString().split('T')[0];
+    
+    if (!summaryData) {
+        showToast('No hay datos para imprimir', true);
+        return;
+    }
+    
     const printWindow = window.open('', '_blank');
-    printWindow.document.write('<html><head><title>Resumen Diario</title>');
+    printWindow.document.write('<html><head><title>Resumen Diario - Business Control</title>');
     printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">');
-    printWindow.document.write('</head><body class="p-4">');
-    printWindow.document.write('<h2 class="mb-4">Resumen Diario - Business Control</h2>');
-    printWindow.document.write(content.innerHTML);
+    printWindow.document.write('<style>body{font-family:Arial,sans-serif;padding:20px;}</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(`<h2 class="mb-4">Resumen Diario - ${date}</h2>`);
+    printWindow.document.write('<div class="container">');
+    printWindow.document.write(summaryData.innerHTML);
+    printWindow.document.write('</div>');
+    printWindow.document.write('<div class="text-center text-muted mt-4"><small>Generado por Business Control</small></div>');
     printWindow.document.write('</body></html>');
     printWindow.document.close();
     setTimeout(() => { printWindow.print(); }, 500);
