@@ -496,16 +496,9 @@ async function closeRoute() {
         });
 
         try {
-            // Timeout de 10 segundos máximo
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            
-            const data = await apiFetch('/api/credits/route-closure', { 
-                method: 'POST',
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
+            console.log('[closeRoute] Enviando petición...');
+            const data = await apiFetch('/api/credits/route-closure', { method: 'POST' });
+            console.log('[closeRoute] Respuesta:', data);
             
             // Siempre cerrar el loading antes de mostrar resultado
             Swal.close();
@@ -530,15 +523,11 @@ async function closeRoute() {
             // Asegurar que el loading se cierre
             Swal.close();
             
-            console.error('Error cerrando ruta:', error);
-            
-            const errorMessage = error.name === 'AbortError' 
-                ? 'La operación tardó demasiado. Intenta nuevamente.'
-                : (error.message || 'No se pudo cerrar la ruta. Verifica tu conexión.');
+            console.error('[closeRoute] Error:', error);
             
             await Swal.fire({
                 title: 'Error',
-                text: errorMessage,
+                text: error.message || 'No se pudo cerrar la ruta. Verifica tu conexión.',
                 icon: 'error'
             });
         }
