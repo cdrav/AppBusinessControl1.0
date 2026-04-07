@@ -102,9 +102,13 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Global error handler
+// Global error handler - SOLO para errores no manejados
 app.use((err, req, res, next) => {
-  console.error('❌ Global error:', err);
+  console.error('❌ Global error:', err.message);
+  // No devolver 500 para archivos estáticos
+  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+    return res.status(404).send('Not found');
+  }
   res.status(500).json({
     message: 'Error interno del servidor',
     error: process.env.NODE_ENV === 'development' ? err.message : 'Contacte al administrador'

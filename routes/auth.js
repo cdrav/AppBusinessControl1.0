@@ -68,7 +68,14 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Email y contraseña son requeridos.' });
     }
     
-    const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    // Verificar conexión a BD antes de consultar
+    let rows;
+    try {
+      [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    } catch (dbError) {
+      console.error('❌ Database error in login:', dbError.message);
+      return res.status(500).json({ message: 'Error de conexión a la base de datos. Intente más tarde.' });
+    }
     
     if (rows.length === 0) {
       return res.status(401).json({ message: 'Credenciales inválidas.' });
@@ -98,7 +105,7 @@ router.post('/login', async (req, res) => {
     
     res.json({ message: 'Bienvenido', token });
   } catch (err) { 
-    console.error('❌ Login error:', err);
+    console.error('❌ Login error:', err.message);
     res.status(500).json({ message: 'Error interno del servidor.' }); 
   }
 });
