@@ -483,8 +483,21 @@ async function closeRoute() {
     });
 
     if (result.isConfirmed) {
+        // Mostrar loading mientras se procesa
+        Swal.fire({
+            title: 'Procesando...',
+            text: 'Generando resumen de cierre de ruta',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
         try {
             const data = await apiFetch('/api/credits/route-closure', { method: 'POST' });
+            
             if (data) {
                 await Swal.fire({
                     title: '¡Ruta Cerrada!',
@@ -500,7 +513,12 @@ async function closeRoute() {
                 });
             }
         } catch (error) {
-            Swal.fire('Error', error.message, 'error');
+            console.error('Error cerrando ruta:', error);
+            Swal.fire({
+                title: 'Error',
+                text: error.message || 'No se pudo cerrar la ruta. Verifica tu conexión o intenta más tarde.',
+                icon: 'error'
+            });
         }
     }
 }
