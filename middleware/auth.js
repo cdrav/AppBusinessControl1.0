@@ -1,13 +1,23 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.warn('⚠️  ADVERTENCIA: JWT_SECRET no está definido en .env. Usando clave por defecto (NO USAR EN PRODUCCIÓN)');
+}
+const SECRET_KEY = JWT_SECRET || 'dev_secret_change_in_production_' + Date.now();
+
+function getJwtSecret() {
+  return SECRET_KEY;
+}
+
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) return res.status(401).json({ message: 'Autenticación requerida.' });
 
-  jwt.verify(token, process.env.JWT_SECRET || 'secreto_super_seguro', (err, user) => {
+  jwt.verify(token, SECRET_KEY, (err, user) => {
     if (err) return res.status(403).json({ message: 'Sesión no válida o expirada.' });
     req.user = user;
     req.userRole = user.role;
@@ -34,11 +44,7 @@ function authorizeSpecificRole(requiredRole) {
       req.userRole = requiredRole;
       next();
     } else {
-      res.status(403).json({ 
-        message: `Acceso denegado. Se requiere rol: ${requiredRole}`,
-        requiredRole: requiredRole,
-        currentUserRole: userRole
-      });
+      res.status(403).json({ message: 'No tienes permisos suficientes.' });
     }
   };
 }
@@ -51,11 +57,7 @@ function authorizeRoles(allowedRoles) {
       req.userRole = userRole;
       next();
     } else {
-      res.status(403).json({ 
-        message: 'No tienes permisos suficientes.',
-        allowedRoles: allowedRoles,
-        currentUserRole: userRole
-      });
+      res.status(403).json({ message: 'No tienes permisos suficientes.' });
     }
   };
 }
@@ -64,5 +66,6 @@ module.exports = {
   authenticateToken, 
   authorizeRole, 
   authorizeSpecificRole,
-  authorizeRoles 
+  authorizeRoles,
+  getJwtSecret
 };

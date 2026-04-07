@@ -373,6 +373,8 @@ function updateSummary() {
   
   // Recalcular cambio si cambia el total
   calculateChange();
+  // Recalcular display de crédito si está activo
+  updateCreditTotalDisplay();
 }
 
 function calculateChange() {
@@ -396,11 +398,53 @@ document.querySelector('.remove-product').addEventListener('click', function() {
   }
 });
 
+// Función global para actualizar display de crédito
+function updateCreditTotalDisplay() {
+  const isCreditCheckbox = document.getElementById('isCredit');
+  const initialPaymentInput = document.getElementById('initialPayment');
+  const isCredit = isCreditCheckbox?.checked || false;
+  const totalElement = document.getElementById('total');
+  const totalValue = parseFloat(totalElement?.dataset?.value) || 0;
+  const initialPayment = parseFloat(initialPaymentInput?.value) || 0;
+  const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  
+  // Manejar el desglose de crédito
+  let creditBreakdown = document.getElementById('creditBreakdown');
+  
+  if (isCredit && totalValue > 0) {
+    const remaining = Math.max(0, totalValue - initialPayment);
+    
+    if (!creditBreakdown) {
+      // Crear sección de desglose si no existe
+      creditBreakdown = document.createElement('div');
+      creditBreakdown.id = 'creditBreakdown';
+      creditBreakdown.className = 'mt-2 p-3 bg-primary bg-opacity-10 rounded border border-primary border-opacity-25';
+      const totalContainer = document.querySelector('.summary-item.total');
+      if (totalContainer) totalContainer.after(creditBreakdown);
+    }
+    
+    creditBreakdown.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="text-muted small">Total de la Venta:</span>
+        <span class="fw-bold">${formatCurrency(totalValue)}</span>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="text-muted small">Pago Inicial:</span>
+        <span class="fw-bold text-success">${formatCurrency(initialPayment)}</span>
+      </div>
+      <div class="d-flex justify-content-between align-items-center pt-1 border-top">
+        <span class="fw-bold small">Saldo a Financiar:</span>
+        <span class="fw-bold fs-5 text-primary">${formatCurrency(remaining)}</span>
+      </div>
+    `;
+    creditBreakdown.style.display = 'block';
+  } else if (creditBreakdown) {
+    creditBreakdown.style.display = 'none';
+  }
+}
+
 // Event listener para checkbox de crédito
 document.addEventListener('DOMContentLoaded', function() {
-  // ... código existente ...
-  
-  // Agregar listener para mostrar/ocultar detalles de crédito y sección de pago
   const isCreditCheckbox = document.getElementById('isCredit');
   const creditDetails = document.getElementById('creditDetails');
   const cashPaymentSection = document.getElementById('cashPaymentSection');
@@ -419,33 +463,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // Actualizar total cuando cambie el pago inicial
   if (initialPaymentInput) {
     initialPaymentInput.addEventListener('input', updateCreditTotalDisplay);
-  }
-  
-  function updateCreditTotalDisplay() {
-    const isCredit = isCreditCheckbox?.checked || false;
-    const totalElement = document.getElementById('total');
-    const totalValue = parseFloat(totalElement?.dataset?.value) || 0;
-    const initialPayment = parseFloat(initialPaymentInput?.value) || 0;
-    
-    if (isCredit && initialPayment > 0) {
-      const remaining = Math.max(0, totalValue - initialPayment);
-      // Mostrar saldo a financiar en el total
-      totalElement.textContent = '$' + remaining.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      totalElement.style.color = '#0d6efd'; // Azul para indicar que es saldo financiado
-      
-      // Agregar indicador visual
-      const totalLabel = document.querySelector('.summary-item.total span:first-child');
-      if (totalLabel) totalLabel.textContent = 'Saldo a Financiar:';
-    } else {
-      // Restaurar total normal
-      totalElement.textContent = '$' + totalValue.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      totalElement.style.color = '';
-      const totalLabel = document.querySelector('.summary-item.total span:first-child');
-      if (totalLabel) totalLabel.textContent = 'Total a Pagar:';
-    }
   }
 });
 

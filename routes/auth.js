@@ -3,7 +3,35 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, getJwtSecret } = require('../middleware/auth');
+
+// Rate limiting en memoria para login
+const loginAttempts = new Map();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutos
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+  if (!record || now - record.firstAttempt > WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now });
+    return true;
+  }
+  record.count++;
+  return record.count <= MAX_ATTEMPTS;
+}
+
+function resetRateLimit(ip) {
+  loginAttempts.delete(ip);
+}
+
+// Limpiar registros expirados cada 30 min
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of loginAttempts) {
+    if (now - record.firstAttempt > WINDOW_MS) loginAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000);
 
 router.post('/register', async (req, res) => {
   try {
@@ -24,32 +52,37 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    console.log('🔐 Login attempt:', { body: req.body });
+    const clientIp = req.ip || req.connection.remoteAddress;
+    
+    // Rate limiting
+    if (!checkRateLimit(clientIp)) {
+      const record = loginAttempts.get(clientIp);
+      const waitMin = Math.ceil((WINDOW_MS - (Date.now() - record.firstAttempt)) / 60000);
+      return res.status(429).json({ message: `Demasiados intentos. Intenta de nuevo en ${waitMin} minutos.` });
+    }
     
     const { email, password } = req.body;
     
     // Validación básica
     if (!email || !password) {
-      console.log('❌ Missing credentials');
       return res.status(400).json({ message: 'Email y contraseña son requeridos.' });
     }
     
-    console.log('🔍 Searching user:', email);
     const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
     
     if (rows.length === 0) {
-      console.log('❌ User not found:', email);
       return res.status(401).json({ message: 'Credenciales inválidas.' });
     }
 
     const user = rows[0];
-    console.log('👤 User found:', { id: user.id, username: user.username });
     
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      console.log('❌ Invalid password for:', email);
       return res.status(401).json({ message: 'Credenciales inválidas.' });
     }
+
+    // Login exitoso: resetear rate limit
+    resetRateLimit(clientIp);
 
     const token = jwt.sign(
       { 
@@ -59,15 +92,14 @@ router.post('/login', async (req, res) => {
         branch_id: user.branch_id || 1,
         tenant_id: user.tenant_id || 1
       }, 
-      process.env.JWT_SECRET || 'secreto_super_seguro', 
+      getJwtSecret(), 
       { expiresIn: '8h' }
     );
     
-    console.log('✅ Login successful:', email);
     res.json({ message: 'Bienvenido', token });
   } catch (err) { 
     console.error('❌ Login error:', err);
-    res.status(500).json({ message: 'Error interno del servidor.', error: err.message }); 
+    res.status(500).json({ message: 'Error interno del servidor.' }); 
   }
 });
 

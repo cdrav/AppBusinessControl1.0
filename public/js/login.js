@@ -35,6 +35,14 @@ document.getElementById('loginForm').addEventListener('submit', async function (
 
     const data = await response.json();
 
+    if (response.status === 429) {
+      // Rate limit alcanzado
+      messageDiv.innerHTML = `<div class="alert alert-warning"><i class="bi bi-shield-exclamation me-2"></i><strong>Acceso bloqueado:</strong> ${data.message}</div>`;
+      submitBtn.disabled = true;
+      setTimeout(() => { submitBtn.disabled = false; }, 60000);
+      return;
+    }
+
     // Mostrar el mensaje en la UI
     messageDiv.innerHTML = `<div class="alert alert-${response.ok ? 'success' : 'danger'}">${data.message}</div>`;
 

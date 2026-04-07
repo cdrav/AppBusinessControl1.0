@@ -12,10 +12,11 @@ const { recordLog } = require('../services/auditService');
 
 // Registrar Venta
 router.post('/', authenticateToken, async (req, res) => {
-    let { clientId, products, saleDate, couponCode, notes, branchId, isCredit, initialPayment } = req.body;
+    let { clientId, products, saleDate, couponCode, notes, branchId, initialPayment } = req.body;
+    // Aceptar ambos formatos: is_credit (frontend) e isCredit (camelCase)
+    let isCredit = req.body.is_credit || req.body.isCredit || false;
     
-    // DEBUG: Verificar qué se recibe del frontend
-    console.log(`[DEBUG POST /sales] isCredit: ${isCredit}, initialPayment: ${initialPayment}, type: ${typeof isCredit}`);
+    console.log(`[DEBUG POST /sales] isCredit: ${isCredit}, initialPayment: ${initialPayment}`);
     
     // Lógica de Sede:
     // Si NO es admin, forzamos la sede asignada al usuario (seguridad).
@@ -60,11 +61,10 @@ router.post('/', authenticateToken, async (req, res) => {
         
         if (isCredit) {
             const payment = parseFloat(initialPayment) || 0;
-            const debt = finalPrice - payment;
-            console.log(`[DEBUG] Credit sale - finalPrice: ${finalPrice}, initialPayment: ${initialPayment}, payment: ${payment}, debt: ${debt}`);
-            // Establecemos la primera cuota en 30 días por defecto
+            const remainingBalance = Math.max(0, finalPrice - payment);
+            console.log(`[DEBUG] Credit sale - finalPrice: ${finalPrice}, payment: ${payment}, remainingBalance: ${remainingBalance}`);
             await conn.query('INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, initial_payment, next_payment_date, collected_by) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), ?)', 
-            [req.user.tenant_id, sale.insertId, clientId, debt, debt, payment, req.user.id]);
+            [req.user.tenant_id, sale.insertId, clientId, finalPrice, remainingBalance, payment, req.user.id]);
         }
 
         for (const d of details) {
@@ -106,9 +106,17 @@ router.post('/', authenticateToken, async (req, res) => {
     } catch (e) { if(conn) await conn.rollback(); res.status(500).json({ message: e.message }); } finally { if(conn) conn.release(); }
 });
 
-// Obtener Ventas
+// Obtener Ventas (con paginación)
 router.get('/', authenticateToken, async (req, res) => {
     try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+        const offset = (page - 1) * limit;
+
+        const [[{ total }]] = await db.query(
+            'SELECT COUNT(*) as total FROM sales WHERE tenant_id = ?', [req.user.tenant_id]
+        );
+
         const [rows] = await db.query(`
             SELECT s.id, c.name AS client_name, c.email as client_email, s.total_price, s.sale_date, 
                    s.is_credit, cr.total_debt, cr.remaining_balance, cr.initial_payment
@@ -117,8 +125,9 @@ router.get('/', authenticateToken, async (req, res) => {
             LEFT JOIN credits cr ON s.id = cr.sale_id
             WHERE s.tenant_id = ? 
             ORDER BY s.sale_date DESC
-        `, [req.user.tenant_id]);
-        res.json(rows);
+            LIMIT ? OFFSET ?
+        `, [req.user.tenant_id, limit, offset]);
+        res.json({ data: rows, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
     } catch (error) {
         console.error('Error al obtener ventas:', error.message);
         res.status(500).json({ message: 'Error al obtener ventas' });
@@ -126,6 +135,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
 // Generar Ticket PDF
 router.get('/:id/ticket', authenticateToken, async (req, res) => {
+  try {
     const [settings] = await db.query('SELECT * FROM settings WHERE tenant_id = ?', [req.user.tenant_id]);
     const config = settings[0] || { company_name: 'Business Control', company_address: '', company_phone: '', company_email: '' };
     const [sale] = await db.query(`SELECT s.*, c.name as client_name, c.address as client_address, c.phone as client_phone, c.email as client_email FROM sales s LEFT JOIN clients c ON s.client_id=c.id WHERE s.id=? AND s.tenant_id=?`, [req.params.id, req.user.tenant_id]);
@@ -135,29 +145,37 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
     const [details] = await db.query(`SELECT i.product_name, sd.quantity, sd.subtotal, (sd.subtotal/sd.quantity) as unit_price FROM sale_details sd LEFT JOIN inventory i ON sd.product_id=i.id WHERE sd.sale_id=? AND sd.tenant_id=?`, [req.params.id, req.user.tenant_id]);
 
     const isThermal = config.ticket_format === '80mm';
-    // Thermal width approx 226 points (80mm). Height auto-expands usually, but we set a large one.
-    const doc = new PDFDocument(isThermal ? { margin: 10, size: [226, 1000] } : { margin: 50, size: 'A4' });
     
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename=ticket_${sale[0].id}.pdf`);
-    doc.pipe(res);
-
     // --- ESTILOS Y FORMATO ---
     const formatCurrency = (amount) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
-    const divider = () => {
-        doc.moveDown(0.5);
-        doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).strokeColor('#aaaaaa').stroke();
-        doc.moveDown(0.5);
-    };
 
     if (isThermal) {
+        // Calcular altura dinámica: base + líneas de productos
+        const baseHeight = 220; // header + footer + total + márgenes
+        const lineHeight = 14;
+        const productLines = details.length;
+        const clientLine = sale[0].client_name ? 12 : 0;
+        const addressLines = (config.company_address ? 10 : 0) + (config.company_phone ? 10 : 0);
+        const calculatedHeight = baseHeight + (productLines * lineHeight) + clientLine + addressLines;
+        
+        const doc = new PDFDocument({ margin: 10, size: [226, calculatedHeight] });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename=ticket_${sale[0].id}.pdf`);
+        doc.pipe(res);
+
+        const divider = () => {
+            doc.moveDown(0.3);
+            doc.moveTo(10, doc.y).lineTo(216, doc.y).strokeColor('#aaaaaa').stroke();
+            doc.moveDown(0.3);
+        };
+
         // --- FORMATO TÉRMICO (80mm) ---
         if (config.company_logo) {
              const logoPath = path.join(__dirname, '../public', config.company_logo);
              if (fs.existsSync(logoPath)) {
                  try {
                      doc.image(logoPath, { fit: [100, 50], align: 'center' });
-                     doc.moveDown(0.5);
+                     doc.moveDown(0.3);
                  } catch (error) {
                      console.error('Error al cargar el logo en ticket térmico:', error.message);
                  }
@@ -167,11 +185,11 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
         doc.fontSize(7).font('Helvetica');
         if(config.company_address) doc.text(config.company_address, { align: 'center' });
         if(config.company_phone) doc.text(`Tel: ${config.company_phone}`, { align: 'center' });
-        doc.moveDown();
+        doc.moveDown(0.5);
         
         doc.fontSize(8).text(`Ticket: #${sale[0].id}`, { align: 'center' });
         doc.text(`Fecha: ${new Date(sale[0].sale_date).toLocaleString()}`, { align: 'center' });
-        doc.moveDown();
+        doc.moveDown(0.3);
         
         if (sale[0].client_name) {
             doc.text(`Cliente: ${sale[0].client_name}`, { align: 'left' });
@@ -190,23 +208,29 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
         doc.text(`TOTAL:`, { continued: true });
         doc.text(formatCurrency(sale[0].total_price), { align: 'right' });
         
-        doc.moveDown();
+        doc.moveDown(0.5);
         doc.fontSize(7).font('Helvetica').text('¡Gracias por su compra!', { align: 'center' });
-        doc.text(`© ${new Date().getFullYear()} Business Control - Desarrollado por Cristian David Ruiz. Todos los derechos reservados.`, { align: 'center' });
+        doc.fontSize(6).text(`© ${new Date().getFullYear()} Business Control`, { align: 'center' });
+        doc.end();
 
     } else {
         // --- FORMATO A4 (Factura Formal) ---
+        const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename=ticket_${sale[0].id}.pdf`);
+        doc.pipe(res);
+
         let headerX = 50;
         if (config.company_logo) {
-             const logoPath = path.join(__dirname, '../public', config.company_logo);
-             if (fs.existsSync(logoPath)) {
-                 try {
-                     doc.image(logoPath, 50, 45, { width: 50 });
-                     headerX = 110;
-                 } catch (error) {
-                     console.error('Error al cargar el logo en ticket A4:', error.message);
-                 }
-             }
+            const logoPath = path.join(__dirname, '../public', config.company_logo);
+            if (fs.existsSync(logoPath)) {
+                try {
+                    doc.image(logoPath, 50, 45, { width: 50 });
+                    headerX = 110;
+                } catch (error) {
+                    console.error('Error al cargar el logo en ticket A4:', error.message);
+                }
+            }
         }
 
         doc.fontSize(20).font('Helvetica-Bold').text(config.company_name, headerX, 50);
@@ -235,32 +259,33 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
 
         let y = tableTop + 25;
         
-        // Función para controlar el salto de página
         const checkAddPage = (currentY) => {
-            if (currentY > 750) { // Si nos acercamos al final de la página A4
+            if (currentY > 750) {
                 doc.addPage();
-                return 50; // Reiniciar Y al margen superior
+                return 50;
             }
             return currentY;
         };
 
         doc.fillColor('#000').font('Helvetica');
         details.forEach((d, i) => {
-            y = checkAddPage(y); // Verificar espacio antes de escribir
-            
+            y = checkAddPage(y);
             if (i % 2 === 1) doc.rect(50, y - 5, 500, 20).fill('#f9f9f9');
             doc.fillColor('#000').text(d.product_name, 60, y).text(d.quantity, 300, y, { width: 40, align: 'center' }).text(formatCurrency(d.unit_price), 350, y, { width: 70, align: 'right' }).text(formatCurrency(d.subtotal), 430, y, { width: 110, align: 'right' });
             y += 20;
         });
         
-        y = checkAddPage(y + 20); // Verificar espacio para el total
+        y = checkAddPage(y + 20);
         doc.fontSize(12).font('Helvetica-Bold').text(`TOTAL: ${formatCurrency(sale[0].total_price)}`, 430, y, { width: 110, align: 'right' });
         
         doc.moveDown(2);
         doc.fontSize(8).font('Helvetica').text(`© ${new Date().getFullYear()} Business Control - Desarrollado por Cristian David Ruiz. Todos los derechos reservados.`, { align: 'center' });
+        doc.end();
     }
-
-    doc.end();
+  } catch (error) {
+    console.error('Error generando ticket PDF:', error);
+    res.status(500).json({ message: 'Error al generar el ticket' });
+  }
 });
 
 // Enviar Ticket por Email

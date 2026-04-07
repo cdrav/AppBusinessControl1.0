@@ -22,6 +22,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Inicializar autenticación unificada
     initAuth('Dashboard', function(payload) {
+        // Si es cobrador, redirigir a su panel de cobros
+        if (payload.role === 'cobrador') {
+            window.location.href = 'cobros.html';
+            return;
+        }
         // Solo cargar tarjetas de sedes si estamos en la vista global
         if (!branchId) loadBranchCards(); 
         loadDashboardStats('7days', branchId);

@@ -9,6 +9,8 @@
 
 import { apiFetch, API_URL } from './api.js';
 let allSales = [];
+let currentPage = 1;
+let totalPages = 1;
 
 document.addEventListener('DOMContentLoaded', function() {
   loadSales();
@@ -25,20 +27,28 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-async function loadSales() {
+async function loadSales(page = 1) {
   const loadingState = document.getElementById('loadingState');
   const emptyState = document.getElementById('emptyState');
   const table = document.getElementById('salesTable');
   
   try {
-    const data = await apiFetch('/sales');
-    if (!data) return;
+    const response = await apiFetch(`/sales?page=${page}&limit=50`);
+    if (!response) return;
 
-    allSales = data;
+    // Soportar respuesta paginada y array directo
+    const sales = response.data || response;
+    const pagination = response.pagination || null;
+    
+    allSales = sales;
+    if (pagination) {
+      currentPage = pagination.page;
+      totalPages = pagination.pages;
+    }
     
     loadingState.style.display = 'none';
     
-    if (allSales.length === 0) {
+    if (allSales.length === 0 && currentPage === 1) {
       emptyState.style.display = 'block';
       table.style.display = 'none';
     } else {
@@ -46,11 +56,53 @@ async function loadSales() {
       table.style.display = 'table';
       renderSalesTable(allSales);
       updateStats(allSales);
+      if (pagination) renderPagination(pagination);
     }
   } catch (error) {
     console.error('Error:', error);
     loadingState.innerHTML = '<div class="alert alert-danger">Error al cargar el historial de ventas.</div>';
   }
+}
+
+function renderPagination(pagination) {
+  let container = document.getElementById('salesPagination');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'salesPagination';
+    container.className = 'pagination-container d-flex justify-content-between align-items-center mt-3 px-3 pb-3';
+    const table = document.getElementById('salesTable');
+    table.parentElement.appendChild(container);
+  }
+
+  const { page, pages, total } = pagination;
+  if (pages <= 1) { container.innerHTML = ''; return; }
+
+  container.innerHTML = `
+    <span class="text-muted small">${total} ventas en total</span>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item ${page <= 1 ? 'disabled' : ''}">
+          <a class="page-link" href="#" data-page="${page - 1}">&laquo;</a>
+        </li>
+        ${Array.from({length: Math.min(pages, 5)}, (_, i) => {
+          const start = Math.max(1, Math.min(page - 2, pages - 4));
+          const p = start + i;
+          return p <= pages ? `<li class="page-item ${p === page ? 'active' : ''}"><a class="page-link" href="#" data-page="${p}">${p}</a></li>` : '';
+        }).join('')}
+        <li class="page-item ${page >= pages ? 'disabled' : ''}">
+          <a class="page-link" href="#" data-page="${page + 1}">&raquo;</a>
+        </li>
+      </ul>
+    </nav>
+  `;
+
+  container.querySelectorAll('.page-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const p = parseInt(e.target.dataset.page);
+      if (p >= 1 && p <= pages) loadSales(p);
+    });
+  });
 }
 
 function renderSalesTable(sales) {

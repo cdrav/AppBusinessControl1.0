@@ -193,31 +193,36 @@ router.get('/receipt/:paymentId', authenticateToken, async (req, res) => {
         if (!payment.length) return res.status(404).send('Recibo no encontrado');
 
         const data = payment[0];
-        const doc = new PDFDocument({ margin: 10, size: [226, 450] }); // Formato 80mm
+        const formatCurrency = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+
+        // Altura dinámica para recibo térmico 80mm
+        const receiptHeight = 200;
+        const doc = new PDFDocument({ margin: 10, size: [226, receiptHeight] });
         
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename=recibo_abono_${data.id}.pdf`);
         doc.pipe(res);
-
-        const formatCurrency = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
         doc.fontSize(10).font('Helvetica-Bold').text(data.company_name || 'Business Control', { align: 'center' });
         doc.fontSize(8).font('Helvetica').text('COMPROBANTE DE ABONO', { align: 'center' });
-        doc.moveDown();
+        doc.moveDown(0.3);
 
+        doc.fontSize(7);
         doc.text(`Recibo: #A-${data.id}`);
         doc.text(`Fecha: ${new Date(data.payment_date).toLocaleString('es-CO')}`);
         doc.text(`Cobrador: ${data.collector_name}`);
-        doc.moveTo(10, doc.y + 5).lineTo(216, doc.y + 5).stroke();
-        doc.moveDown();
+        doc.moveDown(0.2);
+        doc.moveTo(10, doc.y).lineTo(216, doc.y).strokeColor('#aaa').stroke();
+        doc.moveDown(0.2);
 
-        doc.fontSize(9).text(`Cliente: ${data.client_name}`);
-        doc.moveDown();
-        doc.fontSize(12).font('Helvetica-Bold').text(`MONTO: ${formatCurrency(data.amount)}`, { align: 'center' });
-        doc.moveDown(0.5);
-        doc.fontSize(9).font('Helvetica').text(`Saldo Restante: ${formatCurrency(data.remaining_balance)}`, { align: 'right' });
+        doc.fontSize(8).text(`Cliente: ${data.client_name}`);
+        doc.moveDown(0.3);
+        doc.fontSize(12).font('Helvetica-Bold').text(`${formatCurrency(data.amount)}`, { align: 'center' });
+        doc.moveDown(0.2);
+        doc.fontSize(8).font('Helvetica').text(`Saldo Restante: ${formatCurrency(data.remaining_balance)}`, { align: 'right' });
         
-        doc.moveDown(2);
-        doc.fontSize(7).text('Conserve este recibo como soporte.', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(6).text('Conserve este recibo como soporte.', { align: 'center' });
         doc.end();
 
     } catch (error) {
@@ -271,6 +276,28 @@ router.post('/route-closure', authenticateToken, async (req, res) => {
     }
 });
 
+// Asignar cobrador a un crédito (Admin)
+router.put('/:creditId/assign', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+  try {
+    const { collectorId } = req.body;
+    const creditId = req.params.creditId;
+
+    const [result] = await db.query(
+      'UPDATE credits SET collected_by = ? WHERE id = ? AND tenant_id = ?',
+      [collectorId || null, creditId, req.user.tenant_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Crédito no encontrado' });
+    }
+
+    res.json({ message: 'Cobrador asignado correctamente' });
+  } catch (error) {
+    console.error('Error assigning collector:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
 // Obtener detalles de un crédito específico
 router.get('/:creditId', authenticateToken, async (req, res) => {
   try {
@@ -293,7 +320,7 @@ router.get('/:creditId', authenticateToken, async (req, res) => {
     const [payments] = await db.query(`
       SELECT cp.*, u.username as collected_by_username
       FROM credit_payments cp
-      LEFT JOIN users u ON cp.collected_by = u.id
+      LEFT JOIN users u ON cp.collector_id = u.id
       WHERE cp.credit_id = ? AND cp.tenant_id = ?
       ORDER BY cp.payment_date DESC
     `, [creditId, req.user.tenant_id]);

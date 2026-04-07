@@ -453,12 +453,15 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             docRef.moveTo(50, docRef.page.height - 50).lineTo(545, docRef.page.height - 50).strokeColor('#cccccc').stroke();
             docRef.text(`Generado el ${new Date().toLocaleString('es-CO')}`, 50, docRef.page.height - 40, { lineBreak: false });
             docRef.text(`Página ${currentPage} de ${totalPages}`, 0, docRef.page.height - 40, { align: 'center', width: 595, lineBreak: false });
-            docRef.text('© Business Control System', 0, docRef.page.height - 40, { align: 'right', width: 545, lineBreak: false });
+            docRef.text(' Business Control System', 0, docRef.page.height - 40, { align: 'right', width: 545, lineBreak: false });
         };
 
+        const PAGE_BOTTOM = 750;
+
         const checkAddPage = (neededHeight) => {
-            if (doc.y + neededHeight > 700) {
+            if (doc.y + neededHeight > PAGE_BOTTOM) {
                 doc.addPage();
+                drawHeader();
                 return true;
             }
             return false;
@@ -476,9 +479,6 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             doc.font('Helvetica').fontSize(8).fillColor('#000');
         };
 
-        // Evento: dibujar header en cada nueva página
-        doc.on('pageAdded', () => { drawHeader(); });
-
         // Dibujar header en la primera página
         drawHeader();
 
@@ -486,7 +486,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         // SECCIÓN DE VENTAS
         // ============================================================
         if (['sales', 'profits', 'complete'].includes(type) && salesData.length > 0) {
-            checkAddPage(60);
+            checkAddPage(80);
             doc.fontSize(12).font('Helvetica-Bold').fillColor('#2563eb').text('Detalle de Ventas', 50, doc.y, { lineBreak: false });
             doc.fillColor('#000');
             doc.y += 18;
@@ -524,7 +524,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         // SECCIÓN DE GASTOS
         // ============================================================
         if (['profits', 'complete'].includes(type) && expensesData.length > 0) {
-            checkAddPage(60);
+            checkAddPage(80);
             doc.fontSize(12).font('Helvetica-Bold').fillColor('#dc3545').text('Detalle de Gastos', 50, doc.y, { lineBreak: false });
             doc.fillColor('#000');
             doc.y += 18;
@@ -577,7 +577,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         // SECCIÓN DE INVENTARIO
         // ============================================================
         if (['inventory', 'complete'].includes(type) && inventoryData.length > 0) {
-            checkAddPage(60);
+            checkAddPage(80);
             doc.fontSize(12).font('Helvetica-Bold').fillColor('#28a745').text('Inventario', 50, doc.y, { lineBreak: false });
             doc.fillColor('#000');
             doc.y += 18;
@@ -617,7 +617,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         // SECCIÓN DE CLIENTES
         // ============================================================
         if (['clients', 'complete'].includes(type) && clientsData.length > 0) {
-            checkAddPage(60);
+            checkAddPage(80);
             doc.fontSize(12).font('Helvetica-Bold').fillColor('#ffc107').text('Clientes', 50, doc.y, { lineBreak: false });
             doc.fillColor('#000');
             doc.y += 18;
@@ -650,10 +650,8 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         }
 
         // ============================================================
-        // FOOTER: Remover listener antes del loop para evitar páginas en blanco
+        // FOOTER
         // ============================================================
-        doc.removeAllListeners('pageAdded');
-
         const range = doc.bufferedPageRange();
         const totalPages = range.count;
         for (let i = range.start; i < range.start + range.count; i++) {

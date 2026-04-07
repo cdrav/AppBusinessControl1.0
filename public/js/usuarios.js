@@ -22,6 +22,8 @@ async function loadUsers() {
                 roleBadge = '<span class="badge bg-primary">Admin</span>';
             } else if (user.role === 'cobrador') {
                 roleBadge = '<span class="badge bg-warning text-dark">Cobrador</span>';
+            } else if (user.role === 'supervisor') {
+                roleBadge = '<span class="badge bg-info text-dark">Supervisor</span>';
             }
             
             const branchName = user.branch_name ? `<span class="text-dark"><i class="bi bi-shop me-1"></i>${user.branch_name}</span>` : '<span class="text-muted fst-italic">Sin asignar</span>';

@@ -24,6 +24,9 @@ router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) =>
   }
 });
 
+// Roles válidos del sistema
+const VALID_ROLES = Object.values(ROLES);
+
 // Crear nuevo usuario (solo admin)
 router.post('/', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, res) => {
   try {
@@ -31,6 +34,14 @@ router.post('/', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, re
     
     if (!username || !email || !password) {
       return res.status(400).json({ message: 'Todos los campos son obligatorios' });
+    }
+
+    if (!VALID_ROLES.includes(role)) {
+      return res.status(400).json({ message: `Rol inválido. Roles permitidos: ${VALID_ROLES.join(', ')}` });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'La contraseña debe tener mínimo 6 caracteres' });
     }
     
     // Verificar si el usuario ya existe
@@ -84,6 +95,9 @@ router.put('/:id', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, 
     }
     
     if (role) {
+      if (!VALID_ROLES.includes(role)) {
+        return res.status(400).json({ message: `Rol inválido. Roles permitidos: ${VALID_ROLES.join(', ')}` });
+      }
       updateFields.push('role = ?');
       updateValues.push(role);
     }

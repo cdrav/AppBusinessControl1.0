@@ -1,10 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const cron = require('node-cron');
 const { sendDailySummaryEmail } = require('./services/emailService');
 const db = require('./config/db');
+const { sanitizeBody } = require('./middleware/sanitize');
 
 const app = express();
 
@@ -19,7 +21,32 @@ app.use((req, res, next) => {
   });
 });
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cors());
+
+// Seguridad: Headers HTTP
+app.use(helmet({
+  contentSecurityPolicy: false, // Desactivar CSP para permitir CDNs de Bootstrap/SweetAlert
+  crossOriginEmbedderPolicy: false
+}));
+
+// CORS restringido
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Permitir peticiones sin origin (mismo servidor, Postman, curl)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Origen no permitido por CORS'));
+    }
+  },
+  credentials: true
+}));
+
+// Sanitización global de inputs
+app.use(sanitizeBody);
 
 // Servir archivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
