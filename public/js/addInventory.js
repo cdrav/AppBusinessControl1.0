@@ -1,6 +1,4 @@
 // Add Inventory Page JavaScript
-const API_URL = ''; // Ruta relativa para producción
-
 // Importar autenticación unificada
 import { getValidToken, initAuth } from './auth-unified.js';
 import { apiFetch, API_URL } from './api.js';

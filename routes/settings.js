@@ -59,8 +59,13 @@ router.delete('/suppliers/:id', authenticateToken, authorizeRole(['admin']), asy
 
 // Cupones
 router.get('/coupons', authenticateToken, async (req, res) => {
-    const [c] = await db.query('SELECT * FROM coupons WHERE tenant_id = ? ORDER BY created_at DESC', [req.user.tenant_id]);
-    res.json(c);
+    try {
+        const [c] = await db.query('SELECT * FROM coupons WHERE tenant_id = ? ORDER BY created_at DESC', [req.user.tenant_id]);
+        res.json(c);
+    } catch (error) {
+        console.error('Error al obtener cupones:', error.message);
+        res.status(500).json({ message: 'Error al obtener cupones' });
+    }
 });
 router.post('/coupons', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     const { code, discount_type, value, expiration_date } = req.body;

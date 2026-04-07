@@ -100,6 +100,37 @@ cron.schedule('0 20 * * *', async () => {
     }
 }, { scheduled: true, timezone: "America/Bogota" });
 
+// Auto-migración: verificar columnas críticas al arrancar
+async function ensureDatabaseSchema() {
+  const alterations = [
+    { table: 'branches', column: 'is_active', sql: 'ALTER TABLE branches ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
+    { table: 'credits', column: 'initial_payment', sql: 'ALTER TABLE credits ADD COLUMN initial_payment DECIMAL(10,2) DEFAULT 0' },
+    { table: 'credits', column: 'status', sql: "ALTER TABLE credits ADD COLUMN status ENUM('pending','active','partial','paid') DEFAULT 'pending'" },
+    { table: 'credits', column: 'collected_by', sql: 'ALTER TABLE credits ADD COLUMN collected_by INT DEFAULT NULL' },
+    { table: 'credits', column: 'next_payment_date', sql: 'ALTER TABLE credits ADD COLUMN next_payment_date DATE DEFAULT NULL' },
+    { table: 'sales', column: 'is_credit', sql: 'ALTER TABLE sales ADD COLUMN is_credit BOOLEAN DEFAULT FALSE' },
+    { table: 'sales', column: 'notes', sql: 'ALTER TABLE sales ADD COLUMN notes TEXT' },
+    { table: 'sales', column: 'discount', sql: 'ALTER TABLE sales ADD COLUMN discount DECIMAL(10,2) DEFAULT 0' },
+    { table: 'sales', column: 'coupon_code', sql: 'ALTER TABLE sales ADD COLUMN coupon_code VARCHAR(50)' },
+    { table: 'inventory', column: 'cost', sql: 'ALTER TABLE inventory ADD COLUMN cost DECIMAL(10,2) DEFAULT 0' },
+    { table: 'inventory', column: 'barcode', sql: 'ALTER TABLE inventory ADD COLUMN barcode VARCHAR(100)' },
+    { table: 'inventory', column: 'supplier_id', sql: 'ALTER TABLE inventory ADD COLUMN supplier_id INT DEFAULT NULL' },
+  ];
+
+  for (const alt of alterations) {
+    try {
+      const [cols] = await db.query(`SHOW COLUMNS FROM ${alt.table} LIKE '${alt.column}'`);
+      if (cols.length === 0) {
+        await db.query(alt.sql);
+        console.log(`  ✅ Auto-migración: ${alt.table}.${alt.column} agregada`);
+      }
+    } catch (err) {
+      // Table might not exist yet, ignore
+      console.log(`  ⚠️ Auto-migración ${alt.table}.${alt.column}: ${err.message}`);
+    }
+  }
+}
+
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
@@ -110,6 +141,9 @@ app.listen(PORT, async () => {
   try {
     await db.query('SELECT 1');
     console.log('✅ Conexión a base de datos verificada');
+    // Ejecutar auto-migración
+    await ensureDatabaseSchema();
+    console.log('✅ Esquema de base de datos verificado');
   } catch (error) {
     console.error('❌ Error conectando a la base de datos:', error.message);
   }

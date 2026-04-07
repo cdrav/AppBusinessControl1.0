@@ -12,6 +12,7 @@ const TABLES_SQL = [
     name VARCHAR(255) NOT NULL,
     address TEXT,
     phone VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE,
     tenant_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_tenant_branches (tenant_id)
@@ -218,6 +219,7 @@ const ALTER_COLUMNS = [
   { table: 'credits', column: 'collected_by', sql: 'ALTER TABLE credits ADD COLUMN collected_by INT DEFAULT NULL' },
   { table: 'credits', column: 'next_payment_date', sql: 'ALTER TABLE credits ADD COLUMN next_payment_date DATE DEFAULT NULL' },
   { table: 'credits', column: 'created_at', sql: 'ALTER TABLE credits ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
+  { table: 'branches', column: 'is_active', sql: 'ALTER TABLE branches ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
 ];
 
 async function run() {

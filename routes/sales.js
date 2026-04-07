@@ -108,17 +108,21 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // Obtener Ventas
 router.get('/', authenticateToken, async (req, res) => {
-    const [rows] = await db.query(`
-        SELECT s.id, c.name AS client_name, c.email as client_email, s.total_price, s.sale_date, 
-               s.is_credit, cr.total_debt, cr.remaining_balance, cr.initial_payment
-        FROM sales s 
-        LEFT JOIN clients c ON s.client_id = c.id 
-        LEFT JOIN credits cr ON s.id = cr.sale_id
-        WHERE s.tenant_id = ? 
-        ORDER BY s.sale_date DESC
-    `, [req.user.tenant_id]);
-    res.json(rows);
-});
+    try {
+        const [rows] = await db.query(`
+            SELECT s.id, c.name AS client_name, c.email as client_email, s.total_price, s.sale_date, 
+                   s.is_credit, cr.total_debt, cr.remaining_balance, cr.initial_payment
+            FROM sales s 
+            LEFT JOIN clients c ON s.client_id = c.id 
+            LEFT JOIN credits cr ON s.id = cr.sale_id
+            WHERE s.tenant_id = ? 
+            ORDER BY s.sale_date DESC
+        `, [req.user.tenant_id]);
+        res.json(rows);
+    } catch (error) {
+        console.error('Error al obtener ventas:', error.message);
+        res.status(500).json({ message: 'Error al obtener ventas' });
+    }});
 
 // Generar Ticket PDF
 router.get('/:id/ticket', authenticateToken, async (req, res) => {
@@ -280,25 +284,30 @@ router.post('/:id/ticket/email', authenticateToken, async (req, res) => {
 
 // Detalles de venta
 router.get('/:id/details', authenticateToken, async (req, res) => {
-    const [saleInfo] = await db.query(`
-        SELECT s.sale_date, s.total_price, s.is_credit, s.discount, 
-               cr.initial_payment, cr.remaining_balance, cr.total_debt
-        FROM sales s
-        LEFT JOIN credits cr ON s.id = cr.sale_id
-        WHERE s.id = ? AND s.tenant_id = ?
-    `, [req.params.id, req.user.tenant_id]);
-    
-    const [details] = await db.query(`
-        SELECT i.product_name, sd.quantity, sd.subtotal, i.price as unit_price 
-        FROM sale_details sd 
-        LEFT JOIN inventory i ON sd.product_id=i.id 
-        WHERE sd.sale_id=? AND sd.tenant_id=?
-    `, [req.params.id, req.user.tenant_id]);
-    
-    res.json({
-        sale: saleInfo[0] || null,
-        products: details
-    });
+    try {
+        const [saleInfo] = await db.query(`
+            SELECT s.sale_date, s.total_price, s.is_credit, s.discount, 
+                   cr.initial_payment, cr.remaining_balance, cr.total_debt
+            FROM sales s
+            LEFT JOIN credits cr ON s.id = cr.sale_id
+            WHERE s.id = ? AND s.tenant_id = ?
+        `, [req.params.id, req.user.tenant_id]);
+        
+        const [details] = await db.query(`
+            SELECT i.product_name, sd.quantity, sd.subtotal, i.price as unit_price 
+            FROM sale_details sd 
+            LEFT JOIN inventory i ON sd.product_id=i.id 
+            WHERE sd.sale_id=? AND sd.tenant_id=?
+        `, [req.params.id, req.user.tenant_id]);
+        
+        res.json({
+            sale: saleInfo[0] || null,
+            products: details
+        });
+    } catch (error) {
+        console.error('Error al obtener detalles de venta:', error.message);
+        res.status(500).json({ message: 'Error al obtener detalles de venta' });
+    }
 });
 
 // Eliminar Venta (Admin)
