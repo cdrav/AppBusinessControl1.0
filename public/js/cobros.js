@@ -496,27 +496,49 @@ async function closeRoute() {
         });
 
         try {
-            const data = await apiFetch('/api/credits/route-closure', { method: 'POST' });
+            // Timeout de 10 segundos máximo
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
             
-            if (data) {
+            const data = await apiFetch('/api/credits/route-closure', { 
+                method: 'POST',
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            // Siempre cerrar el loading antes de mostrar resultado
+            Swal.close();
+            
+            if (data && data.summary) {
                 await Swal.fire({
                     title: '¡Ruta Cerrada!',
                     html: `
                         <div class="text-center mt-3">
-                            <p class="mb-1"><strong>Cobros realizados:</strong> ${data.summary.collections_count}</p>
-                            <p class="fs-4 fw-bold text-success">${formatCOP(data.summary.total_collected)}</p>
+                            <p class="mb-1"><strong>Cobros realizados:</strong> ${data.summary.collections_count || 0}</p>
+                            <p class="fs-4 fw-bold text-success">${formatCOP(data.summary.total_collected || 0)}</p>
                             <hr>
                             <p class="small text-muted">Registrado en auditoría del sistema.</p>
                         </div>
                     `,
                     icon: 'success'
                 });
+            } else {
+                throw new Error('Respuesta inválida del servidor');
             }
         } catch (error) {
+            // Asegurar que el loading se cierre
+            Swal.close();
+            
             console.error('Error cerrando ruta:', error);
-            Swal.fire({
+            
+            const errorMessage = error.name === 'AbortError' 
+                ? 'La operación tardó demasiado. Intenta nuevamente.'
+                : (error.message || 'No se pudo cerrar la ruta. Verifica tu conexión.');
+            
+            await Swal.fire({
                 title: 'Error',
-                text: error.message || 'No se pudo cerrar la ruta. Verifica tu conexión o intenta más tarde.',
+                text: errorMessage,
                 icon: 'error'
             });
         }
