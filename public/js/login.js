@@ -1,7 +1,8 @@
-// Login Page JavaScript
+// Login Page JavaScript - v1.0.1
 import { apiFetch, API_URL } from './api.js';
 
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('Login.js loaded successfully');
   if (localStorage.getItem('token')) {
     window.location.href = 'dashboard.html';
   }
