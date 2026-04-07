@@ -5,6 +5,7 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 const { authenticateToken } = require('../middleware/auth');
+const { sendDailySummaryEmail } = require('../services/emailService');
 
 // Estadísticas del Dashboard
 router.get('/dashboard-stats', authenticateToken, async (req, res) => {
@@ -712,6 +713,27 @@ router.get('/branch-stats', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error en /api/branch-stats:', error);
         res.status(500).json({ message: 'Error interno del servidor al obtener estadísticas de sedes' });
+    }
+});
+
+// Enviar resumen diario por correo
+router.post('/send-daily-summary', authenticateToken, async (req, res) => {
+    try {
+        const { date } = req.body;
+        if (!date) {
+            return res.status(400).json({ message: 'Fecha requerida' });
+        }
+
+        // Verificar configuración de email
+        if (!process.env.EMAIL_USER) {
+            return res.status(500).json({ message: 'Configuración de correo no disponible' });
+        }
+
+        const result = await sendDailySummaryEmail(date);
+        res.json({ message: result });
+    } catch (error) {
+        console.error('Error enviando resumen por correo:', error);
+        res.status(500).json({ message: error.message || 'Error al enviar el correo' });
     }
 });
 
