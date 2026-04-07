@@ -14,6 +14,9 @@ const { recordLog } = require('../services/auditService');
 router.post('/', authenticateToken, async (req, res) => {
     let { clientId, products, saleDate, couponCode, notes, branchId, isCredit, initialPayment } = req.body;
     
+    // DEBUG: Verificar qué se recibe del frontend
+    console.log(`[DEBUG POST /sales] isCredit: ${isCredit}, initialPayment: ${initialPayment}, type: ${typeof isCredit}`);
+    
     // Lógica de Sede:
     // Si NO es admin, forzamos la sede asignada al usuario (seguridad).
     if (req.user.role !== 'admin') {
@@ -36,7 +39,7 @@ router.post('/', authenticateToken, async (req, res) => {
         let total = 0, details = [], lowStock = [];
 
         for (const p of products) {
-            const [rows] = await conn.query(`SELECT i.product_name, i.price, COALESCE(bs.stock, 0) as stock FROM inventory i LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ? WHERE i.id = ? AND i.tenant_id = ? FOR UPDATE`, [branchId, req.user.tenant_id, p.productId, req.user.tenant_id]);
+            const [rows] = await conn.query(`SELECT i.product_name, i.price, COALESCE(bs.stock, i.stock, 0) as stock FROM inventory i LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ? WHERE i.id = ? AND i.tenant_id = ? FOR UPDATE`, [branchId, req.user.tenant_id, p.productId, req.user.tenant_id]);
             if (!rows.length || rows[0].stock < p.quantity) throw new Error(`Stock insuficiente: ${rows[0]?.product_name || 'Producto'}`);
             
             if (rows[0].price <= 0) throw new Error(`El producto ${rows[0].product_name} tiene un precio inválido ($${rows[0].price}).`);
@@ -56,17 +59,32 @@ router.post('/', authenticateToken, async (req, res) => {
         const [sale] = await conn.query('INSERT INTO sales (tenant_id, client_id, branch_id, total_price, discount, coupon_code, sale_date, notes, is_credit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())', [req.user.tenant_id, clientId, branchId, finalPrice, discount, couponCode, saleDate || new Date(), notes, isCredit || false]);
         
         if (isCredit) {
-            const debt = finalPrice - (initialPayment || 0);
+            const payment = parseFloat(initialPayment) || 0;
+            const debt = finalPrice - payment;
+            console.log(`[DEBUG] Credit sale - finalPrice: ${finalPrice}, initialPayment: ${initialPayment}, payment: ${payment}, debt: ${debt}`);
             // Establecemos la primera cuota en 30 días por defecto
-            await conn.query('INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, next_payment_date, collected_by) VALUES (?, ?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), ?)', 
-            [req.user.tenant_id, sale.insertId, clientId, debt, debt, req.user.id]);
+            await conn.query('INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, initial_payment, next_payment_date, collected_by) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), ?)', 
+            [req.user.tenant_id, sale.insertId, clientId, debt, debt, payment, req.user.id]);
         }
 
         for (const d of details) {
             await conn.query('INSERT INTO sale_details (tenant_id, sale_id, product_id, quantity, subtotal) VALUES (?, ?, ?, ?, ?)', [req.user.tenant_id, sale.insertId, d.productId, d.quantity, d.subtotal]);
-            await conn.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id=? AND branch_id=? AND tenant_id=?', [d.quantity, d.productId, branchId, req.user.tenant_id]);
+            
+            // Verificar si existe registro en branch_stocks
+            const [existing] = await conn.query('SELECT stock FROM branch_stocks WHERE product_id=? AND branch_id=? AND tenant_id=?', [d.productId, branchId, req.user.tenant_id]);
+            
+            if (existing.length > 0) {
+                // Actualizar stock existente
+                await conn.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id=? AND branch_id=? AND tenant_id=?', [d.quantity, d.productId, branchId, req.user.tenant_id]);
+            } else {
+                // Crear nuevo registro con stock de inventory menos cantidad vendida
+                const [invRows] = await conn.query('SELECT stock FROM inventory WHERE id=? AND tenant_id=?', [d.productId, req.user.tenant_id]);
+                const initialStock = invRows.length > 0 ? invRows[0].stock : 0;
+                await conn.query('INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?)', [req.user.tenant_id, branchId, d.productId, initialStock - d.quantity]);
+            }
+            
             // Recalcular el stock global para mantener la consistencia
-            await conn.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(stock), 0) FROM branch_stocks WHERE product_id = ? AND tenant_id = ?) WHERE id = ? AND tenant_id = ?', [d.productId, req.user.tenant_id, d.productId, req.user.tenant_id]);
+            await conn.query('UPDATE inventory SET stock = (SELECT COALESCE(SUM(bs_stock), 0) FROM (SELECT stock as bs_stock FROM branch_stocks WHERE product_id = ? AND tenant_id = ?) as bs_sum) WHERE id = ? AND tenant_id = ?', [d.productId, req.user.tenant_id, d.productId, req.user.tenant_id]);
             const [stk] = await conn.query('SELECT bs.stock, i.product_name FROM branch_stocks bs JOIN inventory i ON bs.product_id=i.id WHERE bs.product_id=? AND bs.branch_id=? AND bs.tenant_id=?', [d.productId, branchId, req.user.tenant_id]);
             if (stk.length > 0 && stk[0].stock < 5) lowStock.push({ name: stk[0].product_name, stock: stk[0].stock });
         }
@@ -90,7 +108,15 @@ router.post('/', authenticateToken, async (req, res) => {
 
 // Obtener Ventas
 router.get('/', authenticateToken, async (req, res) => {
-    const [rows] = await db.query(`SELECT s.id, c.name AS client_name, c.email as client_email, s.total_price, s.sale_date FROM sales s LEFT JOIN clients c ON s.client_id = c.id WHERE s.tenant_id = ? ORDER BY s.sale_date DESC`, [req.user.tenant_id]);
+    const [rows] = await db.query(`
+        SELECT s.id, c.name AS client_name, c.email as client_email, s.total_price, s.sale_date, 
+               s.is_credit, cr.total_debt, cr.remaining_balance, cr.initial_payment
+        FROM sales s 
+        LEFT JOIN clients c ON s.client_id = c.id 
+        LEFT JOIN credits cr ON s.id = cr.sale_id
+        WHERE s.tenant_id = ? 
+        ORDER BY s.sale_date DESC
+    `, [req.user.tenant_id]);
     res.json(rows);
 });
 
@@ -254,8 +280,25 @@ router.post('/:id/ticket/email', authenticateToken, async (req, res) => {
 
 // Detalles de venta
 router.get('/:id/details', authenticateToken, async (req, res) => {
-    const [details] = await db.query(`SELECT i.product_name, sd.quantity, sd.subtotal, i.price as unit_price FROM sale_details sd LEFT JOIN inventory i ON sd.product_id=i.id WHERE sd.sale_id=? AND sd.tenant_id=?`, [req.params.id, req.user.tenant_id]);
-    res.json(details);
+    const [saleInfo] = await db.query(`
+        SELECT s.sale_date, s.total_price, s.is_credit, s.discount, 
+               cr.initial_payment, cr.remaining_balance, cr.total_debt
+        FROM sales s
+        LEFT JOIN credits cr ON s.id = cr.sale_id
+        WHERE s.id = ? AND s.tenant_id = ?
+    `, [req.params.id, req.user.tenant_id]);
+    
+    const [details] = await db.query(`
+        SELECT i.product_name, sd.quantity, sd.subtotal, i.price as unit_price 
+        FROM sale_details sd 
+        LEFT JOIN inventory i ON sd.product_id=i.id 
+        WHERE sd.sale_id=? AND sd.tenant_id=?
+    `, [req.params.id, req.user.tenant_id]);
+    
+    res.json({
+        sale: saleInfo[0] || null,
+        products: details
+    });
 });
 
 // Eliminar Venta (Admin)

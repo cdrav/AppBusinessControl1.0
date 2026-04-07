@@ -267,3 +267,4 @@ function escapeHTML(str) {
 
 // Exportar funciones para onclick handlers
 window.deleteClient = deleteClient;
+window.editClient = editClient;

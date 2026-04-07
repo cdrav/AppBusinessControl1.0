@@ -5,16 +5,28 @@ const clientId = params.get('id');
 
 // Función para cargar los datos del cliente
 function loadClientData() {
+  if (!clientId) {
+    console.error('No se encontró ID de cliente en la URL');
+    showToast('Error: No se especificó un cliente para editar', true);
+    return;
+  }
+  
+  console.log('Cargando cliente con ID:', clientId);
+  
   fetch(`${API_URL}/clients/${clientId}`, {
     headers: {
       'Authorization': 'Bearer ' + localStorage.getItem('token'),
     },
   })
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) throw new Error('Error en la respuesta: ' + response.status);
+      return response.json();
+    })
     .then(client => {
-      document.getElementById('name').value = client.name;
-      document.getElementById('email').value = client.email;
-      document.getElementById('phone').value = client.phone;
+      console.log('Datos recibidos:', client);
+      document.getElementById('name').value = client.name || '';
+      document.getElementById('email').value = client.email || '';
+      document.getElementById('phone').value = client.phone || '';
     })
     .catch(error => {
       console.error('Error al cargar los datos del cliente:', error);
@@ -61,5 +73,5 @@ document.getElementById('editClientForm').addEventListener('submit', function (e
   });
 });
 
-// Cargar los datos del cliente al cargar la página
-window.onload = loadClientData;
+// Cargar los datos del cliente cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', loadClientData);

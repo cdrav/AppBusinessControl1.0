@@ -21,6 +21,12 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, r
     await db.query('DELETE FROM clients WHERE id=? AND tenant_id=?', [req.params.id, req.user.tenant_id]);
     res.json({ message: 'Cliente eliminado' });
 });
+router.get('/:id', authenticateToken, async (req, res) => {
+    const [c] = await db.query('SELECT * FROM clients WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
+    if (c.length === 0) return res.status(404).json({ message: 'Cliente no encontrado' });
+    res.json(c[0]);
+});
+
 router.get('/:id/sales', authenticateToken, async (req, res) => {
     const [sales] = await db.query(`SELECT s.id, s.sale_date, s.total_price, COUNT(sd.id) as item_count FROM sales s LEFT JOIN sale_details sd ON s.id = sd.sale_id WHERE s.client_id = ? AND s.tenant_id = ? GROUP BY s.id ORDER BY s.sale_date DESC`, [req.params.id, req.user.tenant_id]);
     res.json(sales);

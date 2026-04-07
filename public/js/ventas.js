@@ -67,6 +67,21 @@ function renderSalesTable(sales) {
     const statusBadge = sale.is_credit ? 
         '<span class="badge bg-warning text-dark rounded-pill">Crédito</span>' : 
         '<span class="badge bg-success bg-opacity-10 text-success rounded-pill">Completado</span>';
+    
+    // Mostrar información de crédito si aplica
+    let creditInfo = '';
+    if (sale.is_credit) {
+      const totalPrice = parseFloat(sale.total_price) || 0;
+      const initialPayment = parseFloat(sale.initial_payment) || 0;
+      const remaining = parseFloat(sale.remaining_balance) || (totalPrice - initialPayment);
+      const paid = initialPayment;
+      creditInfo = `
+        <div class="small mt-1">
+          <span class="text-muted">Pago Inicial: <strong class="text-success">${formatCOP(paid)}</strong></span>
+          <span class="text-muted ms-2">Saldo: <strong class="text-danger">${formatCOP(remaining)}</strong></span>
+        </div>
+      `;
+    }
 
     const row = `
       <tr class="fade-in">
@@ -84,7 +99,7 @@ function renderSalesTable(sales) {
             <i class="bi bi-list-ul me-1"></i> Ver detalles
           </button>
         </td>
-        <td class="fw-bold text-success">${formatCOP(parseFloat(sale.total_price))}</td>
+        <td class="fw-bold text-success">${formatCOP(parseFloat(sale.total_price))}${creditInfo}</td>
         <td class="text-muted small">${date}</td>
         <td>${statusBadge}</td>
         <td>
@@ -243,15 +258,49 @@ window.viewSaleDetails = async function(saleId) {
 
         if (!response.ok) throw new Error('No se pudieron cargar los detalles.');
 
-        const details = await response.json();
+        const data = await response.json();
+        const sale = data.sale;
+        const details = data.products;
 
         const formatCOP = (amount) => amount.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        
+        // Formatear fecha
+        const saleDate = sale ? new Date(sale.sale_date).toLocaleDateString('es-ES', {
+            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : 'N/A';
+
+        let html = `
+            <div class="mb-3 pb-2 border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Fecha de Venta:</span>
+                    <span class="fw-bold">${saleDate}</span>
+                </div>
+                ${sale && sale.is_credit ? `
+                <div class="mt-2 p-2 bg-warning bg-opacity-10 rounded">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Total Venta:</span>
+                        <span class="fw-bold">${formatCOP(sale.total_price)}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted">Pago Inicial:</span>
+                        <span class="fw-bold text-success">${formatCOP(sale.initial_payment || 0)}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1 pt-1 border-top">
+                        <span class="fw-bold">Saldo por Pagar:</span>
+                        <span class="fw-bold text-danger">${formatCOP(sale.remaining_balance || 0)}</span>
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+
         if (details.length === 0) {
-            modalBody.innerHTML = '<p class="text-muted text-center p-4">No hay productos detallados para esta venta.</p>';
+            html += '<p class="text-muted text-center p-4">No hay productos detallados para esta venta.</p>';
+            modalBody.innerHTML = html;
             return;
         }
 
-        let tableHtml = `
+        html += `
             <table class="table table-sm table-striped">
                 <thead>
                     <tr>
@@ -268,7 +317,7 @@ window.viewSaleDetails = async function(saleId) {
             const unitPrice = parseFloat(item.unit_price) || 0;
             const subtotal = parseFloat(item.subtotal) || 0;
             total += subtotal;
-            tableHtml += `
+            html += `
                 <tr>
                     <td>${item.product_name || 'Producto no encontrado'}</td>
                     <td class="text-center">${item.quantity}</td>
@@ -278,13 +327,13 @@ window.viewSaleDetails = async function(saleId) {
             `;
         });
 
-        tableHtml += `
+        html += `
                 </tbody>
             </table>
-            <div class="text-end mt-3 fs-5 fw-bold text-dark">Total Verificado: <span class="text-success">${formatCOP(total)}</span></div>
+            <div class="text-end mt-3 fs-5 fw-bold text-dark">Total: <span class="text-success">${formatCOP(total)}</span></div>
         `;
 
-        modalBody.innerHTML = tableHtml;
+        modalBody.innerHTML = html;
 
     } catch (error) {
         modalBody.innerHTML = `<p class="text-danger text-center p-4">${error.message}</p>`;

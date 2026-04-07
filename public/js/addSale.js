@@ -29,7 +29,10 @@ function injectSuccessModal() {
     <div class="modal fade" id="saleSuccessModal" tabindex="-1" aria-labelledby="saleSuccessModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
-          <div class="modal-body text-center p-4 p-lg-5">
+          <div class="modal-header border-0 pb-0">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="goToDashboard()"></button>
+          </div>
+          <div class="modal-body text-center p-4 p-lg-5 pt-0">
             <div class="mb-4">
                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-success">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/>
@@ -51,13 +54,18 @@ function injectSuccessModal() {
 
             <div class="d-grid gap-2 mt-4">
                 <button type="button" class="btn btn-primary" onclick="window.location.href='ventas.html'">Ver Historial de Ventas</button>
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" onclick="resetSaleForm()">Registrar Nueva Venta</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" onclick="goToDashboard()">Cerrar</button>
             </div>
           </div>
         </div>
       </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Agregar función para redirigir al dashboard
+    window.goToDashboard = function() {
+        window.location.href = 'dashboard.html';
+    };
 }
 
 // Función para resetear el formulario desde el modal
@@ -392,14 +400,52 @@ document.querySelector('.remove-product').addEventListener('click', function() {
 document.addEventListener('DOMContentLoaded', function() {
   // ... código existente ...
   
-  // Agregar listener para mostrar/ocultar detalles de crédito
+  // Agregar listener para mostrar/ocultar detalles de crédito y sección de pago
   const isCreditCheckbox = document.getElementById('isCredit');
   const creditDetails = document.getElementById('creditDetails');
+  const cashPaymentSection = document.getElementById('cashPaymentSection');
+  const initialPaymentInput = document.getElementById('initialPayment');
   
-  if (isCreditCheckbox && creditDetails) {
+  if (isCreditCheckbox && creditDetails && cashPaymentSection) {
     isCreditCheckbox.addEventListener('change', function() {
-      creditDetails.style.display = this.checked ? 'block' : 'none';
+      const isCredit = this.checked;
+      creditDetails.style.display = isCredit ? 'block' : 'none';
+      cashPaymentSection.style.display = isCredit ? 'none' : 'block';
+      if (isCredit) {
+        document.getElementById('amountPaid').value = '';
+        document.getElementById('changeAmount').textContent = '$0';
+      }
+      updateCreditTotalDisplay();
     });
+  }
+  
+  // Actualizar total cuando cambie el pago inicial
+  if (initialPaymentInput) {
+    initialPaymentInput.addEventListener('input', updateCreditTotalDisplay);
+  }
+  
+  function updateCreditTotalDisplay() {
+    const isCredit = isCreditCheckbox?.checked || false;
+    const totalElement = document.getElementById('total');
+    const totalValue = parseFloat(totalElement?.dataset?.value) || 0;
+    const initialPayment = parseFloat(initialPaymentInput?.value) || 0;
+    
+    if (isCredit && initialPayment > 0) {
+      const remaining = Math.max(0, totalValue - initialPayment);
+      // Mostrar saldo a financiar en el total
+      totalElement.textContent = '$' + remaining.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      totalElement.style.color = '#0d6efd'; // Azul para indicar que es saldo financiado
+      
+      // Agregar indicador visual
+      const totalLabel = document.querySelector('.summary-item.total span:first-child');
+      if (totalLabel) totalLabel.textContent = 'Saldo a Financiar:';
+    } else {
+      // Restaurar total normal
+      totalElement.textContent = '$' + totalValue.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      totalElement.style.color = '';
+      const totalLabel = document.querySelector('.summary-item.total span:first-child');
+      if (totalLabel) totalLabel.textContent = 'Total a Pagar:';
+    }
   }
 });
 
@@ -432,12 +478,13 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     return;
   }
 
-  // Validar Monto Recibido (Obligatorio)
+  // Validar Monto Recibido solo si NO es venta a crédito
+  const isCreditSale = document.getElementById('isCredit')?.checked || false;
   const total = parseFloat(document.getElementById('total').dataset.value) || 0;
-  const amountPaid = parseFloat(document.getElementById('amountPaid').value);
+  const amountPaid = parseFloat(document.getElementById('amountPaid').value) || 0;
 
-  if (isNaN(amountPaid) || amountPaid < total) {
-      showToast('El monto recibido es obligatorio y debe cubrir el total.', true);
+  if (!isCreditSale && (isNaN(amountPaid) || amountPaid < total)) {
+      showToast('El monto recibido es obligatorio y debe cubrir el total para ventas de contado.', true);
       document.getElementById('amountPaid').focus();
       return;
   }
@@ -468,11 +515,40 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     
     if (data) {
       const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      const change = Math.max(0, amountPaid - total);
+      const isCreditSale = document.getElementById('isCredit')?.checked || false;
+      const initialPayment = parseFloat(document.getElementById('initialPayment')?.value) || 0;
       
-      // Ahora podemos llamar al modal directamente y con seguridad.
-      document.getElementById('modalTotalPaid').textContent = formatCurrency(total);
-      document.getElementById('modalChange').textContent = formatCurrency(change);
+      // Actualizar contenido del modal según tipo de venta
+      const modalContent = document.querySelector('#saleSuccessModal .bg-light.p-3');
+      if (isCreditSale) {
+        const remaining = total - initialPayment;
+        modalContent.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted">Total Venta:</span>
+                <span class="fw-bold fs-5">${formatCurrency(total)}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <span class="text-muted">Pago Inicial:</span>
+                <span class="fw-bold fs-5 text-success">${formatCurrency(initialPayment)}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                <span class="fw-bold">Saldo a Financiar:</span>
+                <span class="fw-bold fs-4 text-primary">${formatCurrency(remaining)}</span>
+            </div>
+        `;
+      } else {
+        const change = Math.max(0, amountPaid - total);
+        modalContent.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted">Total Pagado:</span>
+                <span class="fw-bold fs-5">${formatCurrency(total)}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <span class="text-muted">Cambio a devolver:</span>
+                <span class="fw-bold fs-5 text-primary">${formatCurrency(change)}</span>
+            </div>
+        `;
+      }
       
       const successModalEl = document.getElementById('saleSuccessModal');
       const successModal = bootstrap.Modal.getOrCreateInstance(successModalEl);

@@ -174,6 +174,8 @@ async function loadDashboardStats(period = '7days', branchId = null) {
         const totalCreditsEl = document.getElementById('totalCredits');
         const totalExpensesEl = document.getElementById('totalExpenses');
         const lowStockCountEl = document.getElementById('lowStockCount');
+        const todaySalesCountEl = document.getElementById('todaySalesCount');
+        const todaySalesAmountEl = document.getElementById('todaySalesAmount');
 
         if (totalRevenueEl) totalRevenueEl.textContent = formatCOP(stats.totalRevenue);
         if (totalSalesEl) totalSalesEl.textContent = stats.totalSales || 0;
@@ -181,6 +183,8 @@ async function loadDashboardStats(period = '7days', branchId = null) {
         if (totalCreditsEl) totalCreditsEl.textContent = formatCOP(stats.totalCredits);
         if (totalExpensesEl) totalExpensesEl.textContent = formatCOP(stats.totalExpenses);
         if (lowStockCountEl) lowStockCountEl.textContent = stats.lowStockCount || 0;
+        if (todaySalesCountEl) todaySalesCountEl.textContent = stats.todaySalesCount || stats.totalSales || 0;
+        if (todaySalesAmountEl) todaySalesAmountEl.textContent = formatCOP(stats.todaySalesAmount || stats.totalRevenue);
 
     } catch (error) {
         console.error('Error loading dashboard stats:', error);
@@ -350,12 +354,18 @@ async function fetchDailySummary(date, branchId = null) {
 
         const formatCOP = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(val || 0));
 
-        // Actualizar modal
-        document.getElementById('summaryDate').value = date;
-        document.getElementById('totalCash').textContent = formatCOP(data.totalCash);
-        document.getElementById('totalCredit').textContent = formatCOP(data.totalCredit);
-        document.getElementById('totalExpenses').textContent = formatCOP(data.totalExpenses);
-        document.getElementById('netCash').textContent = formatCOP(data.netCash);
+        // Actualizar modal (con verificación de existencia)
+        const summaryDateEl = document.getElementById('summaryDate');
+        const totalCashEl = document.getElementById('totalCash');
+        const totalCreditEl = document.getElementById('totalCredit');
+        const totalExpensesEl = document.getElementById('totalExpenses');
+        const netCashEl = document.getElementById('netCash');
+        
+        if (summaryDateEl) summaryDateEl.value = date;
+        if (totalCashEl) totalCashEl.textContent = formatCOP(data.totalCash);
+        if (totalCreditEl) totalCreditEl.textContent = formatCOP(data.totalCredit);
+        if (totalExpensesEl) totalExpensesEl.textContent = formatCOP(data.totalExpenses);
+        if (netCashEl) netCashEl.textContent = formatCOP(data.netCash);
 
     } catch (error) {
         console.error('Error fetching daily summary:', error);
