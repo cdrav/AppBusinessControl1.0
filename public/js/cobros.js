@@ -472,6 +472,8 @@ window.assignCollector = async (creditId, collectorId) => {
 // ==================== CERRAR RUTA ====================
 
 async function closeRoute() {
+    console.log('[closeRoute] Iniciando...');
+    
     const result = await Swal.fire({
         title: '¿Cerrar ruta del día?',
         text: 'Se generará un resumen de tu recaudo total de hoy.',
@@ -483,6 +485,21 @@ async function closeRoute() {
     });
 
     if (result.isConfirmed) {
+        console.log('[closeRoute] Usuario confirmó');
+        
+        // Verificar token antes de continuar
+        const token = localStorage.getItem('token');
+        console.log('[closeRoute] Token existe:', !!token);
+        if (!token) {
+            await Swal.fire({
+                title: 'Sesión expirada',
+                text: 'Por favor inicia sesión nuevamente',
+                icon: 'warning'
+            });
+            window.location.href = '/login.html';
+            return;
+        }
+        
         // Mostrar loading mientras se procesa
         Swal.fire({
             title: 'Procesando...',
@@ -495,10 +512,24 @@ async function closeRoute() {
             }
         });
 
+        // Timeout de seguridad: cerrar loading después de 8 segundos máximo
+        const safetyTimeout = setTimeout(() => {
+            console.log('[closeRoute] Timeout de seguridad activado');
+            Swal.close();
+            Swal.fire({
+                title: 'Tiempo agotado',
+                text: 'La operación tardó demasiado. El servidor puede estar ocupado.',
+                icon: 'warning'
+            });
+        }, 8000);
+
         try {
-            console.log('[closeRoute] Enviando petición...');
+            console.log('[closeRoute] Enviando petición POST /api/credits/route-closure...');
+            
             const data = await apiFetch('/api/credits/route-closure', { method: 'POST' });
-            console.log('[closeRoute] Respuesta:', data);
+            
+            clearTimeout(safetyTimeout);
+            console.log('[closeRoute] Respuesta recibida:', data);
             
             // Siempre cerrar el loading antes de mostrar resultado
             Swal.close();
@@ -517,9 +548,11 @@ async function closeRoute() {
                     icon: 'success'
                 });
             } else {
-                throw new Error('Respuesta inválida del servidor');
+                throw new Error('Respuesta inválida del servidor: ' + JSON.stringify(data));
             }
         } catch (error) {
+            clearTimeout(safetyTimeout);
+            
             // Asegurar que el loading se cierre
             Swal.close();
             
