@@ -744,14 +744,17 @@ router.post('/send-daily-summary', authenticateToken, async (req, res) => {
             return res.status(400).json({ message: 'Fecha requerida' });
         }
 
-        // Verificar configuración de email
-        if (!isEmailConfigured()) {
-            return res.status(503).json({ 
-                message: 'Servicio de correo no configurado. Configure las variables EMAIL_USER y EMAIL_PASS en Railway.' 
+        // Obtener email de la empresa desde settings
+        const [settings] = await db.query('SELECT company_email FROM settings WHERE tenant_id = ?', [req.user.tenant_id]);
+        const recipientEmail = settings[0]?.company_email;
+        
+        if (!recipientEmail) {
+            return res.status(400).json({ 
+                message: 'No hay correo configurado. Configure el correo de la empresa en Configuración > Datos de la Empresa.' 
             });
         }
 
-        const result = await sendDailySummaryEmail(date);
+        const result = await sendDailySummaryEmail(date, recipientEmail);
         res.json({ message: result });
     } catch (error) {
         console.error('Error enviando resumen por correo:', error);

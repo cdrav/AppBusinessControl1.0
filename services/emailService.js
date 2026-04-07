@@ -28,9 +28,9 @@ async function sendLowStockAlert(products) {
     }
 }
 
-async function sendDailySummaryEmail(date) {
+async function sendDailySummaryEmail(date, recipientEmail) {
     if (!date) throw new Error('Fecha requerida');
-    if (!isEmailConfigured()) throw new Error('Configuración de correo incompleta. Configure EMAIL_USER y EMAIL_PASS en las variables de entorno.');
+    if (!recipientEmail) throw new Error('Correo destinatario requerido');
     
     const startDate = new Date(date); startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(date); endDate.setHours(23, 59, 59, 999);
@@ -44,12 +44,20 @@ async function sendDailySummaryEmail(date) {
 
     try {
         await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER,
+            from: process.env.EMAIL_USER || 'noreply@businesscontrol.com',
+            to: recipientEmail,
             subject: `Cierre de Caja - ${formattedDate}`,
-            html: `<h1>Resumen del Día</h1><p>Ventas: <strong>${summary.totalSales}</strong></p><p>Ingresos: <strong>$${parseFloat(summary.totalRevenue).toFixed(2)}</strong></p>`
+            html: `
+                <h1>Resumen del Día - Business Control</h1>
+                <p><strong>Fecha:</strong> ${formattedDate}</p>
+                <hr>
+                <p><strong>Ventas realizadas:</strong> ${summary.totalSales}</p>
+                <p><strong>Ingresos totales:</strong> $${parseFloat(summary.totalRevenue).toFixed(2)}</p>
+                <hr>
+                <p style="color: #666; font-size: 12px;">Generado automáticamente por Business Control</p>
+            `
         });
-        return `Resumen enviado a ${process.env.EMAIL_USER}`;
+        return `Resumen enviado a ${recipientEmail}`;
     } catch (error) {
         console.error('❌ Error enviando email:', error.message);
         throw new Error(`Error al enviar correo: ${error.message}`);
