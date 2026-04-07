@@ -31,16 +31,28 @@ app.use(helmet({
 // CORS restringido
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:8080'];
+
+// Siempre permitir orígenes de Railway (*.railway.app)
+const isRailwayOrigin = (origin) => {
+  return origin && (origin.includes('.railway.app') || origin.includes('railway'));
+};
 
 app.use(cors({
   origin: function(origin, callback) {
     // Permitir peticiones sin origin (mismo servidor, Postman, curl)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Origen no permitido por CORS'));
+    if (!origin) return callback(null, true);
+    
+    // Permitir orígenes de Railway automáticamente
+    if (isRailwayOrigin(origin)) return callback(null, true);
+    
+    // Permitir orígenes configurados
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    
+    console.log(`❌ CORS bloqueado: ${origin}`);
+    callback(new Error('Origen no permitido por CORS'));
   },
   credentials: true
 }));
