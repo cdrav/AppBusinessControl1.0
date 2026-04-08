@@ -99,7 +99,7 @@
                   <i class="bi bi-eye" id="toggleIcon1"></i>
                 </span>
               </div>
-              <div id="passwordStrengthBar" class="auth-password-strength"></div>
+              <div id="passwordStrength" class="auth-password-strength"></div>
             </div>
             
             <div class="mb-3">
@@ -160,7 +160,7 @@
     // Password strength indicator
     document.getElementById('password').addEventListener('input', function() {
       const password = this.value;
-      const strengthBar = document.getElementById('passwordStrengthBar');
+      const strengthBar = document.getElementById('passwordStrength');
       
       if (password.length === 0) {
         strengthBar.className = 'auth-password-strength';
