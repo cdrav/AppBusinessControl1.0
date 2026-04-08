@@ -123,4 +123,133 @@ router.put('/profile/change-password', authenticateToken, async (req, res) => {
     res.json({ message: 'Contraseña actualizada.' });
 });
 
+// ========================================
+// PASSWORD RECOVERY ENDPOINTS
+// ========================================
+
+// Generar token de recuperación
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: 'Email requerido.' });
+
+        // Verificar que el usuario existe
+        const [users] = await db.query('SELECT id, email, username FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            // Por seguridad, no revelar si el email existe o no
+            return res.json({ message: 'Si el email existe, recibirás instrucciones.' });
+        }
+
+        const user = users[0];
+
+        // Generar token único (6 dígitos para desarrollo, JWT para producción)
+        const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
+        const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+        // Guardar token en tabla password_resets (o crear tabla si no existe)
+        try {
+            await db.query(
+                'INSERT INTO password_resets (email, token, expires_at, created_at) VALUES (?, ?, ?, NOW())',
+                [email, resetToken, tokenExpiry]
+            );
+        } catch (tableError) {
+            // Si la tabla no existe, intentar crearla
+            if (tableError.code === 'ER_NO_SUCH_TABLE') {
+                await db.query(`CREATE TABLE IF NOT EXISTS password_resets (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    email VARCHAR(255) NOT NULL,
+                    token VARCHAR(255) NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    used BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_email (email),
+                    INDEX idx_token (token)
+                )`);
+                await db.query(
+                    'INSERT INTO password_resets (email, token, expires_at, created_at) VALUES (?, ?, ?, NOW())',
+                    [email, resetToken, tokenExpiry]
+                );
+            } else {
+                throw tableError;
+            }
+        }
+
+        // En desarrollo, mostrar token en consola
+        console.log(`\n🔐 PASSWORD RESET TOKEN para ${email}: ${resetToken}\n`);
+
+        // TODO: En producción, enviar email aquí
+        // await sendResetEmail(email, resetToken, user.username);
+
+        res.json({ 
+            message: 'Si el email existe, recibirás instrucciones.',
+            // Solo en desarrollo:
+            devToken: resetToken 
+        });
+
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ message: 'Error procesando solicitud.' });
+    }
+});
+
+// Verificar token válido
+router.get('/verify-reset-token', async (req, res) => {
+    try {
+        const { email, token } = req.query;
+        if (!email || !token) return res.status(400).json({ message: 'Datos incompletos.' });
+
+        const [records] = await db.query(
+            'SELECT * FROM password_resets WHERE email = ? AND token = ? AND used = FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+            [email, token]
+        );
+
+        if (records.length === 0) {
+            return res.status(400).json({ message: 'Token inválido o expirado.' });
+        }
+
+        res.json({ valid: true, email });
+
+    } catch (error) {
+        console.error('Verify token error:', error);
+        res.status(500).json({ message: 'Error verificando token.' });
+    }
+});
+
+// Resetear contraseña con token
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { email, token, newPassword } = req.body;
+        if (!email || !token || !newPassword) {
+            return res.status(400).json({ message: 'Datos incompletos.' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres.' });
+        }
+
+        // Verificar token
+        const [records] = await db.query(
+            'SELECT * FROM password_resets WHERE email = ? AND token = ? AND used = FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+            [email, token]
+        );
+
+        if (records.length === 0) {
+            return res.status(400).json({ message: 'Token inválido o expirado.' });
+        }
+
+        // Actualizar contraseña
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        await db.query('UPDATE users SET password = ? WHERE email = ?', [passwordHash, email]);
+
+        // Marcar token como usado
+        await db.query('UPDATE password_resets SET used = TRUE WHERE id = ?', [records[0].id]);
+
+        res.json({ message: 'Contraseña actualizada exitosamente.' });
+
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ message: 'Error actualizando contraseña.' });
+    }
+});
+
 module.exports = router;

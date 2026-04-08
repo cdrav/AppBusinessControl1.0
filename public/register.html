@@ -4,63 +4,174 @@
   <meta charset="UTF-8">
   <meta name="author" content="Cristian David Ruiz">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Sistema de gestión empresarial - Business Control por Cristian David Ruiz">
+  <meta name="description" content="Crea tu cuenta gratis en Business Control - Sistema de gestión empresarial">
   <title>Crear Cuenta - Business Control</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/business-control-unified.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/auth.css">
 </head>
-<body>
+<body class="auth-page">
   <div class="auth-wrapper">
-    <div class="auth-card fade-in">
-      <div class="auth-header">
-        <div class="rounded-circle bg-success bg-opacity-10 text-success d-inline-flex align-items-center justify-content-center mb-3 auth-icon-circle">
-          <i class="bi bi-person-plus"></i>
+    <div class="auth-card auth-fade-in">
+      <div class="row g-0">
+        <!-- Left Side - Benefits -->
+        <div class="col-lg-6 auth-left">
+          <h3 class="fw-bold mb-4">Únete a +500 empresas</h3>
+          
+          <div class="auth-feature-item">
+            <div class="auth-feature-icon">
+              <i class="bi bi-gift"></i>
+            </div>
+            <div>
+              <h6 class="fw-semibold mb-1">Plan Starter Gratis</h6>
+              <p class="mb-0 opacity-75 small">Para siempre, sin tarjeta de crédito</p>
+            </div>
+          </div>
+          
+          <div class="auth-feature-item">
+            <div class="auth-feature-icon">
+              <i class="bi bi-rocket-takeoff"></i>
+            </div>
+            <div>
+              <h6 class="fw-semibold mb-1">Setup en 2 Minutos</h6>
+              <p class="mb-0 opacity-75 small">Empieza a vender el mismo día</p>
+            </div>
+          </div>
+          
+          <div class="auth-feature-item">
+            <div class="auth-feature-icon">
+              <i class="bi bi-headset"></i>
+            </div>
+            <div>
+              <h6 class="fw-semibold mb-1">Soporte 24/7</h6>
+              <p class="mb-0 opacity-75 small">Estamos aquí para ayudarte</p>
+            </div>
+          </div>
+          
+          <div class="auth-testimonial">
+            <div class="auth-stars">
+              <i class="bi bi-star-fill"></i>
+              <i class="bi bi-star-fill"></i>
+              <i class="bi bi-star-fill"></i>
+              <i class="bi bi-star-fill"></i>
+              <i class="bi bi-star-fill"></i>
+            </div>
+            <p>"Empecé gratis y en una semana ya tenía todo mi inventario digitalizado. ¡Increíble!"</p>
+          </div>
         </div>
-        <h3 class="fw-bold">Crear Cuenta</h3>
-        <p class="text-muted">Comienza a gestionar tu negocio hoy</p>
+        
+        <!-- Right Side - Form -->
+        <div class="col-lg-6 auth-right">
+          <a href="index.html" class="auth-brand">
+            <i class="bi bi-pie-chart-fill"></i>
+            Business Control
+          </a>
+          
+          <h1 class="auth-title">Crear cuenta gratis</h1>
+          <p class="auth-subtitle">Comienza a gestionar tu negocio hoy mismo</p>
+          
+          <div id="message"></div>
+          
+          <form id="registerForm">
+            <div class="mb-3">
+              <label for="username" class="form-label fw-medium">Nombre Completo</label>
+              <div class="auth-input-group">
+                <span class="auth-input-group-text"><i class="bi bi-person"></i></span>
+                <input type="text" class="form-control auth-form-control" id="username" placeholder="Tu nombre" required>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="email" class="form-label fw-medium">Correo Electrónico</label>
+              <div class="auth-input-group">
+                <span class="auth-input-group-text"><i class="bi bi-envelope"></i></span>
+                <input type="email" class="form-control auth-form-control" id="email" placeholder="tu@empresa.com" required>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="password" class="form-label fw-medium">Contraseña</label>
+              <div class="auth-input-group">
+                <span class="auth-input-group-text"><i class="bi bi-lock"></i></span>
+                <input type="password" class="form-control auth-form-control" id="password" placeholder="Mínimo 6 caracteres" required>
+                <span class="auth-password-toggle" onclick="togglePassword('password', 'toggleIcon1')">
+                  <i class="bi bi-eye" id="toggleIcon1"></i>
+                </span>
+              </div>
+              <div id="passwordStrengthBar" class="auth-password-strength"></div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="confirmPassword" class="form-label fw-medium">Confirmar Contraseña</label>
+              <div class="auth-input-group">
+                <span class="auth-input-group-text"><i class="bi bi-lock-fill"></i></span>
+                <input type="password" class="form-control auth-form-control" id="confirmPassword" placeholder="Repite tu contraseña" required>
+                <span class="auth-password-toggle" onclick="togglePassword('confirmPassword', 'toggleIcon2')">
+                  <i class="bi bi-eye" id="toggleIcon2"></i>
+                </span>
+              </div>
+            </div>
+            
+            <div class="mb-4 form-check">
+              <input type="checkbox" class="form-check-input auth-form-check-input" id="terms" required>
+              <label class="form-check-label text-secondary small" for="terms">
+                Acepto los <a href="#" class="auth-link">Términos de Servicio</a> y la <a href="#" class="auth-link">Política de Privacidad</a>
+              </label>
+            </div>
+            
+            <button type="submit" class="auth-btn-primary mb-3">
+              <i class="bi bi-person-plus me-2"></i>Crear Cuenta Gratis
+            </button>
+          </form>
+          
+          <div class="auth-divider">
+            <span>o</span>
+          </div>
+          
+          <div class="text-center">
+            <p class="text-secondary mb-0">¿Ya tienes una cuenta? 
+              <a href="login.html" class="auth-link">Inicia sesión</a>
+            </p>
+          </div>
+        </div>
       </div>
-      <div id="message"></div>
-      <form id="registerForm">
-        <div class="mb-3">
-          <label for="username" class="form-label">Nombre de Usuario</label>
-          <div class="input-group">
-            <span class="input-group-text bg-light border-end-0"><i class="bi bi-person text-muted"></i></span>
-            <input type="text" class="form-control border-start-0 ps-0" id="username" placeholder="Tu nombre" required>
-          </div>
-        </div>
-        <div class="mb-3">
-          <label for="email" class="form-label">Correo Electrónico</label>
-          <div class="input-group">
-            <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
-            <input type="email" class="form-control border-start-0 ps-0" id="email" placeholder="nombre@empresa.com" required>
-          </div>
-        </div>
-        <div class="mb-4">
-          <label for="password" class="form-label">Contraseña</label>
-          <div class="input-group">
-            <span class="input-group-text bg-light border-end-0"><i class="bi bi-key text-muted"></i></span>
-            <input type="password" class="form-control border-start-0 ps-0" id="password" placeholder="••••••••" required>
-          </div>
-          <div class="form-text text-muted small mt-1">Mínimo 6 caracteres</div>
-        </div>
-        <div class="mb-4">
-          <label for="confirmPassword" class="form-label">Confirmar Contraseña</label>
-          <div class="input-group">
-            <span class="input-group-text bg-light border-end-0"><i class="bi bi-key-fill text-muted"></i></span>
-            <input type="password" class="form-control border-start-0 ps-0" id="confirmPassword" placeholder="••••••••" required>
-          </div>
-        </div>
-        <div id="passwordStrength" class="mb-3 small fw-bold"></div>
-        <button type="submit" class="btn btn-primary w-100 py-2 mb-3">Registrarse</button>
-        <div class="text-center">
-          <span class="text-muted small">¿Ya tienes una cuenta?</span>
-          <a href="login.html" class="text-primary small fw-bold ms-1">Inicia Sesión</a>
-        </div>
-      </form>
     </div>
   </div>
+  
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script type="module" src="js/register.js"></script>
+  <script>
+    function togglePassword(inputId, iconId) {
+      const passwordInput = document.getElementById(inputId);
+      const toggleIcon = document.getElementById(iconId);
+      
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.classList.remove('bi-eye');
+        toggleIcon.classList.add('bi-eye-slash');
+      } else {
+        passwordInput.type = 'password';
+        toggleIcon.classList.remove('bi-eye-slash');
+        toggleIcon.classList.add('bi-eye');
+      }
+    }
+    
+    // Password strength indicator
+    document.getElementById('password').addEventListener('input', function() {
+      const password = this.value;
+      const strengthBar = document.getElementById('passwordStrengthBar');
+      
+      if (password.length === 0) {
+        strengthBar.className = 'auth-password-strength';
+      } else if (password.length < 6) {
+        strengthBar.className = 'auth-password-strength weak';
+      } else if (password.length < 10) {
+        strengthBar.className = 'auth-password-strength medium';
+      } else {
+        strengthBar.className = 'auth-password-strength strong';
+      }
+    });
+  </script>
 </body>
 </html>

@@ -1,0 +1,358 @@
+/* ========================================
+   AUTH STYLES - Login & Register Pages
+   Business Control - Cristian David Ruiz
+   ======================================== */
+
+/* CSS Variables - Scope local para auth */
+.auth-page {
+  --auth-primary: #667eea;
+  --auth-primary-dark: #764ba2;
+  --auth-secondary: #6c757d;
+  --auth-success: #198754;
+  --auth-light: #f8f9fa;
+  --auth-dark: #212529;
+}
+
+.auth-page * {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Wrapper principal */
+.auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--auth-primary) 0%, var(--auth-primary-dark) 100%);
+}
+
+/* Card principal */
+.auth-card {
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  max-width: 1000px;
+  width: 100%;
+}
+
+/* Panel izquierdo - Benefits */
+.auth-left {
+  background: linear-gradient(135deg, var(--auth-primary) 0%, var(--auth-primary-dark) 100%);
+  color: white;
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.auth-left h3 {
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+}
+
+/* Feature items en panel izquierdo */
+.auth-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.auth-feature-icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.auth-feature-item h6 {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.auth-feature-item p {
+  margin-bottom: 0;
+  opacity: 0.75;
+}
+
+/* Panel derecho - Form */
+.auth-right {
+  padding: 3rem;
+}
+
+/* Brand logo */
+.auth-brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--auth-primary);
+  text-decoration: none;
+  margin-bottom: 2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auth-brand:hover {
+  color: var(--auth-primary-dark);
+}
+
+/* Títulos */
+.auth-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--auth-dark);
+}
+
+.auth-subtitle {
+  color: var(--auth-secondary);
+  margin-bottom: 2rem;
+}
+
+/* Form controls */
+.auth-form-control {
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  border-radius: 12px;
+  border: 2px solid #e9ecef;
+  transition: all 0.2s ease;
+}
+
+.auth-form-control:focus {
+  border-color: var(--auth-primary);
+  box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.15);
+  outline: none;
+}
+
+/* Input groups */
+.auth-input-group {
+  display: flex;
+  align-items: stretch;
+}
+
+.auth-input-group-text {
+  background: transparent;
+  border: 2px solid #e9ecef;
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  color: var(--auth-secondary);
+  padding: 0.875rem 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input-group .auth-form-control {
+  border-left: none;
+  border-radius: 0 12px 12px 0;
+  flex: 1;
+}
+
+/* Password toggle */
+.auth-password-toggle {
+  cursor: pointer;
+  color: var(--auth-secondary);
+  background: transparent;
+  border: 2px solid #e9ecef;
+  border-left: none;
+  border-radius: 0 12px 12px 0;
+  padding: 0.875rem 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.auth-password-toggle:hover {
+  color: var(--auth-dark);
+}
+
+/* Botón principal */
+.auth-btn-primary {
+  background: linear-gradient(135deg, var(--auth-primary) 0%, var(--auth-primary-dark) 100%);
+  border: none;
+  border-radius: 12px;
+  padding: 0.875rem;
+  font-weight: 600;
+  font-size: 1rem;
+  color: white;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.auth-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+  color: white;
+}
+
+.auth-btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0;
+  color: var(--auth-secondary);
+  font-size: 0.875rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e9ecef;
+}
+
+.auth-divider span {
+  padding: 0 1rem;
+}
+
+/* Password strength bar */
+.auth-password-strength {
+  height: 4px;
+  border-radius: 2px;
+  margin-top: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.auth-password-strength.weak {
+  background: #dc3545;
+  width: 33%;
+}
+
+.auth-password-strength.medium {
+  background: #ffc107;
+  width: 66%;
+}
+
+.auth-password-strength.strong {
+  background: var(--auth-success);
+  width: 100%;
+}
+
+/* Form check */
+.auth-form-check-input:checked {
+  background-color: var(--auth-primary);
+  border-color: var(--auth-primary);
+}
+
+.auth-form-check-label a {
+  color: var(--auth-primary);
+  text-decoration: none;
+}
+
+.auth-form-check-label a:hover {
+  text-decoration: underline;
+}
+
+/* Links */
+.auth-link {
+  color: var(--auth-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+/* Estrellas testimonio */
+.auth-stars {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.auth-stars i {
+  color: #ffc107;
+}
+
+/* Testimonio text */
+.auth-testimonial {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.auth-testimonial p {
+  font-size: 0.875rem;
+  margin-bottom: 0;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+/* Animaciones */
+.auth-fade-in {
+  animation: authFadeIn 0.6s ease-out;
+}
+
+@keyframes authFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 991.98px) {
+  .auth-left {
+    display: none;
+  }
+  
+  .auth-right {
+    padding: 2rem;
+  }
+  
+  .auth-wrapper {
+    padding: 1rem;
+  }
+}
+
+/* Focus visible para accesibilidad */
+.auth-form-control:focus-visible,
+.auth-btn-primary:focus-visible {
+  outline: 2px solid var(--auth-primary);
+  outline-offset: 2px;
+}
+
+/* Estados disabled */
+.auth-btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Mensajes de error/éxito */
+.auth-alert {
+  border-radius: 12px;
+  border: none;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.auth-alert-error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.auth-alert-success {
+  background: #d4edda;
+  color: #155724;
+}
