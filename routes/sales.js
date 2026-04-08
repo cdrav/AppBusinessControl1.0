@@ -57,6 +57,8 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         const finalPrice = Math.max(0, total - discount);
+        console.log(`[DEBUG] total: ${total}, discount: ${discount}, finalPrice: ${finalPrice}`);
+        console.log(`[DEBUG] Inserting sale with finalPrice type: ${typeof finalPrice}, value: ${finalPrice}`);
         const [sale] = await conn.query('INSERT INTO sales (tenant_id, client_id, branch_id, total_price, discount, coupon_code, sale_date, notes, is_credit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())', [req.user.tenant_id, clientId, branchId, finalPrice, discount, couponCode, saleDate || new Date(), notes, isCredit || false]);
         
         if (isCredit) {
