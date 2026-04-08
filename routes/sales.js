@@ -463,4 +463,43 @@ router.post('/:id/return', authenticateToken, authorizeRole(['admin', 'cajero'])
     }
 });
 
+// Fix inflated prices (admin only - requires password)
+router.post('/api/fix-prices', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { password } = req.body || {};
+    if (!password) return res.status(400).json({ message: 'Contraseña requerida' });
+    
+    // Verify admin password
+    const [u] = await db.query('SELECT password FROM users WHERE id=?', [req.user.id]);
+    if (!u.length || !await bcrypt.compare(password, u[0].password)) {
+        return res.status(403).json({ message: 'Contraseña incorrecta' });
+    }
+    
+    try {
+        // Fix prices that are too high (divided by 1000)
+        const [inventoryResult] = await db.query(
+            'UPDATE inventory SET price = price / 1000, cost = cost / 1000 WHERE price > 1000000'
+        );
+        
+        // Also fix sale_details subtotals that might be affected
+        const [detailsResult] = await db.query(
+            'UPDATE sale_details SET subtotal = subtotal / 1000 WHERE subtotal > 1000000'
+        );
+        
+        // Fix sales total_price
+        const [salesResult] = await db.query(
+            'UPDATE sales SET total_price = total_price / 1000 WHERE total_price > 1000000'
+        );
+        
+        res.json({
+            message: 'Precios corregidos exitosamente',
+            inventoryUpdated: inventoryResult.affectedRows,
+            salesUpdated: salesResult.affectedRows,
+            detailsUpdated: detailsResult.affectedRows
+        });
+    } catch (error) {
+        console.error('Error corrigiendo precios:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 module.exports = router;
