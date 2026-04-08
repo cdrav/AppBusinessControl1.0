@@ -106,32 +106,65 @@ router.post('/', authenticateToken, async (req, res) => {
     } catch (e) { if(conn) await conn.rollback(); res.status(500).json({ message: e.message }); } finally { if(conn) conn.release(); }
 });
 
-// Obtener Ventas (con paginación)
+// Listar Ventas con Paginación
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const page = Math.max(1, parseInt(req.query.page) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+        const { page = 1, limit = 50, client_id } = req.query;
         const offset = (page - 1) * limit;
-
-        const [[{ total }]] = await db.query(
-            'SELECT COUNT(*) as total FROM sales WHERE tenant_id = ?', [req.user.tenant_id]
-        );
-
-        const [rows] = await db.query(`
-            SELECT s.id, c.name AS client_name, c.email as client_email, s.total_price, s.sale_date, 
-                   s.is_credit, cr.total_debt, cr.remaining_balance, cr.initial_payment
-            FROM sales s 
-            LEFT JOIN clients c ON s.client_id = c.id 
-            LEFT JOIN credits cr ON s.id = cr.sale_id
-            WHERE s.tenant_id = ? 
-            ORDER BY s.sale_date DESC
-            LIMIT ? OFFSET ?
-        `, [req.user.tenant_id, limit, offset]);
-        res.json({ data: rows, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+        
+        let whereClause = 'WHERE s.tenant_id = ?';
+        let countParams = [req.user.tenant_id];
+        let dataParams = [req.user.tenant_id];
+        
+        if (client_id) {
+            whereClause += ' AND s.client_id = ?';
+            countParams.push(client_id);
+            dataParams.push(client_id);
+        }
+        
+        // Solo aplicar paginación si se solicita explícitamente con ?page=
+        if (req.query.page) {
+            // Query con paginación
+            const [countResult] = await db.query(`SELECT COUNT(*) as total FROM sales s ${whereClause}`, countParams);
+            const total = countResult[0].total;
+            
+            dataParams.push(parseInt(limit), parseInt(offset));
+            const [rows] = await db.query(`
+                SELECT s.*, c.name as client_name 
+                FROM sales s 
+                LEFT JOIN clients c ON s.client_id = c.id 
+                ${whereClause}
+                ORDER BY s.sale_date DESC 
+                LIMIT ? OFFSET ?
+            `, dataParams);
+            
+            res.json({ 
+                data: rows, 
+                pagination: { 
+                    page: parseInt(page), 
+                    limit: parseInt(limit), 
+                    total, 
+                    pages: Math.ceil(total / limit) 
+                } 
+            });
+        } else {
+            // Sin paginación - retornar array directo (compatible con tests y frontend existente)
+            const [rows] = await db.query(`
+                SELECT s.*, c.name as client_name 
+                FROM sales s 
+                LEFT JOIN clients c ON s.client_id = c.id 
+                ${whereClause}
+                ORDER BY s.sale_date DESC 
+                LIMIT 1000
+            `, dataParams);
+            
+            res.json(rows);
+        }
     } catch (error) {
-        console.error('Error al obtener ventas:', error.message);
-        res.status(500).json({ message: 'Error al obtener ventas' });
-    }});
+        console.error('Error al listar ventas:', error);
+        res.status(500).json({ message: 'Error al listar ventas' });
+    }
+});
 
 // Generar Ticket PDF
 router.get('/:id/ticket', authenticateToken, async (req, res) => {
