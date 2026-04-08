@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function loadSuppliers() {
     try {
-        const response = await apiFetch(`${API_URL}/suppliers`, {
+        const response = await fetch(`${API_URL}/suppliers`, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
         const suppliers = await response.json();
