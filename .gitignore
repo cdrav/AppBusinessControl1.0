@@ -10,3 +10,11 @@ node_modules/
 
 # Logs y archivos de depuración
 npm-debug.log
+
+# Test output
+test-output*.txt
+coverage/
+
+# Tokens y datos temporales
+*-token*.json
+*-token*.txt

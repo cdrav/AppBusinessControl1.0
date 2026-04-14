@@ -70,7 +70,7 @@ describe('✅ Utilidades Funcionan', () => {
     const formatCOP = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(parseFloat(val || 0));
     
     expect(formatCOP(1000000)).toContain('$');
-    expect(formatCOP(1000000)).toContain('1,000,000');
+    expect(formatCOP(1000000)).toMatch(/1[.,]000[.,]000/);
     expect(formatCOP(0)).toContain('$');
   });
 

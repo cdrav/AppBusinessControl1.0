@@ -9,6 +9,7 @@ const transporter = require('../config/mailer');
 const fs = require('fs');
 const path = require('path');
 const { recordLog } = require('../services/auditService');
+const { BusinessError } = require('../middleware/validate');
 
 // Registrar Venta
 router.post('/', authenticateToken, async (req, res) => {
@@ -41,9 +42,9 @@ router.post('/', authenticateToken, async (req, res) => {
 
         for (const p of products) {
             const [rows] = await conn.query(`SELECT i.product_name, i.price, COALESCE(bs.stock, i.stock, 0) as stock FROM inventory i LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ? WHERE i.id = ? AND i.tenant_id = ? FOR UPDATE`, [branchId, req.user.tenant_id, p.productId, req.user.tenant_id]);
-            if (!rows.length || rows[0].stock < p.quantity) throw new Error(`Stock insuficiente: ${rows[0]?.product_name || 'Producto'}`);
+            if (!rows.length || rows[0].stock < p.quantity) throw new BusinessError(`Stock insuficiente: ${rows[0]?.product_name || 'Producto'}`);
             
-            if (rows[0].price <= 0) throw new Error(`El producto ${rows[0].product_name} tiene un precio inválido ($${rows[0].price}).`);
+            if (rows[0].price <= 0) throw new BusinessError(`El producto ${rows[0].product_name} tiene un precio inválido ($${rows[0].price}).`);
 
             const subtotal = rows[0].price * p.quantity;
             total += subtotal;
@@ -105,7 +106,11 @@ router.post('/', authenticateToken, async (req, res) => {
         });
 
         res.status(201).json({ message: 'Venta registrada', saleId: sale.insertId });
-    } catch (e) { if(conn) await conn.rollback(); res.status(500).json({ message: e.message }); } finally { if(conn) conn.release(); }
+    } catch (e) {
+        if(conn) await conn.rollback();
+        const status = e.statusCode || 500;
+        res.status(status).json({ message: e.message });
+    } finally { if(conn) conn.release(); }
 });
 
 // Listar Ventas con Paginación

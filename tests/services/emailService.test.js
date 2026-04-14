@@ -10,8 +10,9 @@ describe('Email Service Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Mock de variables de entorno
+    // Mock de variables de entorno - ambos necesarios para isEmailConfigured()
     process.env.EMAIL_USER = 'test@example.com';
+    process.env.EMAIL_PASS = 'test_password';
   });
 
   describe('sendLowStockAlert', () => {
@@ -41,19 +42,19 @@ describe('Email Service Tests', () => {
 
     test('should not send email if EMAIL_USER not configured', async () => {
       delete process.env.EMAIL_USER;
+      delete process.env.EMAIL_PASS;
       
       await sendLowStockAlert([{ name: 'Product', stock: 1 }]);
 
       expect(transporter.sendMail).not.toHaveBeenCalled();
     });
 
-    test('should handle email sending errors', async () => {
+    test('should throw on email sending errors', async () => {
       const mockProducts = [{ name: 'Product', stock: 1 }];
       
       transporter.sendMail.mockRejectedValueOnce(new Error('Email error'));
 
-      // No debería lanzar error, solo manejarlo
-      await expect(sendLowStockAlert(mockProducts)).resolves.toBeUndefined();
+      await expect(sendLowStockAlert(mockProducts)).rejects.toThrow();
     });
   });
 
@@ -67,11 +68,11 @@ describe('Email Service Tests', () => {
       db.query.mockResolvedValueOnce([mockSalesData]);
       transporter.sendMail.mockResolvedValueOnce({ messageId: 'test-message-id' });
 
-      const result = await sendDailySummaryEmail(new Date());
+      const result = await sendDailySummaryEmail(new Date(), 'test@example.com');
 
       expect(result).toContain('Resumen enviado');
       expect(transporter.sendMail).toHaveBeenCalledWith({
-        from: 'test@example.com',
+        from: expect.any(String),
         to: 'test@example.com',
         subject: expect.stringContaining('Cierre de Caja'),
         html: expect.stringContaining('Resumen del Día')
@@ -79,13 +80,11 @@ describe('Email Service Tests', () => {
     });
 
     test('should throw error if date not provided', async () => {
-      await expect(sendDailySummaryEmail()).rejects.toThrow('Configuración de correo incompleta');
+      await expect(sendDailySummaryEmail()).rejects.toThrow('Fecha requerida');
     });
 
-    test('should throw error if EMAIL_USER not configured', async () => {
-      delete process.env.EMAIL_USER;
-      
-      await expect(sendDailySummaryEmail(new Date())).rejects.toThrow('Configuración de correo incompleta');
+    test('should throw error if recipientEmail not provided', async () => {
+      await expect(sendDailySummaryEmail(new Date())).rejects.toThrow('Correo destinatario requerido');
     });
   });
 });

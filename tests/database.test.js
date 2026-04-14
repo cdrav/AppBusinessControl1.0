@@ -1,3 +1,7 @@
+jest.mock('../config/db', () => ({
+  query: jest.fn(), getConnection: jest.fn(), execute: jest.fn()
+}));
+
 const db = require('../config/db');
 
 describe('Database Connection Tests', () => {

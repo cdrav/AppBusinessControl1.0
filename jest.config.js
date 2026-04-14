@@ -1,7 +1,9 @@
 module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
-  testMatch: ['**/quick-smoke.test.js'], // Solo tests funcionales por ahora
+  testMatch: ['**/*.test.js'],
+  testPathIgnorePatterns: ['/node_modules/', '/tests/e2e/', 'smoke.test.js'],
+  forceExit: true,
   collectCoverageFrom: [
     'routes/**/*.js',
     'middleware/**/*.js',

@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const { authenticateToken, getJwtSecret } = require('../middleware/auth');
+const { requireFields, validateEmail, validateMinLength } = require('../middleware/validate');
 
 // Rate limiting en memoria para login
 const loginAttempts = new Map();
@@ -33,10 +34,9 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000);
 
-router.post('/register', async (req, res) => {
+router.post('/register', requireFields('username', 'email', 'password'), validateEmail('email'), async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    if (!username || !email || !password) return res.status(400).json({ message: 'Datos incompletos.' });
 
     const [usersFound] = await db.query('SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
     if (usersFound.length > 0) return res.status(409).json({ message: 'Usuario ya existe.' });
@@ -62,8 +62,6 @@ router.post('/login', async (req, res) => {
     }
     
     const { email, password } = req.body;
-    
-    // Validación básica
     if (!email || !password) {
       return res.status(400).json({ message: 'Email y contraseña son requeridos.' });
     }

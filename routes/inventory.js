@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { recordLog } = require('../services/auditService');
+const { BusinessError } = require('../middleware/validate');
 
 // Obtener inventario
 router.get('/', authenticateToken, async (req, res) => {
@@ -126,7 +127,7 @@ router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
         await conn.beginTransaction();
         const [updateRes] = await conn.query('UPDATE inventory SET product_name=?, price=?, cost=?, category=?, supplier_id=?, description=?, barcode=? WHERE id=? AND tenant_id=?', [name, price, cost||0, category, supplier_id || null, description, barcode || null, id, req.user.tenant_id]);
         
-        if (updateRes.affectedRows === 0) throw new Error('Producto no encontrado o sin permisos');
+        if (updateRes.affectedRows === 0) throw new BusinessError('Producto no encontrado o sin permisos', 404);
         
         const [rows] = await conn.query('SELECT COALESCE(SUM(stock), 0) as total FROM branch_stocks WHERE product_id = ?', [id]);
         const diff = parseInt(quantity) - parseInt(rows[0].total);
@@ -146,7 +147,11 @@ router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
         });
 
         res.json({ message: 'Producto actualizado' });
-    } catch (e) { if(conn) await conn.rollback(); res.status(500).json({message: 'Error actualizando'}); } finally { if(conn) conn.release(); }
+    } catch (e) {
+        if(conn) await conn.rollback();
+        const status = e.statusCode || 500;
+        res.status(status).json({ message: e.message || 'Error actualizando' });
+    } finally { if(conn) conn.release(); }
 });
 
 // Eliminar producto

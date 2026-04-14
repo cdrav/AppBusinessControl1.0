@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
-const { isValidEmail } = require('../middleware/sanitize');
+const { requireFields, validateEmail, validateParamId } = require('../middleware/validate');
 
 router.get('/', authenticateToken, async (req, res) => {
     try {
@@ -13,14 +13,11 @@ router.get('/', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor' });
     }
 });
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requireFields('name'), validateEmail('email'), async (req, res) => {
     try {
         const { name, email, phone, address } = req.body;
-        if (!name || !name.trim()) {
+        if (!name.trim()) {
             return res.status(400).json({ message: 'El nombre del cliente es obligatorio' });
-        }
-        if (email && !isValidEmail(email)) {
-            return res.status(400).json({ message: 'Formato de email inválido' });
         }
         const [r] = await db.query('INSERT INTO clients (tenant_id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)', [req.user.tenant_id, name.trim(), email || null, phone || null, address || null]);
         res.status(201).json({ message: 'Cliente creado', clienteId: r.insertId });
@@ -29,14 +26,11 @@ router.post('/', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor' });
     }
 });
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, validateParamId, requireFields('name'), validateEmail('email'), async (req, res) => {
     try {
         const { name, email, phone, address } = req.body;
-        if (!name || !name.trim()) {
+        if (!name.trim()) {
             return res.status(400).json({ message: 'El nombre del cliente es obligatorio' });
-        }
-        if (email && !isValidEmail(email)) {
-            return res.status(400).json({ message: 'Formato de email inválido' });
         }
         await db.query('UPDATE clients SET name=?, email=?, phone=?, address=? WHERE id=? AND tenant_id=?', [name.trim(), email || null, phone || null, address || null, req.params.id, req.user.tenant_id]);
         res.json({ message: 'Cliente actualizado' });
