@@ -4,42 +4,44 @@ const db = require('../config/db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { recordLog } = require('../services/auditService');
 const { BusinessError } = require('../middleware/validate');
+const { parsePagination, paginatedResponse } = require('../middleware/paginate');
 
 // Obtener inventario
 router.get('/', authenticateToken, async (req, res) => {
-    const { branch_id } = req.query;
+    const { branch_id, search } = req.query;
 
     try {
-        if (branch_id) {
-            // Si se pide el inventario de una sede específica, se une con branch_stocks
-            const [results] = await db.query(`
-                SELECT 
-                    i.id, i.product_name, i.price, i.cost, i.category, i.barcode, i.description, i.supplier_id,
-                    s.name as supplier_name,
-                    COALESCE(bs.stock, 0) as stock 
-                FROM inventory i
-                LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
-                LEFT JOIN suppliers s ON i.supplier_id = s.id
-                WHERE i.tenant_id = ?
-                ORDER BY i.product_name ASC
-            `, [branch_id, req.user.tenant_id, req.user.tenant_id]);
-            res.json(results);
-        } else {
-            // Inventario con stock de la sucursal del usuario (o stock global si no hay registro en branch_stocks)
-            const userBranchId = req.user.branch_id || 1;
-            const [results] = await db.query(`
-                SELECT 
-                    i.id, i.product_name, i.price, i.cost, i.category, i.barcode, i.description, i.supplier_id,
-                    s.name as supplier_name,
-                    COALESCE(bs.stock, i.stock, 0) as stock 
-                FROM inventory i
-                LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
-                LEFT JOIN suppliers s ON i.supplier_id = s.id
-                WHERE i.tenant_id = ?
-                ORDER BY i.product_name ASC
-            `, [userBranchId, req.user.tenant_id, req.user.tenant_id]);
-            res.json(results);
+        const branchIdVal = branch_id || req.user.branch_id || 1;
+        let where = 'WHERE i.tenant_id = ? AND i.is_active = TRUE';
+        let params = [req.user.tenant_id];
+
+        if (search) {
+            where += ' AND (i.product_name LIKE ? OR i.barcode LIKE ? OR i.category LIKE ?)';
+            const term = `%${search}%`;
+            params.push(term, term, term);
         }
+
+        const baseQuery = `
+            FROM inventory i
+            LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
+            LEFT JOIN suppliers s ON i.supplier_id = s.id
+            ${where}`;
+        const baseParams = [branchIdVal, req.user.tenant_id, ...params];
+
+        const selectFields = branch_id
+            ? 'i.id, i.product_name, i.price, i.cost, i.category, i.barcode, i.description, i.supplier_id, s.name as supplier_name, COALESCE(bs.stock, 0) as stock'
+            : 'i.id, i.product_name, i.price, i.cost, i.category, i.barcode, i.description, i.supplier_id, s.name as supplier_name, COALESCE(bs.stock, i.stock, 0) as stock';
+
+        // Si se pasa ?page=, devolver formato paginado
+        if (req.query.page) {
+            const { page, limit, offset } = parsePagination(req.query);
+            const [countResult] = await db.query(`SELECT COUNT(*) as total ${baseQuery}`, baseParams);
+            const [results] = await db.query(`SELECT ${selectFields} ${baseQuery} ORDER BY i.product_name ASC LIMIT ? OFFSET ?`, [...baseParams, limit, offset]);
+            return res.json(paginatedResponse(results, countResult[0].total, page, limit));
+        }
+
+        const [results] = await db.query(`SELECT ${selectFields} ${baseQuery} ORDER BY i.product_name ASC`, baseParams);
+        res.json(results);
     } catch (error) {
         console.error('Error al obtener inventario:', error);
         res.status(500).json({ message: 'Error interno del servidor al obtener el inventario.' });
@@ -156,7 +158,7 @@ router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
 
 // Eliminar producto
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    await db.query('DELETE FROM inventory WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
+    await db.query('UPDATE inventory SET is_active = FALSE WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
 
     await recordLog({
         tenantId: req.user.tenant_id,

@@ -472,8 +472,6 @@ window.assignCollector = async (creditId, collectorId) => {
 // ==================== CERRAR RUTA ====================
 
 async function closeRoute() {
-    console.log('[closeRoute] Iniciando...');
-    
     const result = await Swal.fire({
         title: '¿Cerrar ruta del día?',
         text: 'Se generará un resumen de tu recaudo total de hoy.',
@@ -485,11 +483,7 @@ async function closeRoute() {
     });
 
     if (result.isConfirmed) {
-        console.log('[closeRoute] Usuario confirmó');
-        
-        // Verificar token antes de continuar
         const token = localStorage.getItem('token');
-        console.log('[closeRoute] Token existe:', !!token);
         if (!token) {
             await Swal.fire({
                 title: 'Sesión expirada',
@@ -499,22 +493,17 @@ async function closeRoute() {
             window.location.href = '/login.html';
             return;
         }
-        
-        // Mostrar loading mientras se procesa
+
         Swal.fire({
             title: 'Procesando...',
             text: 'Generando resumen de cierre de ruta',
             allowOutsideClick: false,
             allowEscapeKey: false,
             showConfirmButton: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
+            didOpen: () => { Swal.showLoading(); }
         });
 
-        // Timeout de seguridad: cerrar loading después de 8 segundos máximo
         const safetyTimeout = setTimeout(() => {
-            console.log('[closeRoute] Timeout de seguridad activado');
             Swal.close();
             Swal.fire({
                 title: 'Tiempo agotado',
@@ -524,16 +513,11 @@ async function closeRoute() {
         }, 8000);
 
         try {
-            console.log('[closeRoute] Enviando petición POST /api/credits/route-closure...');
-            
             const data = await apiFetch('/api/credits/route-closure', { method: 'POST' });
-            
+
             clearTimeout(safetyTimeout);
-            console.log('[closeRoute] Respuesta recibida:', data);
-            
-            // Siempre cerrar el loading antes de mostrar resultado
             Swal.close();
-            
+
             if (data && data.summary) {
                 await Swal.fire({
                     title: '¡Ruta Cerrada!',
@@ -552,12 +536,8 @@ async function closeRoute() {
             }
         } catch (error) {
             clearTimeout(safetyTimeout);
-            
-            // Asegurar que el loading se cierre
             Swal.close();
-            
-            console.error('[closeRoute] Error:', error);
-            
+
             await Swal.fire({
                 title: 'Error',
                 text: error.message || 'No se pudo cerrar la ruta. Verifica tu conexión.',

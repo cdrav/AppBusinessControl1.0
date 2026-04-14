@@ -3,10 +3,29 @@ const router = express.Router();
 const db = require('../config/db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { requireFields, validateEmail, validateParamId } = require('../middleware/validate');
+const { parsePagination, paginatedResponse } = require('../middleware/paginate');
 
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const [c] = await db.query('SELECT * FROM clients WHERE tenant_id = ? ORDER BY name ASC', [req.user.tenant_id]);
+        const { search } = req.query;
+        let where = 'WHERE tenant_id = ? AND is_active = TRUE';
+        let params = [req.user.tenant_id];
+
+        if (search) {
+            where += ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)';
+            const term = `%${search}%`;
+            params.push(term, term, term);
+        }
+
+        // Si se pasa ?page=, devolver formato paginado
+        if (req.query.page) {
+            const { page, limit, offset } = parsePagination(req.query);
+            const [countResult] = await db.query(`SELECT COUNT(*) as total FROM clients ${where}`, params);
+            const [c] = await db.query(`SELECT * FROM clients ${where} ORDER BY name ASC LIMIT ? OFFSET ?`, [...params, limit, offset]);
+            return res.json(paginatedResponse(c, countResult[0].total, page, limit));
+        }
+
+        const [c] = await db.query(`SELECT * FROM clients ${where} ORDER BY name ASC`, params);
         res.json(c);
     } catch (error) {
         console.error('Error al obtener clientes:', error);
@@ -41,7 +60,15 @@ router.put('/:id', authenticateToken, validateParamId, requireFields('name'), va
 });
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
     try {
-        await db.query('DELETE FROM clients WHERE id=? AND tenant_id=?', [req.params.id, req.user.tenant_id]);
+        const [sales] = await db.query('SELECT COUNT(*) as count FROM sales WHERE client_id=? AND tenant_id=?', [req.params.id, req.user.tenant_id]);
+        if (sales[0].count > 0) {
+            return res.status(400).json({ message: `No se puede eliminar: el cliente tiene ${sales[0].count} venta(s) asociada(s).` });
+        }
+        const [credits] = await db.query('SELECT COUNT(*) as count FROM credits WHERE client_id=? AND tenant_id=?', [req.params.id, req.user.tenant_id]);
+        if (credits[0].count > 0) {
+            return res.status(400).json({ message: `No se puede eliminar: el cliente tiene ${credits[0].count} crédito(s) asociado(s).` });
+        }
+        await db.query('UPDATE clients SET is_active = FALSE WHERE id=? AND tenant_id=?', [req.params.id, req.user.tenant_id]);
         res.json({ message: 'Cliente eliminado' });
     } catch (error) {
         console.error('Error al eliminar cliente:', error);

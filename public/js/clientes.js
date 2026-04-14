@@ -176,11 +176,12 @@ async function deleteClient(id) {
         },
       });
 
+      const data = await response.json();
       if (response.ok) {
         showToast('Cliente eliminado exitosamente');
-        loadClients(); // Recargar la lista de clientes desde el servidor
+        loadClients();
       } else {
-        throw new Error('No se pudo eliminar el cliente');
+        showToast(data.message || 'No se pudo eliminar el cliente', true);
       }
     } catch (error) {
       console.error('Error al eliminar cliente:', error);
@@ -268,3 +269,4 @@ function escapeHTML(str) {
 // Exportar funciones para onclick handlers
 window.deleteClient = deleteClient;
 window.editClient = editClient;
+window.viewClientHistory = viewClientHistory;

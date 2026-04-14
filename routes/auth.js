@@ -108,6 +108,25 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Refresh token silencioso
+router.post('/refresh-token', authenticateToken, async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT id, username, role, branch_id, tenant_id FROM users WHERE id = ?', [req.user.id]);
+        if (rows.length === 0) return res.status(401).json({ message: 'Usuario no encontrado.' });
+
+        const user = rows[0];
+        const token = jwt.sign(
+            { id: user.id, username: user.username, role: user.role, branch_id: user.branch_id || 1, tenant_id: user.tenant_id || 1 },
+            getJwtSecret(),
+            { expiresIn: '8h' }
+        );
+        res.json({ token });
+    } catch (error) {
+        console.error('Error refreshing token:', error);
+        res.status(500).json({ message: 'Error renovando sesión.' });
+    }
+});
+
 router.put('/profile/change-password', authenticateToken, async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     if (newPassword.length < 6) return res.status(400).json({ message: 'Mínimo 6 caracteres.' });
@@ -173,16 +192,16 @@ router.post('/forgot-password', async (req, res) => {
         }
 
         // En desarrollo, mostrar token en consola
-        console.log(`\n🔐 PASSWORD RESET TOKEN para ${email}: ${resetToken}\n`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`\n🔐 PASSWORD RESET TOKEN para ${email}: ${resetToken}\n`);
+        }
 
         // TODO: En producción, enviar email aquí
         // await sendResetEmail(email, resetToken, user.username);
 
-        res.json({ 
-            message: 'Si el email existe, recibirás instrucciones.',
-            // Solo en desarrollo:
-            devToken: resetToken 
-        });
+        const response = { message: 'Si el email existe, recibirás instrucciones.' };
+        if (process.env.NODE_ENV !== 'production') response.devToken = resetToken;
+        res.json(response);
 
     } catch (error) {
         console.error('Forgot password error:', error);

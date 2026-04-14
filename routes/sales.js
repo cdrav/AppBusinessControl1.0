@@ -10,15 +10,28 @@ const fs = require('fs');
 const path = require('path');
 const { recordLog } = require('../services/auditService');
 const { BusinessError } = require('../middleware/validate');
+const rateLimit = require('../middleware/rateLimit');
+
+const saleLimiter = rateLimit({ windowMs: 60000, max: 30, message: 'Demasiadas ventas registradas. Espere un momento.' });
 
 // Registrar Venta
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, saleLimiter, async (req, res) => {
     let { clientId, products, saleDate, couponCode, notes, branchId, initialPayment } = req.body;
     // Aceptar ambos formatos: is_credit (frontend) e isCredit (camelCase)
     let isCredit = req.body.is_credit || req.body.isCredit || false;
-    
-    console.log(`[DEBUG POST /sales] isCredit: ${isCredit}, initialPayment: ${initialPayment}`);
-    
+
+    if (!products || !Array.isArray(products) || products.length === 0) {
+        return res.status(400).json({ message: 'Debe incluir al menos un producto.' });
+    }
+    for (const p of products) {
+        if (!p.productId || !p.quantity || p.quantity <= 0 || !Number.isInteger(p.quantity)) {
+            return res.status(400).json({ message: 'Cada producto debe tener productId y quantity (entero positivo).' });
+        }
+    }
+    if (initialPayment !== undefined && initialPayment !== null && (isNaN(initialPayment) || parseFloat(initialPayment) < 0)) {
+        return res.status(400).json({ message: 'El pago inicial no puede ser negativo.' });
+    }
+
     // Lógica de Sede:
     // Si NO es admin, forzamos la sede asignada al usuario (seguridad).
     if (req.user.role !== 'admin') {
@@ -58,14 +71,11 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         const finalPrice = Math.max(0, total - discount);
-        console.log(`[DEBUG] total: ${total}, discount: ${discount}, finalPrice: ${finalPrice}`);
-        console.log(`[DEBUG] Inserting sale with finalPrice type: ${typeof finalPrice}, value: ${finalPrice}`);
         const [sale] = await conn.query('INSERT INTO sales (tenant_id, client_id, branch_id, total_price, discount, coupon_code, sale_date, notes, is_credit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())', [req.user.tenant_id, clientId, branchId, finalPrice, discount, couponCode, saleDate || new Date(), notes, isCredit || false]);
         
         if (isCredit) {
             const payment = parseFloat(initialPayment) || 0;
             const remainingBalance = Math.max(0, finalPrice - payment);
-            console.log(`[DEBUG] Credit sale - finalPrice: ${finalPrice}, payment: ${payment}, remainingBalance: ${remainingBalance}`);
             await conn.query('INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, initial_payment, next_payment_date, collected_by) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), ?)', 
             [req.user.tenant_id, sale.insertId, clientId, finalPrice, remainingBalance, payment, req.user.id]);
         }

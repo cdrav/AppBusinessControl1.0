@@ -1,29 +1,57 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { authenticateToken, authorizeSpecificRole, authorizeRole } = require('../middleware/auth');
+const { authenticateToken, authorizeRole } = require('../middleware/auth');
+const { BusinessError } = require('../middleware/validate');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
 const { recordLog } = require('../services/auditService');
+const { parsePagination, paginatedResponse } = require('../middleware/paginate');
+const rateLimit = require('../middleware/rateLimit');
+
+const paymentLimiter = rateLimit({ windowMs: 60000, max: 20, message: 'Demasiados pagos registrados. Espere un momento.' });
 
 // Obtener todos los créditos (Admin)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const [credits] = await db.query(`
-      SELECT c.*, cl.name as client_name, cl.email as client_email, cl.phone as client_phone,
-             u.username as created_by_user,
-             s.total_price as sale_total, s.sale_date,
-             b.name as branch_name
+    const { search, status } = req.query;
+    let where = 'WHERE c.tenant_id = ?';
+    let params = [req.user.tenant_id];
+
+    if (status && status !== 'all') {
+      where += ' AND c.status = ?';
+      params.push(status);
+    } else {
+      where += " AND c.status != 'paid'";
+    }
+
+    if (search) {
+      where += ' AND cl.name LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    const baseFrom = `
       FROM credits c
       JOIN clients cl ON c.client_id = cl.id
       LEFT JOIN users u ON c.collected_by = u.id
       LEFT JOIN sales s ON c.sale_id = s.id
       LEFT JOIN branches b ON u.branch_id = b.id
-      WHERE c.tenant_id = ? AND c.status != 'paid'
-      ORDER BY c.next_payment_date ASC, c.created_at DESC
-    `, [req.user.tenant_id]);
-    
+      ${where}`;
+
+    const selectFields = `c.*, cl.name as client_name, cl.email as client_email, cl.phone as client_phone,
+             u.username as created_by_user,
+             s.total_price as sale_total, s.sale_date,
+             b.name as branch_name`;
+
+    if (req.query.page) {
+      const { page, limit, offset } = parsePagination(req.query);
+      const [countResult] = await db.query(`SELECT COUNT(*) as total ${baseFrom}`, params);
+      const [credits] = await db.query(`SELECT ${selectFields} ${baseFrom} ORDER BY c.next_payment_date ASC, c.created_at DESC LIMIT ? OFFSET ?`, [...params, limit, offset]);
+      return res.json(paginatedResponse(credits, countResult[0].total, page, limit));
+    }
+
+    const [credits] = await db.query(`SELECT ${selectFields} ${baseFrom} ORDER BY c.next_payment_date ASC, c.created_at DESC`, params);
     res.json(credits);
   } catch (error) {
     console.error('Error loading credits:', error);
@@ -85,8 +113,17 @@ router.get('/client/:clientId', authenticateToken, async (req, res) => {
 });
 
 // Obtener resumen de créditos del cobrador
-router.get('/summary', authenticateToken, authorizeSpecificRole('cobrador'), async (req, res) => {
+router.get('/summary', authenticateToken, authorizeRole(['admin', 'cobrador']), async (req, res) => {
   try {
+    // Admin ve todos los créditos, cobrador solo los suyos
+    const isAdmin = req.user.role === 'admin';
+    const whereClause = isAdmin 
+      ? 'WHERE tenant_id = ?' 
+      : 'WHERE collected_by = ? AND tenant_id = ?';
+    const params = isAdmin 
+      ? [req.user.tenant_id] 
+      : [req.user.id, req.user.tenant_id];
+
     const [summary] = await db.query(`
       SELECT 
         COUNT(*) as total_credits,
@@ -97,8 +134,8 @@ router.get('/summary', authenticateToken, authorizeSpecificRole('cobrador'), asy
         COALESCE(SUM(remaining_balance), 0) as total_pending,
         COALESCE(SUM(initial_payment), 0) as total_collected
       FROM credits
-      WHERE collected_by = ? AND tenant_id = ?
-    `, [req.user.id, req.user.tenant_id]);
+      ${whereClause}
+    `, params);
     
     res.json(summary[0] || {});
   } catch (error) {
@@ -108,9 +145,16 @@ router.get('/summary', authenticateToken, authorizeSpecificRole('cobrador'), asy
 });
 
 // Registrar pago/abono de crédito
-router.post('/payment', authenticateToken, async (req, res) => {
+router.post('/payment', authenticateToken, paymentLimiter, async (req, res) => {
     const { creditId, amount, notes, nextPaymentDate } = req.body;
-    
+
+    if (!creditId || !amount) {
+        return res.status(400).json({ message: 'Campos requeridos: creditId, amount' });
+    }
+    if (isNaN(amount) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ message: 'El monto debe ser un número positivo.' });
+    }
+
     let conn;
   try {
         conn = await db.getConnection();
@@ -122,12 +166,12 @@ router.post('/payment', authenticateToken, async (req, res) => {
       [creditId, req.user.tenant_id]
     );
 
-    if (!credit.length) throw new Error('Crédito no encontrado');
+    if (!credit.length) throw new BusinessError('Crédito no encontrado', 404);
     
     const currentBalance = parseFloat(credit[0].remaining_balance);
     const paymentAmount = parseFloat(amount);
 
-    if (paymentAmount > currentBalance) throw new Error('El pago excede el saldo restante');
+    if (paymentAmount > currentBalance) throw new BusinessError('El pago excede el saldo restante');
     
     // Actualizar el crédito
     const newBalance = credit[0].remaining_balance - amount;
@@ -171,7 +215,8 @@ router.post('/payment', authenticateToken, async (req, res) => {
     
   } catch (error) {
     if (conn) await conn.rollback();
-    res.status(500).json({ message: error.message || 'Error interno' });
+    const status = error.statusCode || 500;
+    res.status(status).json({ message: error.message || 'Error interno' });
   } finally {
     if (conn) conn.release();
   }

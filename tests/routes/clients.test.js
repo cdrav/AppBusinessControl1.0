@@ -185,7 +185,9 @@ describe('Clients Routes', () => {
   // ==========================================
   describe('DELETE /clients/:id', () => {
     test('elimina cliente (admin)', async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
+      db.query.mockResolvedValueOnce([[{ count: 0 }]]); // COUNT sales
+      db.query.mockResolvedValueOnce([[{ count: 0 }]]); // COUNT credits
+      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]); // DELETE
 
       const res = await request(app).delete('/clients/1');
 

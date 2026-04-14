@@ -191,6 +191,58 @@ async function loadDashboardStats(period = '7days', branchId = null) {
         if (todaySalesCountEl) todaySalesCountEl.textContent = stats.todaySalesCount || stats.totalSales || 0;
         if (todaySalesAmountEl) todaySalesAmountEl.textContent = formatCOP(stats.todaySalesAmount || stats.totalRevenue);
 
+        // Actualizar gráfico de Ingresos (Revenue Chart)
+        if (revenueChart && stats.salesTrend) {
+            const labels = stats.salesTrend.map(item => {
+                const d = new Date(item.date);
+                return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+            });
+            revenueChart.data.labels = labels;
+            revenueChart.data.datasets[0].data = stats.salesTrend.map(item => parseFloat(item.total));
+            revenueChart.update();
+        }
+
+        // Actualizar gráfico de Productos Top
+        if (topProductsChart && stats.topProducts) {
+            topProductsChart.data.labels = stats.topProducts.map(p => p.product_name);
+            topProductsChart.data.datasets[0].data = stats.topProducts.map(p => parseInt(p.totalSold));
+            topProductsChart.update();
+        }
+
+        // Actualizar gráfico Contado vs Crédito
+        if (cashVsCreditChart) {
+            const cashVal = parseFloat(stats.cashRevenue || 0);
+            const creditVal = parseFloat(stats.creditRevenue || 0);
+            cashVsCreditChart.data.datasets[0].data = [cashVal, creditVal];
+            cashVsCreditChart.update();
+        }
+
+        // Actualizar gráfico de Comparación (Ingresos vs Gastos)
+        if (comparisonChart && stats.salesTrend) {
+            const revenueByMonth = {};
+            const expensesByMonth = {};
+            
+            (stats.salesTrend || []).forEach(item => {
+                const d = new Date(item.date);
+                const key = d.toLocaleDateString('es-CO', { month: 'short' });
+                revenueByMonth[key] = (revenueByMonth[key] || 0) + parseFloat(item.total);
+            });
+            
+            (stats.expensesTrend || []).forEach(item => {
+                const d = new Date(item.date);
+                const key = d.toLocaleDateString('es-CO', { month: 'short' });
+                expensesByMonth[key] = (expensesByMonth[key] || 0) + parseFloat(item.total);
+            });
+
+            const allLabels = [...new Set([...Object.keys(revenueByMonth), ...Object.keys(expensesByMonth)])];
+            comparisonChart.data.labels = allLabels;
+            comparisonChart.data.datasets[0].label = 'Ingresos';
+            comparisonChart.data.datasets[0].data = allLabels.map(l => revenueByMonth[l] || 0);
+            comparisonChart.data.datasets[1].label = 'Gastos';
+            comparisonChart.data.datasets[1].data = allLabels.map(l => expensesByMonth[l] || 0);
+            comparisonChart.update();
+        }
+
     } catch (error) {
         console.error('Error loading dashboard stats:', error);
     }
@@ -358,8 +410,6 @@ window.sendSummaryByEmail = async function() {
 };
 
 async function fetchDailySummary(date, branchId = null) {
-    console.log('[fetchDailySummary] Cargando datos para fecha:', date);
-    
     // Mostrar spinner, ocultar datos
     const summaryContent = document.getElementById('summaryContent');
     const summaryData = document.getElementById('summaryData');
@@ -374,8 +424,6 @@ async function fetchDailySummary(date, branchId = null) {
         }
 
         const data = await apiFetch(url);
-        console.log('[fetchDailySummary] Datos recibidos:', data);
-        
         if (!data) {
             throw new Error('No se recibieron datos del servidor');
         }

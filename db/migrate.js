@@ -40,8 +40,8 @@ async function ensureDatabaseSchema() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       product_name VARCHAR(255) NOT NULL,
       stock INT NOT NULL DEFAULT 0,
-      price DECIMAL(10,2) NOT NULL,
-      cost DECIMAL(10,2) DEFAULT 0,
+      price DECIMAL(15,2) NOT NULL,
+      cost DECIMAL(15,2) DEFAULT 0,
       category VARCHAR(100),
       description TEXT,
       barcode VARCHAR(100),
@@ -76,8 +76,8 @@ async function ensureDatabaseSchema() {
       tenant_id INT DEFAULT NULL,
       client_id INT DEFAULT NULL,
       branch_id INT DEFAULT NULL,
-      total_price DECIMAL(10,2) NOT NULL,
-      discount DECIMAL(10,2) DEFAULT 0,
+      total_price DECIMAL(15,2) NOT NULL,
+      discount DECIMAL(15,2) DEFAULT 0,
       coupon_code VARCHAR(50),
       notes TEXT,
       sale_date DATETIME NOT NULL,
@@ -93,7 +93,7 @@ async function ensureDatabaseSchema() {
       sale_id INT DEFAULT NULL,
       product_id INT DEFAULT NULL,
       quantity INT NOT NULL,
-      subtotal DECIMAL(10,2) NOT NULL,
+      subtotal DECIMAL(15,2) NOT NULL,
       INDEX idx_tenant_sd (tenant_id),
       INDEX idx_sale_sd (sale_id)
     )`,
@@ -102,7 +102,7 @@ async function ensureDatabaseSchema() {
       tenant_id INT DEFAULT NULL,
       code VARCHAR(50) NOT NULL,
       discount_type ENUM('percent','fixed') NOT NULL DEFAULT 'percent',
-      value DECIMAL(10,2) NOT NULL,
+      value DECIMAL(15,2) NOT NULL,
       active BOOLEAN DEFAULT TRUE,
       expiration_date DATE DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -113,9 +113,9 @@ async function ensureDatabaseSchema() {
       tenant_id INT DEFAULT NULL,
       sale_id INT DEFAULT NULL,
       client_id INT DEFAULT NULL,
-      total_debt DECIMAL(10,2) NOT NULL,
-      remaining_balance DECIMAL(10,2) NOT NULL,
-      initial_payment DECIMAL(10,2) DEFAULT 0,
+      total_debt DECIMAL(15,2) NOT NULL,
+      remaining_balance DECIMAL(15,2) NOT NULL,
+      initial_payment DECIMAL(15,2) DEFAULT 0,
       status ENUM('pending','active','partial','paid') DEFAULT 'pending',
       next_payment_date DATE DEFAULT NULL,
       collected_by INT DEFAULT NULL,
@@ -128,7 +128,7 @@ async function ensureDatabaseSchema() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       tenant_id INT DEFAULT NULL,
       credit_id INT DEFAULT NULL,
-      amount DECIMAL(10,2) NOT NULL,
+      amount DECIMAL(15,2) NOT NULL,
       payment_date DATETIME NOT NULL,
       notes TEXT,
       collector_id INT DEFAULT NULL,
@@ -141,7 +141,7 @@ async function ensureDatabaseSchema() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       tenant_id INT DEFAULT NULL,
       description TEXT NOT NULL,
-      amount DECIMAL(10,2) NOT NULL,
+      amount DECIMAL(15,2) NOT NULL,
       category VARCHAR(100),
       supplier_id INT DEFAULT NULL,
       branch_id INT DEFAULT NULL,
@@ -201,18 +201,20 @@ async function ensureDatabaseSchema() {
   // Paso 2: Verificar columnas faltantes
   const alterations = [
     { table: 'branches', column: 'is_active', sql: 'ALTER TABLE branches ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
-    { table: 'credits', column: 'initial_payment', sql: 'ALTER TABLE credits ADD COLUMN initial_payment DECIMAL(10,2) DEFAULT 0' },
+    { table: 'credits', column: 'initial_payment', sql: 'ALTER TABLE credits ADD COLUMN initial_payment DECIMAL(15,2) DEFAULT 0' },
     { table: 'credits', column: 'status', sql: "ALTER TABLE credits ADD COLUMN status ENUM('pending','active','partial','paid') DEFAULT 'pending'" },
     { table: 'credits', column: 'collected_by', sql: 'ALTER TABLE credits ADD COLUMN collected_by INT DEFAULT NULL' },
     { table: 'credits', column: 'next_payment_date', sql: 'ALTER TABLE credits ADD COLUMN next_payment_date DATE DEFAULT NULL' },
     { table: 'sales', column: 'is_credit', sql: 'ALTER TABLE sales ADD COLUMN is_credit BOOLEAN DEFAULT FALSE' },
     { table: 'sales', column: 'notes', sql: 'ALTER TABLE sales ADD COLUMN notes TEXT' },
-    { table: 'sales', column: 'discount', sql: 'ALTER TABLE sales ADD COLUMN discount DECIMAL(10,2) DEFAULT 0' },
+    { table: 'sales', column: 'discount', sql: 'ALTER TABLE sales ADD COLUMN discount DECIMAL(15,2) DEFAULT 0' },
     { table: 'sales', column: 'coupon_code', sql: 'ALTER TABLE sales ADD COLUMN coupon_code VARCHAR(50)' },
-    { table: 'inventory', column: 'cost', sql: 'ALTER TABLE inventory ADD COLUMN cost DECIMAL(10,2) DEFAULT 0' },
+    { table: 'inventory', column: 'cost', sql: 'ALTER TABLE inventory ADD COLUMN cost DECIMAL(15,2) DEFAULT 0' },
     { table: 'inventory', column: 'barcode', sql: 'ALTER TABLE inventory ADD COLUMN barcode VARCHAR(100)' },
     { table: 'inventory', column: 'supplier_id', sql: 'ALTER TABLE inventory ADD COLUMN supplier_id INT DEFAULT NULL' },
     { table: 'sale_details', column: 'tenant_id', sql: 'ALTER TABLE sale_details ADD COLUMN tenant_id INT DEFAULT NULL' },
+    { table: 'clients', column: 'is_active', sql: 'ALTER TABLE clients ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
+    { table: 'inventory', column: 'is_active', sql: 'ALTER TABLE inventory ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
   ];
 
   for (const alt of alterations) {
@@ -224,6 +226,29 @@ async function ensureDatabaseSchema() {
       }
     } catch (err) {
       console.log(`  ⚠️ ${alt.table}.${alt.column}: ${err.message}`);
+    }
+  }
+
+  // Paso 2.5: Ampliar columnas DECIMAL(10,2) a DECIMAL(15,2) para montos grandes (COP)
+  const decimalUpgrades = [
+    'ALTER TABLE inventory MODIFY COLUMN price DECIMAL(15,2) NOT NULL',
+    'ALTER TABLE inventory MODIFY COLUMN cost DECIMAL(15,2) DEFAULT 0',
+    'ALTER TABLE sales MODIFY COLUMN total_price DECIMAL(15,2) NOT NULL',
+    'ALTER TABLE sales MODIFY COLUMN discount DECIMAL(15,2) DEFAULT 0',
+    'ALTER TABLE sale_details MODIFY COLUMN subtotal DECIMAL(15,2) NOT NULL',
+    'ALTER TABLE credits MODIFY COLUMN total_debt DECIMAL(15,2) NOT NULL',
+    'ALTER TABLE credits MODIFY COLUMN remaining_balance DECIMAL(15,2) NOT NULL',
+    'ALTER TABLE credits MODIFY COLUMN initial_payment DECIMAL(15,2) DEFAULT 0',
+    'ALTER TABLE credit_payments MODIFY COLUMN amount DECIMAL(15,2) NOT NULL',
+    'ALTER TABLE expenses MODIFY COLUMN amount DECIMAL(15,2) NOT NULL',
+    'ALTER TABLE coupons MODIFY COLUMN value DECIMAL(15,2) NOT NULL',
+  ];
+
+  for (const sql of decimalUpgrades) {
+    try {
+      await db.query(sql);
+    } catch (err) {
+      // Ignorar errores si la tabla no existe aún
     }
   }
 

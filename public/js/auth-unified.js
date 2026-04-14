@@ -185,15 +185,61 @@ export function setupLogoutButton() {
  * @param {Function} callback - Función a ejecutar si la sesión es válida
  */
 export function initAuth(pageName, callback) {
-    console.log(`🚀 Inicializando autenticación para: ${pageName}`);
-    
     const payload = setupUserSession(pageName);
     if (!payload) return;
     
     updateUserInfo(payload);
     setupLogoutButton();
+    scheduleTokenRefresh();
     
     if (callback && typeof callback === 'function') {
         callback(payload);
+    }
+}
+
+/**
+ * Renueva el token silenciosamente si quedan menos de 30 min
+ */
+let refreshTimer = null;
+async function refreshToken() {
+    const token = getValidToken();
+    if (!token) return;
+
+    try {
+        const res = await fetch('/auth/refresh-token', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.token) {
+                localStorage.setItem('token', data.token);
+                scheduleTokenRefresh();
+            }
+        }
+    } catch (e) {
+        // Silencioso: no interrumpir al usuario
+    }
+}
+
+function scheduleTokenRefresh() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    const payload = getUserPayload();
+    if (!payload || !payload.exp) return;
+
+    const now = Date.now();
+    const expTime = payload.exp * 1000;
+    const timeLeft = expTime - now;
+    const REFRESH_THRESHOLD = 30 * 60 * 1000; // 30 min antes de expirar
+
+    if (timeLeft <= 0) return;
+
+    if (timeLeft <= REFRESH_THRESHOLD) {
+        // Ya está cerca de expirar, renovar inmediatamente
+        refreshToken();
+    } else {
+        // Programar renovación para 30 min antes de expirar
+        const delay = timeLeft - REFRESH_THRESHOLD;
+        refreshTimer = setTimeout(refreshToken, delay);
     }
 }
