@@ -1,7 +1,7 @@
 const API_URL = '';
 let expenseModal;
-let currentExpenses = []; // Almacenar gastos para edición
-let userRole = 'cajero'; // Valor por defecto
+let currentExpenses = [];
+let userRole = 'cajero';
 
 document.addEventListener('DOMContentLoaded', () => {
     expenseModal = new bootstrap.Modal(document.getElementById('expenseModal'));
@@ -20,7 +20,6 @@ function checkUserRole() {
             const payload = JSON.parse(atob(token.split('.')[1]));
             userRole = payload.role;
             
-            // Si no es admin, ocultar el selector de sucursal en el formulario
             if (userRole !== 'admin') {
                 const branchContainer = document.getElementById('expenseBranch').closest('.col-md-6') || document.getElementById('expenseBranch').parentElement;
                 if (branchContainer) branchContainer.style.display = 'none';
@@ -43,7 +42,7 @@ async function loadExpenses() {
             return;
         }
         if (!res.ok) throw new Error('Error cargando gastos');
-        currentExpenses = await res.json(); // Guardar en variable global
+        currentExpenses = await res.json();
 
         loading.style.display = 'none';
         tbody.innerHTML = '';
@@ -58,7 +57,6 @@ async function loadExpenses() {
 
         currentExpenses.forEach(expense => {
             const date = new Date(expense.expense_date);
-            // Ajustar por zona horaria para que muestre la fecha correcta
             const userTimezoneOffset = date.getTimezoneOffset() * 60000;
             const localDate = new Date(date.getTime() + userTimezoneOffset);
 
@@ -87,7 +85,10 @@ async function loadExpenses() {
 async function loadSuppliers() {
     const select = document.getElementById('expenseSupplier');
     try {
-        const res = await apiFetch('/suppliers');
+        const res = await fetch(`${API_URL}/suppliers`, {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        });
+        if (!res.ok) throw new Error('Error cargando proveedores');
         const suppliers = await res.json();
         suppliers.forEach(s => {
             select.innerHTML += `<option value="${s.id}">${s.name}</option>`;
@@ -98,7 +99,6 @@ async function loadSuppliers() {
 }
 
 async function loadBranches() {
-    // Si no es admin, no necesitamos cargar las sedes
     if (userRole !== 'admin') return;
 
     const select = document.getElementById('expenseBranch');
@@ -119,7 +119,6 @@ function openExpenseModal() {
     document.getElementById('expenseForm').reset();
     document.getElementById('expenseId').value = '';
     document.getElementById('expenseModalLabel').textContent = 'Registrar Nuevo Gasto';
-    // Set today's date by default
     document.getElementById('expenseDate').valueAsDate = new Date();
     expenseModal.show();
 }
@@ -135,7 +134,6 @@ function editExpense(id) {
     document.getElementById('expenseSupplier').value = expense.supplier_id || '';
     document.getElementById('expenseBranch').value = expense.branch_id || '';
     
-    // Formatear fecha para input date (YYYY-MM-DD)
     const date = new Date(expense.expense_date);
     document.getElementById('expenseDate').value = date.toISOString().split('T')[0];
 

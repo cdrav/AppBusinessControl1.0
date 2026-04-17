@@ -137,7 +137,7 @@ function renderSalesTable(sales) {
 
     const row = `
       <tr class="fade-in">
-        <td><span class="fw-bold">#${sale.id}</span></td>
+        <td><span class="fw-bold">${sale.sale_number || '#' + sale.id}</span></td>
         <td>
           <div class="d-flex align-items-center">
             <div class="rounded-circle bg-light text-primary d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px; font-size: 0.8rem;">

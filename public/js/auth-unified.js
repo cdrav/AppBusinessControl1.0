@@ -206,7 +206,7 @@ async function refreshToken() {
     if (!token) return;
 
     try {
-        const res = await fetch('/auth/refresh-token', {
+        const res = await fetch('/refresh-token', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });

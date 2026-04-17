@@ -215,6 +215,9 @@ async function ensureDatabaseSchema() {
     { table: 'sale_details', column: 'tenant_id', sql: 'ALTER TABLE sale_details ADD COLUMN tenant_id INT DEFAULT NULL' },
     { table: 'clients', column: 'is_active', sql: 'ALTER TABLE clients ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
     { table: 'inventory', column: 'is_active', sql: 'ALTER TABLE inventory ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
+    { table: 'sales', column: 'sale_number', sql: 'ALTER TABLE sales ADD COLUMN sale_number VARCHAR(30) DEFAULT NULL' },
+    { table: 'users', column: 'plain_password', sql: 'ALTER TABLE users ADD COLUMN plain_password VARCHAR(255) DEFAULT NULL' },
+    { table: 'users', column: 'is_login_enabled', sql: 'ALTER TABLE users ADD COLUMN is_login_enabled BOOLEAN DEFAULT TRUE' },
   ];
 
   for (const alt of alterations) {

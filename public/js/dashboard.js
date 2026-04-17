@@ -359,16 +359,6 @@ function initComparisonChart() {
 }
 
 // Funciones accesibles desde onclick en dashboard.html
-window.applyOverdueInterests = async function() {
-    if (!confirm('¿Aplicar intereses a créditos vencidos? Esta acción no se puede deshacer.')) return;
-    try {
-        const data = await apiFetch('/api/credits/apply-interests', { method: 'POST' });
-        if (data) showToast('Intereses aplicados correctamente');
-    } catch (error) {
-        console.error('Error aplicando intereses:', error);
-        showToast('Error al aplicar intereses', true);
-    }
-};
 
 window.printDailySummary = function() {
     const summaryData = document.getElementById('summaryData');

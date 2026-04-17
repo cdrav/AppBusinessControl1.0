@@ -71,7 +71,7 @@ router.get('/for-sale', authenticateToken, async (req, res) => {
                 COALESCE(bs.stock, i.stock, 0) as stock 
             FROM inventory i
             LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
-            WHERE i.tenant_id = ? AND (COALESCE(bs.stock, i.stock, 0) > 0 OR i.stock > 0)
+            WHERE i.tenant_id = ? AND i.is_active = TRUE AND (COALESCE(bs.stock, i.stock, 0) > 0 OR i.stock > 0)
             ORDER BY i.product_name ASC
         `, [branchId, req.user.tenant_id, req.user.tenant_id]);
         res.json(products);
@@ -82,37 +82,50 @@ router.get('/for-sale', authenticateToken, async (req, res) => {
 
 // Buscar por código de barras
 router.get('/barcode/:code', authenticateToken, async (req, res) => {
-    const [results] = await db.query('SELECT * FROM inventory WHERE barcode = ? AND tenant_id = ?', [req.params.code, req.user.tenant_id]);
-    if (results.length === 0) return res.status(404).json({ message: 'Producto no encontrado' });
-    res.json(results[0]);
+    try {
+        const [results] = await db.query('SELECT * FROM inventory WHERE barcode = ? AND tenant_id = ?', [req.params.code, req.user.tenant_id]);
+        if (results.length === 0) return res.status(404).json({ message: 'Producto no encontrado' });
+        res.json(results[0]);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al buscar producto.' });
+    }
 });
 
 // Exportar CSV
 router.get('/export', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    const [results] = await db.query('SELECT * FROM inventory WHERE tenant_id = ? ORDER BY id ASC', [req.user.tenant_id]);
-    let csv = 'ID,Codigo,Nombre,Stock,Precio,Costo,Categoria\n';
-    results.forEach(row => { csv += `${row.id},"${row.barcode||''}", "${row.product_name}",${row.stock},${row.price},${row.cost||0},"${row.category||''}"\n`; });
-    res.header('Content-Type', 'text/csv').attachment('inventario.csv').send(csv);
+    try {
+        const [results] = await db.query('SELECT * FROM inventory WHERE tenant_id = ? ORDER BY id ASC', [req.user.tenant_id]);
+        let csv = 'ID,Codigo,Nombre,Stock,Precio,Costo,Categoria\n';
+        results.forEach(row => { csv += `${row.id},"${row.barcode||''}", "${row.product_name}",${row.stock},${row.price},${row.cost||0},"${row.category||''}"\n`; });
+        res.header('Content-Type', 'text/csv').attachment('inventario.csv').send(csv);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al exportar inventario.' });
+    }
 });
 
 // Crear producto
 router.post('/', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    const { name, quantity, price, cost, category, supplier_id, description, barcode } = req.body;
-    const [result] = await db.query('INSERT INTO inventory (tenant_id, product_name, stock, price, cost, category, supplier_id, description, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [req.user.tenant_id, name, quantity, price, cost||0, category, supplier_id || null, description, barcode || null]);
-    const branchId = req.user.branch_id || 1;
-    await db.query('INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?)', [req.user.tenant_id, branchId, result.insertId, quantity]);
-    
-    await recordLog({
-        tenantId: req.user.tenant_id,
-        userId: req.user.id,
-        action: 'PRODUCT_CREATED',
-        entityType: 'product',
-        entityId: result.insertId,
-        details: { name, quantity, price },
-        ipAddress: req.ip
-    });
+    try {
+        const { name, quantity, price, cost, category, supplier_id, description, barcode } = req.body;
+        const [result] = await db.query('INSERT INTO inventory (tenant_id, product_name, stock, price, cost, category, supplier_id, description, barcode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [req.user.tenant_id, name, quantity, price, cost||0, category, supplier_id || null, description, barcode || null]);
+        const branchId = req.user.branch_id || 1;
+        await db.query('INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?)', [req.user.tenant_id, branchId, result.insertId, quantity]);
+        
+        await recordLog({
+            tenantId: req.user.tenant_id,
+            userId: req.user.id,
+            action: 'PRODUCT_CREATED',
+            entityType: 'product',
+            entityId: result.insertId,
+            details: { name, quantity, price },
+            ipAddress: req.ip
+        });
 
-    res.status(201).json({ message: 'Producto agregado', productId: result.insertId });
+        res.status(201).json({ message: 'Producto agregado', productId: result.insertId });
+    } catch (error) {
+        console.error('Error al crear producto:', error);
+        res.status(500).json({ message: 'Error al crear producto.' });
+    }
 });
 
 // Editar producto (Sincronizado)
@@ -158,18 +171,22 @@ router.put('/:id', authenticateToken, authorizeRole(['admin']), async (req, res)
 
 // Eliminar producto
 router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    await db.query('UPDATE inventory SET is_active = FALSE WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
+    try {
+        await db.query('UPDATE inventory SET is_active = FALSE WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
 
-    await recordLog({
-        tenantId: req.user.tenant_id,
-        userId: req.user.id,
-        action: 'PRODUCT_DELETED',
-        entityType: 'product',
-        entityId: req.params.id,
-        ipAddress: req.ip
-    });
+        await recordLog({
+            tenantId: req.user.tenant_id,
+            userId: req.user.id,
+            action: 'PRODUCT_DELETED',
+            entityType: 'product',
+            entityId: req.params.id,
+            ipAddress: req.ip
+        });
 
-    res.json({ message: 'Producto eliminado' });
+        res.json({ message: 'Producto eliminado' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al eliminar producto.' });
+    }
 });
 
 // Obtener un producto
@@ -184,8 +201,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
 // Stock por sucursal
 router.get('/:id/stocks', authenticateToken, async (req, res) => {
-    const [stocks] = await db.query(`SELECT b.id as branch_id, b.name as branch_name, COALESCE(bs.stock, 0) as stock FROM branches b LEFT JOIN branch_stocks bs ON b.id = bs.branch_id AND bs.product_id = ? ORDER BY b.id ASC`, [req.params.id]);
-    res.json(stocks);
+    try {
+        const [stocks] = await db.query(`SELECT b.id as branch_id, b.name as branch_name, COALESCE(bs.stock, 0) as stock FROM branches b LEFT JOIN branch_stocks bs ON b.id = bs.branch_id AND bs.product_id = ? ORDER BY b.id ASC`, [req.params.id]);
+        res.json(stocks);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener stock por sucursal.' });
+    }
 });
 
 // Sincronizar stock global con la suma de sucursales (Herramienta de reparación)
@@ -218,26 +239,30 @@ router.post('/sync-global', authenticateToken, authorizeRole(['admin']), async (
 
 // Ajuste manual de stock
 router.post('/stock', authenticateToken, authorizeRole(['admin']), async (req, res) => {
-    const { productId, branchId, newStock } = req.body;
-    
-    // Validar pertenencia del producto
-    const [p] = await db.query('SELECT id FROM inventory WHERE id = ? AND tenant_id = ?', [productId, req.user.tenant_id]);
-    if (!p.length) return res.status(403).json({ message: 'Producto no pertenece a su empresa' });
+    try {
+        const { productId, branchId, newStock } = req.body;
+        
+        // Validar pertenencia del producto
+        const [p] = await db.query('SELECT id FROM inventory WHERE id = ? AND tenant_id = ?', [productId, req.user.tenant_id]);
+        if (!p.length) return res.status(403).json({ message: 'Producto no pertenece a su empresa' });
 
-    await db.query(`INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE stock = ?`, [req.user.tenant_id, branchId, productId, newStock, newStock]);
-    await db.query(`UPDATE inventory i SET stock = (SELECT SUM(stock) FROM branch_stocks WHERE product_id = i.id AND tenant_id = i.tenant_id) WHERE i.id = ? AND i.tenant_id = ?`, [productId, req.user.tenant_id]);
+        await db.query(`INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE stock = ?`, [req.user.tenant_id, branchId, productId, newStock, newStock]);
+        await db.query(`UPDATE inventory i SET stock = (SELECT SUM(stock) FROM branch_stocks WHERE product_id = i.id AND tenant_id = i.tenant_id) WHERE i.id = ? AND i.tenant_id = ?`, [productId, req.user.tenant_id]);
 
-    await recordLog({
-        tenantId: req.user.tenant_id,
-        userId: req.user.id,
-        action: 'STOCK_ADJUSTMENT',
-        entityType: 'product',
-        entityId: productId,
-        details: { branchId, newStock },
-        ipAddress: req.ip
-    });
+        await recordLog({
+            tenantId: req.user.tenant_id,
+            userId: req.user.id,
+            action: 'STOCK_ADJUSTMENT',
+            entityType: 'product',
+            entityId: productId,
+            details: { branchId, newStock },
+            ipAddress: req.ip
+        });
 
-    res.json({ message: 'Stock actualizado' });
+        res.json({ message: 'Stock actualizado' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error al ajustar stock.' });
+    }
 });
 
 // Transferencia
@@ -276,10 +301,14 @@ router.post('/transfer', authenticateToken, authorizeRole(['admin']), async (req
 
 // Historial Transferencias
 router.get('/:id/transfers', authenticateToken, async (req, res) => {
-    const [exists] = await db.query("SHOW TABLES LIKE 'inventory_transfers'");
-    if (!exists.length) return res.json([]);
-    const [rows] = await db.query(`SELECT t.*, b1.name as from_branch, b2.name as to_branch, u.username as user_name FROM inventory_transfers t LEFT JOIN branches b1 ON t.from_branch_id=b1.id LEFT JOIN branches b2 ON t.to_branch_id=b2.id LEFT JOIN users u ON t.user_id=u.id WHERE t.product_id=? ORDER BY t.created_at DESC LIMIT 10`, [req.params.id]);
-    res.json(rows);
+    try {
+        const [exists] = await db.query("SHOW TABLES LIKE 'inventory_transfers'");
+        if (!exists.length) return res.json([]);
+        const [rows] = await db.query(`SELECT t.*, b1.name as from_branch, b2.name as to_branch, u.username as user_name FROM inventory_transfers t LEFT JOIN branches b1 ON t.from_branch_id=b1.id LEFT JOIN branches b2 ON t.to_branch_id=b2.id LEFT JOIN users u ON t.user_id=u.id WHERE t.product_id=? ORDER BY t.created_at DESC LIMIT 10`, [req.params.id]);
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ message: 'Error al obtener historial de transferencias.' });
+    }
 });
 
 module.exports = router;

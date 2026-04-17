@@ -74,10 +74,16 @@ router.post('/', authenticateToken, saleLimiter, async (req, res) => {
         const [sale] = await conn.query('INSERT INTO sales (tenant_id, client_id, branch_id, total_price, discount, coupon_code, sale_date, notes, is_credit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())', [req.user.tenant_id, clientId, branchId, finalPrice, discount, couponCode, saleDate || new Date(), notes, isCredit || false]);
         
         if (isCredit) {
+            if (!clientId) throw new BusinessError('Las ventas a crédito requieren un cliente.');
             const payment = parseFloat(initialPayment) || 0;
             const remainingBalance = Math.max(0, finalPrice - payment);
-            await conn.query('INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, initial_payment, next_payment_date, collected_by) VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), ?)', 
-            [req.user.tenant_id, sale.insertId, clientId, finalPrice, remainingBalance, payment, req.user.id]);
+            // Determinar status según pago inicial
+            let creditStatus = 'active';
+            if (remainingBalance <= 0) creditStatus = 'paid';
+            else if (payment > 0) creditStatus = 'partial';
+
+            await conn.query('INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, initial_payment, status, next_payment_date, collected_by) VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), ?)', 
+            [req.user.tenant_id, sale.insertId, clientId, finalPrice, remainingBalance, payment, creditStatus, req.user.id]);
         }
 
         for (const d of details) {
@@ -102,6 +108,12 @@ router.post('/', authenticateToken, saleLimiter, async (req, res) => {
             if (stk.length > 0 && stk[0].stock < 5) lowStock.push({ name: stk[0].product_name, stock: stk[0].stock });
         }
         
+        // Generar consecutivo legible: VTA-YYYYMMDD-HHMMSS-ID
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const saleNumber = `VTA-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}-${sale.insertId}`;
+        await conn.query('UPDATE sales SET sale_number = ? WHERE id = ?', [saleNumber, sale.insertId]);
+
         await conn.commit();
         if (lowStock.length) sendLowStockAlert(lowStock);
 
@@ -111,11 +123,11 @@ router.post('/', authenticateToken, saleLimiter, async (req, res) => {
             action: 'SALE_CREATED',
             entityType: 'sale',
             entityId: sale.insertId,
-            details: { clientId, total: finalPrice, isCredit: isCredit || false },
+            details: { clientId, total: finalPrice, isCredit: isCredit || false, saleNumber },
             ipAddress: req.ip
         });
 
-        res.status(201).json({ message: 'Venta registrada', saleId: sale.insertId });
+        res.status(201).json({ message: 'Venta registrada', saleId: sale.insertId, saleNumber });
     } catch (e) {
         if(conn) await conn.rollback();
         const status = e.statusCode || 500;
@@ -147,7 +159,7 @@ router.get('/', authenticateToken, async (req, res) => {
             
             dataParams.push(parseInt(limit), parseInt(offset));
             const [rows] = await db.query(`
-                SELECT s.*, c.name as client_name 
+                SELECT s.*, s.sale_number, c.name as client_name 
                 FROM sales s 
                 LEFT JOIN clients c ON s.client_id = c.id 
                 ${whereClause}
@@ -237,7 +249,7 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
         if(config.company_phone) doc.text(`Tel: ${config.company_phone}`, { align: 'center' });
         doc.moveDown(0.5);
         
-        doc.fontSize(8).text(`Ticket: #${sale[0].id}`, { align: 'center' });
+        doc.fontSize(8).text(`Ticket: ${sale[0].sale_number || '#' + sale[0].id}`, { align: 'center' });
         doc.text(`Fecha: ${new Date(sale[0].sale_date).toLocaleString()}`, { align: 'center' });
         doc.moveDown(0.3);
         
@@ -291,7 +303,7 @@ router.get('/:id/ticket', authenticateToken, async (req, res) => {
 
         doc.fontSize(12).font('Helvetica-Bold').text('RECIBO DE VENTA', 400, 50, { align: 'right' });
         doc.fontSize(10).font('Helvetica');
-        doc.text(`N° Ticket: #${sale[0].id}`, 400, 70, { align: 'right' });
+        doc.text(`N° ${sale[0].sale_number || '#' + sale[0].id}`, 400, 70, { align: 'right' });
         doc.text(`Fecha: ${new Date(sale[0].sale_date).toLocaleDateString()}`, 400, 85, { align: 'right' });
 
         doc.moveDown(4);

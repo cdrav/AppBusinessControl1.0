@@ -10,6 +10,7 @@ router.get('/', authenticateToken, authorizeRole(['admin']), async (req, res) =>
   try {
     const [users] = await db.query(`
       SELECT u.id, u.username, u.email, u.role, u.created_at,
+             u.plain_password, u.is_login_enabled, u.branch_id,
              b.name as branch_name
       FROM users u
       LEFT JOIN branches b ON u.branch_id = b.id
@@ -59,8 +60,8 @@ router.post('/', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, re
     
     // Insertar nuevo usuario
     const [result] = await db.query(
-      'INSERT INTO users (tenant_id, username, email, password, role, branch_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.user.tenant_id, username, email, passwordHash, role, branch_id]
+      'INSERT INTO users (tenant_id, username, email, password, plain_password, role, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [req.user.tenant_id, username, email, passwordHash, password, role, branch_id]
     );
     
     res.status(201).json({ 
@@ -111,6 +112,8 @@ router.put('/:id', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, 
       const passwordHash = await bcrypt.hash(password, 10);
       updateFields.push('password = ?');
       updateValues.push(passwordHash);
+      updateFields.push('plain_password = ?');
+      updateValues.push(password);
     }
     
     if (updateFields.length === 0) {
@@ -136,6 +139,33 @@ router.put('/:id', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, 
   }
 });
 
+// Habilitar/Inhabilitar acceso de login (solo admin)
+router.put('/:id/toggle-access', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    if (parseInt(userId) === req.user.id) {
+      return res.status(403).json({ message: 'No puedes deshabilitar tu propio acceso' });
+    }
+
+    const [user] = await db.query('SELECT is_login_enabled FROM users WHERE id = ? AND tenant_id = ?', [userId, req.user.tenant_id]);
+    if (user.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    const newStatus = user[0].is_login_enabled ? false : true;
+    await db.query('UPDATE users SET is_login_enabled = ? WHERE id = ? AND tenant_id = ?', [newStatus, userId, req.user.tenant_id]);
+
+    res.json({
+      message: newStatus ? 'Acceso habilitado correctamente' : 'Acceso deshabilitado correctamente',
+      is_login_enabled: newStatus
+    });
+  } catch (error) {
+    console.error('Error al cambiar acceso:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
 // Eliminar usuario (solo admin)
 router.delete('/:id', authenticateToken, authorizeRole([ROLES.ADMIN]), async (req, res) => {
   try {
@@ -144,6 +174,12 @@ router.delete('/:id', authenticateToken, authorizeRole([ROLES.ADMIN]), async (re
     // No permitir eliminar al usuario actual
     if (parseInt(userId) === req.user.id) {
       return res.status(403).json({ message: 'No puedes eliminar tu propio usuario' });
+    }
+
+    // No permitir eliminar usuarios con rol admin
+    const [targetUser] = await db.query('SELECT role FROM users WHERE id = ? AND tenant_id = ?', [userId, req.user.tenant_id]);
+    if (targetUser.length > 0 && targetUser[0].role === 'admin') {
+      return res.status(403).json({ message: 'No se puede eliminar un usuario administrador' });
     }
     
     const [result] = await db.query('DELETE FROM users WHERE id = ? AND tenant_id = ?', [userId, req.user.tenant_id]);

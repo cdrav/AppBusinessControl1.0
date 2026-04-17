@@ -45,7 +45,7 @@ router.post('/register', requireFields('username', 'email', 'password'), validat
     const role = userCount[0].count === 0 ? 'admin' : 'cajero';
     const passwordHash = await bcrypt.hash(password, 10);
 
-    await db.query('INSERT INTO users (username, email, password, role, tenant_id, branch_id) VALUES (?, ?, ?, ?, 1, 1)', [username, email, passwordHash, role]);
+    await db.query('INSERT INTO users (username, email, password, plain_password, role, tenant_id, branch_id) VALUES (?, ?, ?, ?, ?, 1, 1)', [username, email, passwordHash, password, role]);
     res.status(201).json({ message: 'Cuenta creada exitosamente.' });
   } catch (err) { res.status(500).json({ message: 'Error interno.' }); }
 });
@@ -80,6 +80,11 @@ router.post('/login', async (req, res) => {
     }
 
     const user = rows[0];
+
+    // Verificar si el acceso está habilitado
+    if (user.is_login_enabled === 0 || user.is_login_enabled === false) {
+      return res.status(403).json({ message: 'Tu acceso ha sido deshabilitado. Contacta al administrador.' });
+    }
     
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
@@ -128,16 +133,23 @@ router.post('/refresh-token', authenticateToken, async (req, res) => {
 });
 
 router.put('/profile/change-password', authenticateToken, async (req, res) => {
-    const { currentPassword, newPassword } = req.body;
-    if (newPassword.length < 6) return res.status(400).json({ message: 'Mínimo 6 caracteres.' });
-    
-    const [userData] = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
-    const isMatch = await bcrypt.compare(currentPassword, userData[0].password);
-    if (!isMatch) return res.status(401).json({ message: 'Contraseña actual incorrecta.' });
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) return res.status(400).json({ message: 'Contraseña actual y nueva son requeridas.' });
+        if (newPassword.length < 6) return res.status(400).json({ message: 'Mínimo 6 caracteres.' });
+        
+        const [userData] = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
+        if (!userData.length) return res.status(404).json({ message: 'Usuario no encontrado.' });
+        const isMatch = await bcrypt.compare(currentPassword, userData[0].password);
+        if (!isMatch) return res.status(401).json({ message: 'Contraseña actual incorrecta.' });
 
-    const encrypted = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [encrypted, req.user.id]);
-    res.json({ message: 'Contraseña actualizada.' });
+        const encrypted = await bcrypt.hash(newPassword, 10);
+        await db.query('UPDATE users SET password = ?, plain_password = ? WHERE id = ?', [encrypted, newPassword, req.user.id]);
+        res.json({ message: 'Contraseña actualizada.' });
+    } catch (error) {
+        console.error('Error al cambiar contraseña:', error);
+        res.status(500).json({ message: 'Error al cambiar contraseña.' });
+    }
 });
 
 // ========================================
@@ -256,7 +268,7 @@ router.post('/reset-password', async (req, res) => {
 
         // Actualizar contraseña
         const passwordHash = await bcrypt.hash(newPassword, 10);
-        await db.query('UPDATE users SET password = ? WHERE email = ?', [passwordHash, email]);
+        await db.query('UPDATE users SET password = ?, plain_password = ? WHERE email = ?', [passwordHash, newPassword, email]);
 
         // Marcar token como usado
         await db.query('UPDATE password_resets SET used = TRUE WHERE id = ?', [records[0].id]);

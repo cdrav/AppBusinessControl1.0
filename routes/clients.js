@@ -77,7 +77,7 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin']), async (req, r
 });
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
-        const [c] = await db.query('SELECT * FROM clients WHERE id = ? AND tenant_id = ?', [req.params.id, req.user.tenant_id]);
+        const [c] = await db.query('SELECT * FROM clients WHERE id = ? AND tenant_id = ? AND is_active = TRUE', [req.params.id, req.user.tenant_id]);
         if (c.length === 0) return res.status(404).json({ message: 'Cliente no encontrado' });
         res.json(c[0]);
     } catch (error) {

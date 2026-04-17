@@ -66,27 +66,31 @@ console.log(`📁 Serving static files from: ${publicPath}`);
 app.use(express.static(publicPath));
 
 // Debug endpoint para verificar archivos (solo en desarrollo)
-app.get('/debug/files', (req, res) => {
-  const fs = require('fs');
-  try {
-    const files = fs.readdirSync(publicPath);
-    const jsFiles = fs.readdirSync(path.join(publicPath, 'js'));
-    res.json({
-      publicPath,
-      rootFiles: files,
-      jsFiles: jsFiles,
-      __dirname: __dirname
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message, publicPath, __dirname });
-  }
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/debug/files', (req, res) => {
+    const fs = require('fs');
+    try {
+      const files = fs.readdirSync(publicPath);
+      const jsFiles = fs.readdirSync(path.join(publicPath, 'js'));
+      res.json({
+        publicPath,
+        rootFiles: files,
+        jsFiles: jsFiles,
+        __dirname: __dirname
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message, publicPath, __dirname });
+    }
+  });
+}
 
-// Logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
-});
+// Logging middleware (solo en desarrollo)
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+  });
+}
 
 // Importar Rutas
 const authRoutes = require('./routes/auth');
