@@ -33,8 +33,8 @@ export async function apiFetch(endpoint, options = {}) {
     try {
         const response = await fetch(endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`, config);
         
-        if (response.status === 401 || response.status === 403) {
-            // Sesión expirada o no autorizada
+        if (response.status === 401) {
+            // Sesión expirada
             localStorage.removeItem('token');
             window.location.href = '/login.html';
             return;

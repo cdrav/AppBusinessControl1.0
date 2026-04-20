@@ -103,6 +103,7 @@ const settingsRoutes = require('./routes/settings');
 const expensesRoutes = require('./routes/expenses');
 const creditRoutes = require('./routes/credits');
 const auditRoutes = require('./routes/audit');
+const superadminRoutes = require('./routes/superadmin');
 
 // Usar Rutas
 app.use('/', authRoutes); // Login, Register
@@ -114,6 +115,7 @@ app.use('/api/credits', creditRoutes);
 app.use('/api', reportRoutes); // Dashboard, Backup
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/superadmin', superadminRoutes);
 // Montar reportRoutes también en la raíz para soportar /report y /statistics
 app.use('/', reportRoutes);
 

@@ -1,5 +1,6 @@
 // Configuración de roles del sistema
 const ROLES = {
+  SUPERADMIN: 'superadmin',
   ADMIN: 'admin',
   CAJERO: 'cajero', 
   COBRADOR: 'cobrador',
@@ -26,11 +27,22 @@ const PERMISOS = {
   GESTIONAR_USUARIOS: 'manage_users',
   ASIGNAR_ROLES: 'assign_roles',
   CONFIGURAR_SISTEMA: 'configure_system',
-  VER_CONFIGURACION: 'view_config'
+  VER_CONFIGURACION: 'view_config',
+  
+  // Permisos de superadmin (plataforma)
+  GESTIONAR_TENANTS: 'manage_tenants',
+  VER_METRICAS_GLOBALES: 'view_global_metrics',
+  IMPERSONAR_TENANT: 'impersonate_tenant',
+  SOPORTE_PLATAFORMA: 'platform_support'
 };
 
 const PERMISOS_POR_ROL = {
-  [ROLES.ADMIN]: Object.values(PERMISOS), // Admin tiene todos los permisos
+  [ROLES.SUPERADMIN]: Object.values(PERMISOS), // Superadmin tiene TODOS los permisos
+  
+  [ROLES.ADMIN]: Object.values(PERMISOS).filter(p => ![
+    PERMISOS.GESTIONAR_TENANTS, PERMISOS.VER_METRICAS_GLOBALES,
+    PERMISOS.IMPERSONAR_TENANT, PERMISOS.SOPORTE_PLATAFORMA
+  ].includes(p)), // Admin tiene todos excepto los de plataforma
   
   [ROLES.CAJERO]: [
     PERMISOS.VER_DASHBOARD,

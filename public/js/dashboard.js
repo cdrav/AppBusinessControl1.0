@@ -16,6 +16,26 @@ let comparisonChart; // Variable global para el gráfico de comparación
 let cashVsCreditChart; // Variable global para el nuevo gráfico
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Banner de impersonación para superadmin
+    if (localStorage.getItem('sa_impersonating') === 'true') {
+        const tenantName = localStorage.getItem('sa_tenant_name') || 'Negocio';
+        const banner = document.createElement('div');
+        banner.style.cssText = 'background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff;padding:10px 20px;text-align:center;font-weight:600;position:fixed;top:0;left:0;right:0;z-index:9999;font-size:.9rem;';
+        banner.innerHTML = `<i class="bi bi-shield-exclamation me-2"></i>Estás viendo como admin de <strong>${tenantName}</strong> <button onclick="window._exitImpersonation()" class="btn btn-sm btn-light ms-3 fw-bold">Volver al Panel</button>`;
+        document.body.prepend(banner);
+        document.body.style.paddingTop = '50px';
+    }
+    window._exitImpersonation = function() {
+        const originalToken = localStorage.getItem('sa_original_token');
+        if (originalToken) {
+            localStorage.setItem('token', originalToken);
+            localStorage.removeItem('sa_original_token');
+            localStorage.removeItem('sa_impersonating');
+            localStorage.removeItem('sa_tenant_name');
+            window.location.href = 'superadmin.html';
+        }
+    };
+
     updateDate();
     const urlParams = new URLSearchParams(window.location.search);
     const branchId = urlParams.get('branch_id');

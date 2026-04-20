@@ -4,6 +4,18 @@ const db = require('../config/db');
 async function ensureDatabaseSchema() {
   // Paso 1: Crear todas las tablas si no existen
   const tables = [
+    `CREATE TABLE IF NOT EXISTS tenants (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      business_name VARCHAR(255) NOT NULL,
+      owner_name VARCHAR(255),
+      email VARCHAR(255),
+      phone VARCHAR(50),
+      plan VARCHAR(50) DEFAULT 'basic',
+      is_active BOOLEAN DEFAULT TRUE,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS branches (
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -218,6 +230,10 @@ async function ensureDatabaseSchema() {
     { table: 'sales', column: 'sale_number', sql: 'ALTER TABLE sales ADD COLUMN sale_number VARCHAR(30) DEFAULT NULL' },
     { table: 'users', column: 'plain_password', sql: 'ALTER TABLE users ADD COLUMN plain_password VARCHAR(255) DEFAULT NULL' },
     { table: 'users', column: 'is_login_enabled', sql: 'ALTER TABLE users ADD COLUMN is_login_enabled BOOLEAN DEFAULT TRUE' },
+    { table: 'tenants', column: 'is_active', sql: 'ALTER TABLE tenants ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
+    { table: 'tenants', column: 'plan', sql: "ALTER TABLE tenants ADD COLUMN plan VARCHAR(50) DEFAULT 'basic'" },
+    { table: 'tenants', column: 'notes', sql: 'ALTER TABLE tenants ADD COLUMN notes TEXT' },
+    { table: 'tenants', column: 'updated_at', sql: 'ALTER TABLE tenants ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP' },
   ];
 
   for (const alt of alterations) {
@@ -256,6 +272,15 @@ async function ensureDatabaseSchema() {
   }
 
   // Paso 3: Datos iniciales
+  // Seed: Tenant por defecto
+  try {
+    const [tenantRows] = await db.query('SELECT COUNT(*) as c FROM tenants');
+    if (tenantRows[0].c === 0) {
+      await db.query("INSERT INTO tenants (id, business_name, owner_name, email, plan) VALUES (1, 'Mi Negocio', 'Administrador', '', 'basic')");
+      console.log('  ✅ Tenant por defecto creado');
+    }
+  } catch (err) { console.log('  ⚠️ Tenants seed:', err.message); }
+
   try {
     const [branchRows] = await db.query('SELECT COUNT(*) as c FROM branches');
     if (branchRows[0].c === 0) {
@@ -271,6 +296,21 @@ async function ensureDatabaseSchema() {
       console.log('  ✅ Configuración por defecto creada');
     }
   } catch (err) { console.log('  ⚠️ Settings seed:', err.message); }
+
+  // Seed: Crear superadmin si no existe
+  try {
+    const [saRows] = await db.query("SELECT id FROM users WHERE role = 'superadmin' LIMIT 1");
+    if (saRows.length === 0) {
+      const bcrypt = require('bcryptjs');
+      const saPass = 'super@2026';
+      const saHash = await bcrypt.hash(saPass, 10);
+      await db.query(
+        "INSERT INTO users (username, email, password, plain_password, role, tenant_id, branch_id) VALUES (?, ?, ?, ?, 'superadmin', 1, 1)",
+        ['SuperAdmin', 'superadmin@businesscontrol.com', saHash, saPass]
+      );
+      console.log('  ✅ Usuario superadmin creado (superadmin@businesscontrol.com / super@2026)');
+    }
+  } catch (err) { console.log('  ⚠️ Superadmin seed:', err.message); }
 
   // Fix: Asegurar que todos los usuarios tengan tenant_id y branch_id
   try {

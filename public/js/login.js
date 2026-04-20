@@ -1,10 +1,16 @@
 // Login Page JavaScript - v1.0.1
 import { apiFetch, API_URL } from './api.js';
 
+function getTokenRole(token) {
+  try { return JSON.parse(atob(token.split('.')[1])).role; } catch(e) { return null; }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   console.log('Login.js loaded successfully');
-  if (localStorage.getItem('token')) {
-    window.location.href = 'dashboard.html';
+  const token = localStorage.getItem('token');
+  if (token) {
+    const role = getTokenRole(token);
+    window.location.href = role === 'superadmin' ? 'superadmin.html' : 'dashboard.html';
   }
 });
 
@@ -50,8 +56,9 @@ document.getElementById('loginForm').addEventListener('submit', async function (
     // Si el login es exitoso, redirigir al dashboard
     if (response.ok) {
       localStorage.setItem('token', data.token);
+      const role = getTokenRole(data.token);
       setTimeout(() => {
-        window.location.href = 'dashboard.html';
+        window.location.href = role === 'superadmin' ? 'superadmin.html' : 'dashboard.html';
       }, 1500);
     }
   } catch (error) {

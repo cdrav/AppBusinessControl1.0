@@ -28,7 +28,8 @@ function authenticateToken(req, res, next) {
 function authorizeRole(allowedRoles) {
   return (req, res, next) => {
     const userRole = req.user ? req.user.role : null;
-    if (allowedRoles.includes(userRole)) {
+    // Superadmin siempre tiene acceso a cualquier ruta protegida
+    if (userRole === 'superadmin' || allowedRoles.includes(userRole)) {
       next();
     } else {
       res.status(403).json({ message: 'No tienes permisos suficientes.' });

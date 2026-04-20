@@ -85,6 +85,16 @@ router.post('/login', async (req, res) => {
     if (user.is_login_enabled === 0 || user.is_login_enabled === false) {
       return res.status(403).json({ message: 'Tu acceso ha sido deshabilitado. Contacta al administrador.' });
     }
+
+    // Verificar si el tenant está activo (excepto superadmin)
+    if (user.role !== 'superadmin' && user.tenant_id) {
+      try {
+        const [tenantRows] = await db.query('SELECT is_active FROM tenants WHERE id = ?', [user.tenant_id]);
+        if (tenantRows.length > 0 && (tenantRows[0].is_active === 0 || tenantRows[0].is_active === false)) {
+          return res.status(403).json({ message: 'El acceso a este negocio ha sido suspendido. Contacta al soporte.' });
+        }
+      } catch (e) { /* Si no existe la tabla tenants aún, no bloquear */ }
+    }
     
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="author" content="Cristian David Ruiz">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Control - Business Control</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/business-control-unified.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .sa-card { border: none; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,.06); transition: transform .2s; }
+    .sa-card:hover { transform: translateY(-2px); }
+    .sa-metric { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .sa-label { font-size: .78rem; color: #6c757d; text-transform: uppercase; letter-spacing: .5px; }
+    .sa-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+    .tenant-row { cursor: pointer; transition: background .15s; }
+    .tenant-row:hover { background: #f0f4ff !important; }
+    .badge-plan { font-size: .7rem; padding: 4px 10px; border-radius: 20px; }
+    .impersonate-banner { background: linear-gradient(135deg, #ff6b6b, #ee5a24); color: #fff; padding: 10px 20px; text-align: center; font-weight: 600; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; }
+    .nav-sa .nav-link { color: #495057; font-weight: 500; border-radius: 10px; padding: 8px 16px; }
+    .nav-sa .nav-link.active { background: #0d6efd; color: #fff; }
+    .nav-sa .nav-link:hover:not(.active) { background: #e9ecef; }
+  </style>
+</head>
+<body>
+  <div class="page-wrapper">
+    <div class="content-container">
+      <div class="container-custom">
+        <!-- Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 fade-in">
+          <div>
+            <h2 class="fw-bold text-dark mb-1">
+              <i class="bi bi-shield-lock text-primary me-2"></i>Panel de Control
+            </h2>
+            <p class="text-muted mb-0">Gestión de plataforma y soporte</p>
+          </div>
+          <div class="d-flex gap-2 mt-3 mt-md-0 align-items-center">
+            <span class="badge bg-dark bg-opacity-10 text-dark px-3 py-2" id="saUser">
+              <i class="bi bi-person-gear me-1"></i> Superadmin
+            </span>
+            <button onclick="logout()" class="btn btn-outline-danger rounded-pill px-3 btn-sm">
+              <i class="bi bi-box-arrow-right me-1"></i> Salir
+            </button>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-sa d-flex gap-2 mb-4 fade-in flex-wrap" id="saTabs">
+          <li><a class="nav-link active" href="#" data-tab="dashboard" onclick="switchTab('dashboard', this)"><i class="bi bi-speedometer2 me-1"></i> Dashboard</a></li>
+          <li><a class="nav-link" href="#" data-tab="tenants" onclick="switchTab('tenants', this)"><i class="bi bi-buildings me-1"></i> Negocios</a></li>
+          <li><a class="nav-link" href="#" data-tab="audit" onclick="switchTab('audit', this)"><i class="bi bi-clock-history me-1"></i> Actividad</a></li>
+        </ul>
+
+        <!-- TAB: Dashboard -->
+        <div id="tab-dashboard" class="tab-content-sa fade-in">
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+              <div class="card sa-card p-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="sa-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-buildings"></i></div>
+                  <div>
+                    <div class="sa-metric" id="mTotalTenants">-</div>
+                    <div class="sa-label">Negocios</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card sa-card p-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="sa-icon bg-success bg-opacity-10 text-success"><i class="bi bi-people"></i></div>
+                  <div>
+                    <div class="sa-metric" id="mTotalUsers">-</div>
+                    <div class="sa-label">Usuarios</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card sa-card p-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="sa-icon bg-info bg-opacity-10 text-info"><i class="bi bi-cart-check"></i></div>
+                  <div>
+                    <div class="sa-metric" id="mTotalSales">-</div>
+                    <div class="sa-label">Ventas Totales</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card sa-card p-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="sa-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-cash-stack"></i></div>
+                  <div>
+                    <div class="sa-metric" id="mTotalRevenue">-</div>
+                    <div class="sa-label">Ingresos Totales</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Second row -->
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+              <div class="card sa-card p-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="sa-icon bg-success bg-opacity-10 text-success"><i class="bi bi-graph-up-arrow"></i></div>
+                  <div>
+                    <div class="sa-metric" id="mSalesToday">-</div>
+                    <div class="sa-label">Ventas Hoy</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card sa-card p-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="sa-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-triangle"></i></div>
+                  <div>
+                    <div class="sa-metric" id="mPendingDebt">-</div>
+                    <div class="sa-label">Deuda Pendiente</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card sa-card p-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="sa-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-box-seam"></i></div>
+                  <div>
+                    <div class="sa-metric" id="mTotalProducts">-</div>
+                    <div class="sa-label">Productos</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card sa-card p-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="sa-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-check-circle"></i></div>
+                  <div>
+                    <div class="sa-metric" id="mActiveTenants">-</div>
+                    <div class="sa-label">Activos / Inactivos</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: Tenants -->
+        <div id="tab-tenants" class="tab-content-sa fade-in" style="display:none;">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">Negocios Registrados</h5>
+            <button class="btn btn-primary rounded-pill px-3 btn-sm" onclick="openTenantModal()">
+              <i class="bi bi-plus-lg me-1"></i> Nuevo Negocio
+            </button>
+          </div>
+          <div class="card border-0 shadow-sm p-0 rounded-xl overflow-hidden">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0 align-middle">
+                <thead class="bg-light">
+                  <tr>
+                    <th class="ps-4 py-3">Negocio</th>
+                    <th>Plan</th>
+                    <th>Usuarios</th>
+                    <th>Ventas</th>
+                    <th>Ingresos</th>
+                    <th>Estado</th>
+                    <th class="text-end pe-4">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tenantsTableBody">
+                  <tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: Audit Logs -->
+        <div id="tab-audit" class="tab-content-sa fade-in" style="display:none;">
+          <h5 class="fw-bold mb-3">Actividad Reciente</h5>
+          <div class="card border-0 shadow-sm p-0 rounded-xl overflow-hidden">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0 align-middle small">
+                <thead class="bg-light">
+                  <tr>
+                    <th class="ps-4 py-3">Fecha</th>
+                    <th>Usuario</th>
+                    <th>Negocio</th>
+                    <th>Acción</th>
+                    <th>Detalles</th>
+                  </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                  <tr><td colspan="5" class="text-center py-4"><div class="spinner-border text-primary"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Tenant Detail Modal -->
+  <div class="modal fade" id="tenantDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold" id="tenantDetailTitle">Detalle del Negocio</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4" id="tenantDetailBody">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tenant Create/Edit Modal -->
+  <div class="modal fade" id="tenantModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold" id="tenantModalLabel">Nuevo Negocio</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <form id="tenantForm">
+            <input type="hidden" id="tenantId">
+            <div class="mb-3">
+              <label class="form-label small text-muted">Nombre del Negocio *</label>
+              <input type="text" class="form-control" id="tenantName" required>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label small text-muted">Propietario</label>
+                <input type="text" class="form-control" id="tenantOwner">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small text-muted">Plan</label>
+                <select class="form-select" id="tenantPlan">
+                  <option value="basic">Básico</option>
+                  <option value="professional">Profesional</option>
+                  <option value="enterprise">Empresarial</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label small text-muted">Email</label>
+                <input type="email" class="form-control" id="tenantEmail">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small text-muted">Teléfono</label>
+                <input type="text" class="form-control" id="tenantPhone">
+              </div>
+            </div>
+            <div class="mb-4">
+              <label class="form-label small text-muted">Notas</label>
+              <textarea class="form-control" id="tenantNotes" rows="2"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 py-2">Guardar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/utils.js"></script>
+  <script type="module" src="js/superadmin.js"></script>
+  <footer class="main-footer"><p class="mb-0">&copy; 2026 Business Control - Desarrollado por <strong>Cristian David Ruiz</strong>. Todos los derechos reservados.</p></footer>
+</body>
+</html>
