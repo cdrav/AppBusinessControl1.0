@@ -3,20 +3,52 @@ const router = express.Router();
 const db = require('../config/db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
-// Obtener todos los gastos
+// Obtener todos los gastos (con filtros opcionales)
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        // Filtramos por tenant_id para asegurar aislamiento de datos
+        const { startDate, endDate, category, branch_id } = req.query;
+        let whereClauses = ['e.tenant_id = ?'];
+        let params = [req.user.tenant_id];
+
+        if (startDate) {
+            whereClauses.push('e.expense_date >= ?');
+            params.push(`${startDate} 00:00:00`);
+        }
+        if (endDate) {
+            whereClauses.push('e.expense_date <= ?');
+            params.push(`${endDate} 23:59:59`);
+        }
+        if (category) {
+            whereClauses.push('e.category = ?');
+            params.push(category);
+        }
+        if (branch_id) {
+            whereClauses.push('e.branch_id = ?');
+            params.push(branch_id);
+        }
+
+        const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
         const [expenses] = await db.query(`
             SELECT e.*, s.name as supplier_name, b.name as branch_name
             FROM expenses e
             LEFT JOIN suppliers s ON e.supplier_id = s.id
             LEFT JOIN branches b ON e.branch_id = b.id
-            WHERE e.tenant_id = ?
+            ${whereClause}
             ORDER BY e.expense_date DESC
-        `, [req.user.tenant_id]);
-        res.json(expenses);
+        `, params);
+
+        // Calcular resumen
+        const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+        const categories = {};
+        expenses.forEach(e => {
+            const cat = e.category || 'Sin categoría';
+            categories[cat] = (categories[cat] || 0) + parseFloat(e.amount || 0);
+        });
+
+        res.json({ expenses, summary: { total, count: expenses.length, categories } });
     } catch (error) {
+        console.error('Error al obtener gastos:', error);
         res.status(500).json({ message: 'Error al obtener gastos.' });
     }
 });

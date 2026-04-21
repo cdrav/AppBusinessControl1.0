@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // Solo cargar tarjetas de sedes si estamos en la vista global
         if (!branchId) loadBranchCards(); 
-        loadDashboardStats('7days', branchId);
+        loadDashboardStats('month', branchId);
         loadTodaySales(branchId); // Agregar esta línea
         initRevenueChart();
         initTopProductsChart();
@@ -199,8 +199,6 @@ async function loadDashboardStats(period = '7days', branchId = null) {
         const totalCreditsEl = document.getElementById('totalCredits');
         const totalExpensesEl = document.getElementById('totalExpenses');
         const lowStockCountEl = document.getElementById('lowStockCount');
-        const todaySalesCountEl = document.getElementById('todaySalesCount');
-        const todaySalesAmountEl = document.getElementById('todaySalesAmount');
 
         if (totalRevenueEl) totalRevenueEl.textContent = formatCOP(stats.totalRevenue);
         if (totalSalesEl) totalSalesEl.textContent = stats.totalSales || 0;
@@ -208,8 +206,6 @@ async function loadDashboardStats(period = '7days', branchId = null) {
         if (totalCreditsEl) totalCreditsEl.textContent = formatCOP(stats.totalCredits);
         if (totalExpensesEl) totalExpensesEl.textContent = formatCOP(stats.totalExpenses);
         if (lowStockCountEl) lowStockCountEl.textContent = stats.lowStockCount || 0;
-        if (todaySalesCountEl) todaySalesCountEl.textContent = stats.todaySalesCount || stats.totalSales || 0;
-        if (todaySalesAmountEl) todaySalesAmountEl.textContent = formatCOP(stats.todaySalesAmount || stats.totalRevenue);
 
         // Actualizar gráfico de Ingresos (Revenue Chart)
         if (revenueChart && stats.salesTrend) {
@@ -281,11 +277,13 @@ function initRevenueChart() {
                 data: [],
                 borderColor: '#2563EB',
                 backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                fill: true,
                 tension: 0.4
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: { display: false }
             },

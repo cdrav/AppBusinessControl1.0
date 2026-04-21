@@ -159,9 +159,11 @@ router.get('/', authenticateToken, async (req, res) => {
             
             dataParams.push(parseInt(limit), parseInt(offset));
             const [rows] = await db.query(`
-                SELECT s.*, s.sale_number, c.name as client_name 
+                SELECT s.*, s.sale_number, c.name as client_name,
+                       cr.initial_payment, cr.remaining_balance
                 FROM sales s 
-                LEFT JOIN clients c ON s.client_id = c.id 
+                LEFT JOIN clients c ON s.client_id = c.id
+                LEFT JOIN credits cr ON s.id = cr.sale_id
                 ${whereClause}
                 ORDER BY s.sale_date DESC 
                 LIMIT ? OFFSET ?
@@ -179,9 +181,11 @@ router.get('/', authenticateToken, async (req, res) => {
         } else {
             // Sin paginación - retornar array directo (compatible con tests y frontend existente)
             const [rows] = await db.query(`
-                SELECT s.*, c.name as client_name 
+                SELECT s.*, c.name as client_name,
+                       cr.initial_payment, cr.remaining_balance
                 FROM sales s 
-                LEFT JOIN clients c ON s.client_id = c.id 
+                LEFT JOIN clients c ON s.client_id = c.id
+                LEFT JOIN credits cr ON s.id = cr.sale_id
                 ${whereClause}
                 ORDER BY s.sale_date DESC 
                 LIMIT 1000

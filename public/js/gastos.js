@@ -6,6 +6,7 @@ let userRole = 'cajero';
 document.addEventListener('DOMContentLoaded', () => {
     expenseModal = new bootstrap.Modal(document.getElementById('expenseModal'));
     checkUserRole();
+    setDefaultDates();
     loadExpenses();
     loadSuppliers();
     loadBranches();
@@ -34,7 +35,16 @@ async function loadExpenses() {
     const empty = document.getElementById('emptyState');
 
     try {
-        const res = await fetch(`${API_URL}/api/expenses`, {
+        const params = new URLSearchParams();
+        const startDate = document.getElementById('filterStartDate');
+        const endDate = document.getElementById('filterEndDate');
+        const category = document.getElementById('filterCategory');
+        if (startDate && startDate.value) params.append('startDate', startDate.value);
+        if (endDate && endDate.value) params.append('endDate', endDate.value);
+        if (category && category.value) params.append('category', category.value);
+
+        const url = `${API_URL}/api/expenses${params.toString() ? '?' + params.toString() : ''}`;
+        const res = await fetch(url, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
         if (res.status === 401 || res.status === 403) {
@@ -42,7 +52,12 @@ async function loadExpenses() {
             return;
         }
         if (!res.ok) throw new Error('Error cargando gastos');
-        currentExpenses = await res.json();
+        const data = await res.json();
+        currentExpenses = data.expenses || data;
+        const summary = data.summary || null;
+
+        updateSummary(summary);
+        populateCategoryFilter(currentExpenses);
 
         loading.style.display = 'none';
         tbody.innerHTML = '';
@@ -199,4 +214,62 @@ async function deleteExpense(id) {
     } catch (error) {
         showToast(error.message, true);
     }
+}
+
+function setDefaultDates() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const startEl = document.getElementById('filterStartDate');
+    const endEl = document.getElementById('filterEndDate');
+    if (startEl) startEl.value = `${y}-${m}-01`;
+    if (endEl) endEl.value = `${y}-${m}-${d}`;
+}
+
+function updateSummary(summary) {
+    const formatCurrency = (amount) => parseFloat(amount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const totalEl = document.getElementById('summaryTotal');
+    const countEl = document.getElementById('summaryCount');
+    const catEl = document.getElementById('summaryCategories');
+
+    if (!summary) return;
+    if (totalEl) totalEl.textContent = formatCurrency(summary.total);
+    if (countEl) countEl.textContent = summary.count || 0;
+    if (catEl && summary.categories) {
+        const entries = Object.entries(summary.categories).sort((a, b) => b[1] - a[1]);
+        if (entries.length === 0) {
+            catEl.innerHTML = '<span class="text-muted">Sin datos</span>';
+        } else {
+            catEl.innerHTML = entries.map(([cat, amount]) =>
+                `<span class="badge bg-danger bg-opacity-10 text-danger me-1 mb-1">${cat}: ${formatCurrency(amount)}</span>`
+            ).join('');
+        }
+    }
+}
+
+let categoriesPopulated = false;
+function populateCategoryFilter(expenses) {
+    if (categoriesPopulated) return;
+    const select = document.getElementById('filterCategory');
+    if (!select) return;
+    const categories = [...new Set(expenses.map(e => e.category).filter(Boolean))];
+    categories.sort().forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        select.appendChild(opt);
+    });
+    categoriesPopulated = true;
+}
+
+function applyFilters() {
+    loadExpenses();
+}
+
+function clearFilters() {
+    setDefaultDates();
+    const cat = document.getElementById('filterCategory');
+    if (cat) cat.value = '';
+    loadExpenses();
 }

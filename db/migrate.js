@@ -301,7 +301,7 @@ async function ensureDatabaseSchema() {
   try {
     const [saRows] = await db.query("SELECT id FROM users WHERE role = 'superadmin' LIMIT 1");
     if (saRows.length === 0) {
-      const bcrypt = require('bcryptjs');
+      const bcrypt = require('bcrypt');
       const saPass = 'super@2026';
       const saHash = await bcrypt.hash(saPass, 10);
       await db.query(

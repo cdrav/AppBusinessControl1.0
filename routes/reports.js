@@ -20,7 +20,9 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         let groupBy = "GROUP BY DATE(sale_date)";
         let selectDate = "DATE(sale_date) as date";
         
-        if (period === 'month') {
+        if (period === 'today') {
+            whereClauses.push("DATE(sale_date) = CURDATE()");
+        } else if (period === 'month') {
             whereClauses.push("sale_date >= DATE_FORMAT(NOW(), '%Y-%m-01 00:00:00')");
         } else if (period === 'year') {
             whereClauses.push("sale_date >= DATE_FORMAT(NOW(), '%Y-01-01 00:00:00')");
@@ -328,6 +330,40 @@ router.post('/generate', authenticateToken, async (req, res) => {
             reportData.hourlyChart = hours;
         }
         
+        // 5. Reporte de Gastos
+        if (['expenses', 'profits', 'complete'].includes(type)) {
+            const expDateFilter = dateFilter.replace('sale_date', 'expense_date');
+            const expParams = [req.user.tenant_id];
+            if (startDate && endDate) {
+                expParams.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+            }
+
+            const [expensesByDate] = await db.query(`
+                SELECT DATE(expense_date) as date, SUM(amount) as total, COUNT(*) as count
+                FROM expenses
+                WHERE tenant_id = ? ${expDateFilter}
+                GROUP BY DATE(expense_date)
+                ORDER BY date ASC
+            `, expParams);
+            reportData.expensesChart = expensesByDate;
+
+            const [expensesByCategory] = await db.query(`
+                SELECT COALESCE(category, 'Sin categoría') as category, SUM(amount) as total, COUNT(*) as count
+                FROM expenses
+                WHERE tenant_id = ? ${expDateFilter}
+                GROUP BY category
+                ORDER BY total DESC
+            `, expParams);
+            reportData.expensesCategoryChart = expensesByCategory;
+
+            const [expenseTotals] = await db.query(`
+                SELECT COALESCE(SUM(amount), 0) as totalExpenses, COUNT(*) as expenseCount
+                FROM expenses
+                WHERE tenant_id = ? ${expDateFilter}
+            `, expParams);
+            reportData.expenseTotals = expenseTotals[0];
+        }
+
         // Totales para las tarjetas
         const [totals] = await db.query(`
             SELECT 
@@ -364,6 +400,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         else if (type === 'low-stock') filename = `reporte-stock-bajo-${dateStr}.pdf`;
         else if (type === 'inventory') filename = `reporte-inventario-${dateStr}.pdf`;
         else if (type === 'clients') filename = `reporte-clientes-${dateStr}.pdf`;
+        else if (type === 'expenses') filename = `reporte-gastos-${startDate}-a-${endDate}.pdf`;
         else if (type === 'complete') filename = `reporte-completo-${startDate}.pdf`;
         
         // 1. Obtener Configuración de la Empresa
@@ -390,7 +427,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
             salesData = rows;
         }
 
-        if (['profits', 'complete'].includes(type)) {
+        if (['expenses', 'profits', 'complete'].includes(type)) {
             const expParams = [req.user.tenant_id];
             let expDateFilter = '';
             if (startDate && endDate) {
@@ -444,6 +481,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         else if (type === 'profits') title = 'Reporte de Ganancias';
         else if (type === 'inventory') title = 'Reporte de Inventario';
         else if (type === 'clients') title = 'Reporte de Clientes';
+        else if (type === 'expenses') title = 'Reporte de Gastos';
         else if (type === 'complete') title = 'Reporte Completo';
         const period = startDate && endDate ? `${startDate}  al  ${endDate}` : 'Todos los registros';
 
@@ -544,7 +582,7 @@ router.get('/report-export', authenticateToken, async (req, res) => {
         // ============================================================
         // SECCIÓN DE GASTOS
         // ============================================================
-        if (['profits', 'complete'].includes(type) && expensesData.length > 0) {
+        if (['expenses', 'profits', 'complete'].includes(type) && expensesData.length > 0) {
             checkAddPage(80);
             doc.fontSize(12).font('Helvetica-Bold').fillColor('#dc3545').text('Detalle de Gastos', 50, doc.y, { lineBreak: false });
             doc.fillColor('#000');
