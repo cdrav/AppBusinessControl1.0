@@ -64,6 +64,7 @@ router.get('/today', authenticateToken, async (req, res) => {
     try {
         let query = `
             SELECT c.*, cl.name as client_name, cl.phone, cl.address, s.total_price as original_sale_total,
+                   c.payment_frequency,
                    (SELECT MAX(payment_date) FROM credit_payments WHERE credit_id = c.id) as last_payment_date
             FROM credits c
             JOIN clients cl ON c.client_id = cl.id
@@ -162,7 +163,7 @@ router.post('/payment', authenticateToken, paymentLimiter, async (req, res) => {
     
     // Validar que el monto no sea mayor que el saldo restante
     const [credit] = await conn.query(
-      'SELECT remaining_balance FROM credits WHERE id = ? AND tenant_id = ?', 
+      'SELECT remaining_balance, payment_frequency FROM credits WHERE id = ? AND tenant_id = ?', 
       [creditId, req.user.tenant_id]
     );
 
@@ -177,6 +178,18 @@ router.post('/payment', authenticateToken, paymentLimiter, async (req, res) => {
     const newBalance = credit[0].remaining_balance - amount;
     const status = newBalance <= 0 ? 'paid' : 'active';
     
+    // Auto-calcular próxima fecha según frecuencia si no se envió una fecha manual
+    const freq = credit[0].payment_frequency || 'monthly';
+    let calcNextDate = nextPaymentDate || null;
+    if (!calcNextDate && newBalance > 0) {
+        const now = new Date();
+        if (freq === 'daily') now.setDate(now.getDate() + 1);
+        else if (freq === 'weekly') now.setDate(now.getDate() + 7);
+        else if (freq === 'biweekly') now.setDate(now.getDate() + 15);
+        else now.setMonth(now.getMonth() + 1);
+        calcNextDate = now.toISOString().split('T')[0];
+    }
+    
     await conn.query(`
       UPDATE credits 
       SET remaining_balance = ?, 
@@ -186,7 +199,7 @@ router.post('/payment', authenticateToken, paymentLimiter, async (req, res) => {
             ELSE ?
           END
       WHERE id = ? AND tenant_id = ?
-    `, [newBalance, status, newBalance, nextPaymentDate || null, creditId, req.user.tenant_id]);
+    `, [newBalance, status, newBalance, calcNextDate, creditId, req.user.tenant_id]);
     
     // Registrar el pago en historial
     const [pRes] = await conn.query(`

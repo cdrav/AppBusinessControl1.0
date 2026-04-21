@@ -129,6 +129,7 @@ const TABLES_SQL = [
     remaining_balance DECIMAL(10,2) NOT NULL,
     initial_payment DECIMAL(10,2) DEFAULT 0,
     status ENUM('pending','active','partial','paid') DEFAULT 'pending',
+    payment_frequency ENUM('daily','weekly','biweekly','monthly') DEFAULT 'monthly',
     next_payment_date DATE DEFAULT NULL,
     collected_by INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -221,6 +222,7 @@ const ALTER_COLUMNS = [
   { table: 'credits', column: 'next_payment_date', sql: 'ALTER TABLE credits ADD COLUMN next_payment_date DATE DEFAULT NULL' },
   { table: 'credits', column: 'created_at', sql: 'ALTER TABLE credits ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP' },
   { table: 'branches', column: 'is_active', sql: 'ALTER TABLE branches ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
+  { table: 'credits', column: 'payment_frequency', sql: "ALTER TABLE credits ADD COLUMN payment_frequency ENUM('daily','weekly','biweekly','monthly') DEFAULT 'monthly'" },
 ];
 
 async function run() {

@@ -150,6 +150,10 @@ function renderCollections(credits) {
             ? `<small class="text-muted"><i class="bi bi-clock me-1"></i>Último pago: ${new Date(item.last_payment_date).toLocaleDateString('es-CO')}</small>`
             : '<small class="text-muted fst-italic">Sin pagos previos</small>';
 
+        // Mostrar frecuencia de pago
+        const freqLabels = { daily: 'Diario', weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensual' };
+        const freqBadge = `<span class="badge bg-secondary bg-opacity-10 text-secondary ms-2" title="Frecuencia de cobro">${freqLabels[item.payment_frequency] || 'Mensual'}</span>`;
+
         const safeName = (item.client_name || '').replace(/'/g, "\\'");
         const card = document.createElement('div');
         card.className = 'col-md-6 col-lg-4';
@@ -161,7 +165,7 @@ function renderCollections(credits) {
                             <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;font-size:0.9rem;">
                                 ${(item.client_name || '?').charAt(0).toUpperCase()}
                             </div>
-                            <h6 class="fw-bold mb-0">${item.client_name}</h6>
+                            <h6 class="fw-bold mb-0">${item.client_name}${freqBadge}</h6>
                         </div>
                         ${badge}
                     </div>
@@ -180,7 +184,7 @@ function renderCollections(credits) {
                     </div>
 
                     <div class="d-grid gap-2">
-                        <button class="btn btn-primary btn-sm" onclick="window.openPaymentModal(${item.id}, '${safeName}', ${item.remaining_balance})">
+                        <button class="btn btn-primary btn-sm" onclick="window.openPaymentModal(${item.id}, '${safeName}', ${item.remaining_balance}, '${item.payment_frequency || 'monthly'}')">
                             <i class="bi bi-cash-stack me-1"></i>Cobrar
                         </button>
                         <div class="d-flex gap-2">
@@ -280,7 +284,7 @@ function renderAllCredits(credits) {
                     </div>
                     ${assignHtml}
                     <div class="d-flex gap-2 mt-2">
-                        <button class="btn btn-primary btn-sm flex-fill" onclick="window.openPaymentModal(${item.id}, '${safeName}', ${item.remaining_balance})">
+                        <button class="btn btn-primary btn-sm flex-fill" onclick="window.openPaymentModal(${item.id}, '${safeName}', ${item.remaining_balance}, '${item.payment_frequency || 'monthly'}')">
                             <i class="bi bi-cash-stack me-1"></i>Cobrar
                         </button>
                         <button class="btn btn-outline-info btn-sm" onclick="window.viewCreditDetail(${item.id})">
@@ -296,7 +300,7 @@ function renderAllCredits(credits) {
 
 // ==================== MODAL DE PAGO ====================
 
-window.openPaymentModal = (id, name, balance) => {
+window.openPaymentModal = (id, name, balance, frequency = 'monthly') => {
     const paymentModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal'));
     document.getElementById('modalCreditId').value = id;
     document.getElementById('modalClientName').textContent = name;
@@ -304,9 +308,21 @@ window.openPaymentModal = (id, name, balance) => {
     document.getElementById('payAmount').value = '';
     document.getElementById('payAmount').max = balance;
     document.getElementById('payNotes').value = '';
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    document.getElementById('nextDate').value = nextMonth.toISOString().split('T')[0];
+    
+    // Auto-calcular próxima fecha según frecuencia
+    const nextDate = new Date();
+    if (frequency === 'daily') nextDate.setDate(nextDate.getDate() + 1);
+    else if (frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
+    else if (frequency === 'biweekly') nextDate.setDate(nextDate.getDate() + 15);
+    else nextDate.setMonth(nextDate.getMonth() + 1); // monthly default
+    
+    document.getElementById('nextDate').value = nextDate.toISOString().split('T')[0];
+    
+    // Mostrar frecuencia en el modal
+    const freqLabels = { daily: 'Diario', weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensual' };
+    const freqDisplay = document.getElementById('paymentFrequencyDisplay');
+    if (freqDisplay) freqDisplay.textContent = `Próximo pago (${freqLabels[frequency] || 'Mensual'}):`;
+    
     paymentModal.show();
 };
 
@@ -423,6 +439,10 @@ window.viewCreditDetail = async (creditId) => {
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted">Estado:</span>
                             <span class="badge bg-${c.status === 'paid' ? 'success' : (c.status === 'partial' ? 'warning text-dark' : 'primary')}">${c.status}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Frecuencia:</span>
+                            <span>${({ daily: 'Diario', weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensual' }[c.payment_frequency] || 'Mensual')}</span>
                         </div>
                         <div class="d-flex justify-content-between">
                             <span class="text-muted">Próximo pago:</span>

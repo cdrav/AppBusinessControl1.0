@@ -519,6 +519,7 @@ document.getElementById('addSaleForm').addEventListener('submit', async function
     notes: document.getElementById('saleNotes').value,
     is_credit: document.getElementById('isCredit')?.checked || false,
     initialPayment: document.getElementById('initialPayment')?.value || null,
+    paymentFrequency: document.getElementById('paymentFrequency')?.value || 'monthly',
     branchId: branchId // Enviar la sede si existe en la URL (solo funcionará si es admin en el backend)
   };
   

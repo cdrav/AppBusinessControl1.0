@@ -16,9 +16,12 @@ const saleLimiter = rateLimit({ windowMs: 60000, max: 30, message: 'Demasiadas v
 
 // Registrar Venta
 router.post('/', authenticateToken, saleLimiter, async (req, res) => {
-    let { clientId, products, saleDate, couponCode, notes, branchId, initialPayment } = req.body;
+    let { clientId, products, saleDate, couponCode, notes, branchId, initialPayment, paymentFrequency } = req.body;
     // Aceptar ambos formatos: is_credit (frontend) e isCredit (camelCase)
     let isCredit = req.body.is_credit || req.body.isCredit || false;
+    // Validar frecuencia de pago
+    const validFrequencies = ['daily', 'weekly', 'biweekly', 'monthly'];
+    if (!paymentFrequency || !validFrequencies.includes(paymentFrequency)) paymentFrequency = 'monthly';
 
     if (!products || !Array.isArray(products) || products.length === 0) {
         return res.status(400).json({ message: 'Debe incluir al menos un producto.' });
@@ -54,7 +57,7 @@ router.post('/', authenticateToken, saleLimiter, async (req, res) => {
         let total = 0, details = [], lowStock = [];
 
         for (const p of products) {
-            const [rows] = await conn.query(`SELECT i.product_name, i.price, COALESCE(bs.stock, i.stock, 0) as stock FROM inventory i LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ? WHERE i.id = ? AND i.tenant_id = ? FOR UPDATE`, [branchId, req.user.tenant_id, p.productId, req.user.tenant_id]);
+            const [rows] = await conn.query(`SELECT i.product_name, i.price, COALESCE(bs.stock, 0) as stock FROM inventory i LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ? WHERE i.id = ? AND i.tenant_id = ? FOR UPDATE`, [branchId, req.user.tenant_id, p.productId, req.user.tenant_id]);
             if (!rows.length || rows[0].stock < p.quantity) throw new BusinessError(`Stock insuficiente: ${rows[0]?.product_name || 'Producto'}`);
             
             if (rows[0].price <= 0) throw new BusinessError(`El producto ${rows[0].product_name} tiene un precio inválido ($${rows[0].price}).`);
@@ -82,8 +85,14 @@ router.post('/', authenticateToken, saleLimiter, async (req, res) => {
             if (remainingBalance <= 0) creditStatus = 'paid';
             else if (payment > 0) creditStatus = 'partial';
 
-            await conn.query('INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, initial_payment, status, next_payment_date, collected_by) VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 MONTH), ?)', 
-            [req.user.tenant_id, sale.insertId, clientId, finalPrice, remainingBalance, payment, creditStatus, req.user.id]);
+            // Calcular próxima fecha de pago según frecuencia
+            let intervalSql = 'INTERVAL 1 MONTH';
+            if (paymentFrequency === 'daily') intervalSql = 'INTERVAL 1 DAY';
+            else if (paymentFrequency === 'weekly') intervalSql = 'INTERVAL 7 DAY';
+            else if (paymentFrequency === 'biweekly') intervalSql = 'INTERVAL 15 DAY';
+
+            await conn.query(`INSERT INTO credits (tenant_id, sale_id, client_id, total_debt, remaining_balance, initial_payment, status, payment_frequency, next_payment_date, collected_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(CURDATE(), ${intervalSql}), ?)`, 
+            [req.user.tenant_id, sale.insertId, clientId, finalPrice, remainingBalance, payment, creditStatus, paymentFrequency, req.user.id]);
         }
 
         for (const d of details) {

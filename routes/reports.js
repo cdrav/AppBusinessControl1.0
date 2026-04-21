@@ -737,7 +737,7 @@ router.get('/branch-stats', authenticateToken, async (req, res) => {
 
     try {
         // 1. Obtener todas las sedes activas
-        const [branches] = await db.query('SELECT id, name, address FROM branches WHERE is_active = true ORDER BY id ASC');
+        const [branches] = await db.query('SELECT id, name, address FROM branches WHERE is_active = true AND tenant_id = ? ORDER BY id ASC', [req.user.tenant_id]);
 
         // 2. Obtener ventas agregadas por sede
         const [salesStats] = await db.query(`
@@ -746,9 +746,9 @@ router.get('/branch-stats', authenticateToken, async (req, res) => {
                 COALESCE(SUM(total_price), 0) as totalRevenue, 
                 COUNT(id) as totalSales 
             FROM sales 
-            WHERE branch_id IS NOT NULL
+            WHERE branch_id IS NOT NULL AND tenant_id = ?
             GROUP BY branch_id
-        `);
+        `, [req.user.tenant_id]);
 
         // 3. Obtener inventario agregado por sede
         const [inventoryStats] = await db.query(`
@@ -757,8 +757,9 @@ router.get('/branch-stats', authenticateToken, async (req, res) => {
                 COALESCE(SUM(stock), 0) as totalStock,
                 COUNT(product_id) as uniqueProducts
             FROM branch_stocks
+            WHERE tenant_id = ?
             GROUP BY branch_id
-        `);
+        `, [req.user.tenant_id]);
 
         // 4. Combinar los datos en un solo objeto por sede
         const combinedStats = branches.map(branch => {

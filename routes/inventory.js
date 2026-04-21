@@ -68,10 +68,10 @@ router.get('/for-sale', authenticateToken, async (req, res) => {
         const [products] = await db.query(`
             SELECT 
                 i.id, i.product_name, i.price, i.barcode,
-                COALESCE(bs.stock, i.stock, 0) as stock 
+                COALESCE(bs.stock, 0) as stock 
             FROM inventory i
             LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
-            WHERE i.tenant_id = ? AND i.is_active = TRUE AND (COALESCE(bs.stock, i.stock, 0) > 0 OR i.stock > 0)
+            WHERE i.tenant_id = ? AND i.is_active = TRUE AND COALESCE(bs.stock, 0) > 0
             ORDER BY i.product_name ASC
         `, [branchId, req.user.tenant_id, req.user.tenant_id]);
         res.json(products);

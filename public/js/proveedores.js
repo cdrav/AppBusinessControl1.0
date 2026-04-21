@@ -20,11 +20,12 @@ async function loadSuppliers() {
     const empty = document.getElementById('emptyState');
 
     try {
-        const response = await apiFetch(`${API_URL}/suppliers`, {
+        const response = await fetch(`${API_URL}/suppliers`, {
             headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
 
         if (response.status === 401) { window.location.href = 'login.html'; return; }
+        if (!response.ok) throw new Error('Error al cargar proveedores');
 
         const suppliers = await response.json();
         loading.style.display = 'none';
