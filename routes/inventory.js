@@ -80,13 +80,35 @@ router.get('/for-sale', authenticateToken, async (req, res) => {
     }
 });
 
-// Buscar por código de barras
+// Buscar por código de barras (solo productos disponibles en la sede)
 router.get('/barcode/:code', authenticateToken, async (req, res) => {
     try {
-        const [results] = await db.query('SELECT * FROM inventory WHERE barcode = ? AND tenant_id = ?', [req.params.code, req.user.tenant_id]);
-        if (results.length === 0) return res.status(404).json({ message: 'Producto no encontrado' });
-        res.json(results[0]);
+        // Determinar la sede
+        let branchId = req.user.branch_id;
+        if (req.user.role === 'admin' && req.query.branch_id) {
+            branchId = req.query.branch_id;
+        }
+        if (!branchId) {
+            const [u] = await db.query('SELECT branch_id FROM users WHERE id = ?', [req.user.id]);
+            branchId = u[0]?.branch_id || 1;
+        }
+
+        // Buscar producto SOLO si tiene stock en esta sede
+        const [results] = await db.query(`
+            SELECT i.*, COALESCE(bs.stock, 0) as branch_stock 
+            FROM inventory i
+            LEFT JOIN branch_stocks bs ON i.id = bs.product_id AND bs.branch_id = ? AND bs.tenant_id = ?
+            WHERE i.barcode = ? AND i.tenant_id = ? AND i.is_active = TRUE AND COALESCE(bs.stock, 0) > 0
+        `, [branchId, req.user.tenant_id, req.params.code, req.user.tenant_id]);
+
+        if (results.length === 0) return res.status(404).json({ message: 'Producto no encontrado o sin stock en esta sede' });
+        
+        // Devolver el producto con el stock de la sede
+        const product = results[0];
+        product.stock = product.branch_stock;
+        res.json(product);
     } catch (error) {
+        console.error('Error al buscar por barcode:', error);
         res.status(500).json({ message: 'Error al buscar producto.' });
     }
 });

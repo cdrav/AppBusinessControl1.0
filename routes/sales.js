@@ -105,10 +105,8 @@ router.post('/', authenticateToken, saleLimiter, async (req, res) => {
                 // Actualizar stock existente
                 await conn.query('UPDATE branch_stocks SET stock = stock - ? WHERE product_id=? AND branch_id=? AND tenant_id=?', [d.quantity, d.productId, branchId, req.user.tenant_id]);
             } else {
-                // Crear nuevo registro con stock de inventory menos cantidad vendida
-                const [invRows] = await conn.query('SELECT stock FROM inventory WHERE id=? AND tenant_id=?', [d.productId, req.user.tenant_id]);
-                const initialStock = invRows.length > 0 ? invRows[0].stock : 0;
-                await conn.query('INSERT INTO branch_stocks (tenant_id, branch_id, product_id, stock) VALUES (?, ?, ?, ?)', [req.user.tenant_id, branchId, d.productId, initialStock - d.quantity]);
+                // Si no existe registro en branch_stocks, el producto no está disponible en esta sede
+                throw new BusinessError(`El producto no tiene stock asignado en esta sede. Producto ID: ${d.productId}`);
             }
             
             // Recalcular el stock global para mantener la consistencia

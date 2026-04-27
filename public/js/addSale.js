@@ -118,14 +118,15 @@ async function handleBarcodeScan() {
 
     scanMessage.innerHTML = `<span class="text-muted">Buscando...</span>`;
 
+    // Obtener branch_id de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const branchId = urlParams.get('branch_id');
+    const endpoint = branchId ? `/inventory/barcode/${barcode}?branch_id=${branchId}` : `/inventory/barcode/${barcode}`;
+
     try {
-        const response = await apiFetch(`/inventory/barcode/${barcode}`);
+        const response = await apiFetch(endpoint);
         if (!response) {
-            if (response.status === 404) {
-                scanMessage.innerHTML = `<span class="text-danger fw-bold">Producto no encontrado.</span>`;
-            } else {
-                throw new Error('Error del servidor');
-            }
+            scanMessage.innerHTML = `<span class="text-danger fw-bold">Producto no encontrado o sin stock en esta sede.</span>`;
             return;
         }
 
