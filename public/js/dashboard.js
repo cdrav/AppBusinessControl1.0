@@ -48,9 +48,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         // Solo cargar tarjetas de sedes si estamos en la vista global
-        if (!branchId) loadBranchCards(); 
+        if (!branchId) loadBranchCards();
+        else updateBranchLinks(branchId); // Actualizar enlaces para que pasen branch_id
         loadDashboardStats('month', branchId);
-        loadTodaySales(branchId); // Agregar esta línea
+        loadTodaySales(branchId);
         initRevenueChart();
         initTopProductsChart();
         initCashVsCreditChart();
@@ -83,6 +84,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Actualizar enlaces de navegación para incluir branch_id de la sede seleccionada
+function updateBranchLinks(branchId) {
+    // Páginas que deben recibir el branch_id
+    const branchAwarePages = ['inventarios.html', 'addSale.html', 'ventas.html'];
+    
+    document.querySelectorAll('a[href]').forEach(link => {
+        const href = link.getAttribute('href');
+        if (branchAwarePages.some(page => href === page || href.startsWith(page + '?'))) {
+            const separator = href.includes('?') ? '&' : '?';
+            link.setAttribute('href', `${href}${separator}branch_id=${branchId}`);
+        }
+    });
+
+    // Actualizar también el enlace de alerta de stock bajo
+    const lowStockLink = document.querySelector('#lowStockAlert a');
+    if (lowStockLink) {
+        lowStockLink.setAttribute('href', `inventarios.html?branch_id=${branchId}`);
+    }
+}
 
 function updateDate() {
     const dateElement = document.getElementById('currentDate');

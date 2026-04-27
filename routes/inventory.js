@@ -32,15 +32,18 @@ router.get('/', authenticateToken, async (req, res) => {
             ? 'i.id, i.product_name, i.price, i.cost, i.category, i.barcode, i.description, i.supplier_id, s.name as supplier_name, COALESCE(bs.stock, 0) as stock'
             : 'i.id, i.product_name, i.price, i.cost, i.category, i.barcode, i.description, i.supplier_id, s.name as supplier_name, COALESCE(bs.stock, i.stock, 0) as stock';
 
+        // Filtrar productos sin stock cuando se consulta una sede específica
+        const branchFilter = branch_id ? ' AND COALESCE(bs.stock, 0) > 0' : '';
+
         // Si se pasa ?page=, devolver formato paginado
         if (req.query.page) {
             const { page, limit, offset } = parsePagination(req.query);
-            const [countResult] = await db.query(`SELECT COUNT(*) as total ${baseQuery}`, baseParams);
-            const [results] = await db.query(`SELECT ${selectFields} ${baseQuery} ORDER BY i.product_name ASC LIMIT ? OFFSET ?`, [...baseParams, limit, offset]);
+            const [countResult] = await db.query(`SELECT COUNT(*) as total ${baseQuery}${branchFilter}`, baseParams);
+            const [results] = await db.query(`SELECT ${selectFields} ${baseQuery}${branchFilter} ORDER BY i.product_name ASC LIMIT ? OFFSET ?`, [...baseParams, limit, offset]);
             return res.json(paginatedResponse(results, countResult[0].total, page, limit));
         }
 
-        const [results] = await db.query(`SELECT ${selectFields} ${baseQuery} ORDER BY i.product_name ASC`, baseParams);
+        const [results] = await db.query(`SELECT ${selectFields} ${baseQuery}${branchFilter} ORDER BY i.product_name ASC`, baseParams);
         res.json(results);
     } catch (error) {
         console.error('Error al obtener inventario:', error);

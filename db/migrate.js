@@ -234,6 +234,7 @@ async function ensureDatabaseSchema() {
     { table: 'tenants', column: 'plan', sql: "ALTER TABLE tenants ADD COLUMN plan VARCHAR(50) DEFAULT 'basic'" },
     { table: 'tenants', column: 'notes', sql: 'ALTER TABLE tenants ADD COLUMN notes TEXT' },
     { table: 'tenants', column: 'updated_at', sql: 'ALTER TABLE tenants ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP' },
+    { table: 'credits', column: 'payment_frequency', sql: "ALTER TABLE credits ADD COLUMN payment_frequency ENUM('daily','weekly','biweekly','monthly') DEFAULT 'monthly' AFTER status" },
   ];
 
   for (const alt of alterations) {
